@@ -1,75 +1,18 @@
 use miniquad::*;
 mod state;
 use crate::state::{GameMap, GameState, InputState, Player};
+mod render;
+use crate::render::Renderer;
 
 struct Stage {
-    ctx: Box<Context>,
-    pipeline: Pipeline,
-    bindings: Bindings,
     state: GameState,
+    renderer: Renderer,
 }
 
 impl Stage {
     fn new(width: i32, height: i32) -> Stage {
         // Simple unit quad at origin (0..1, 0..1)
-        #[repr(C)]
-        struct Vertex { pos: [f32; 2] }
-        let vertices: [Vertex; 4] = [
-            Vertex { pos: [0.0, 0.0] },
-            Vertex { pos: [1.0, 0.0] },
-            Vertex { pos: [1.0, 1.0] },
-            Vertex { pos: [0.0, 1.0] },
-        ];
-        let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
-
-        let mut ctx = window::new_rendering_backend();
-
-        let vertex_buffer = ctx.new_buffer(
-            BufferType::VertexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(&vertices),
-        );
-        let index_buffer = ctx.new_buffer(
-            BufferType::IndexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(&indices),
-        );
-
-        let shader = ctx
-            .new_shader(
-                ShaderSource::Glsl { vertex: VERTEX_SHADER, fragment: FRAGMENT_SHADER },
-                ShaderMeta {
-                    images: vec![],
-                    uniforms: UniformBlockLayout {
-                        uniforms: vec![
-                            UniformDesc::new("mvp", UniformType::Mat4),
-                            UniformDesc::new("color", UniformType::Float4),
-                        ],
-                    },
-                },
-            )
-            .expect("failed to compile shader");
-
-        let pipeline = ctx.new_pipeline(
-            &[BufferLayout::default()],
-            &[VertexAttribute::new("pos", VertexFormat::Float2)],
-            shader,
-            PipelineParams {
-                color_blend: Some(BlendState::new(
-                    Equation::Add,
-                    BlendFactor::One,
-                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                )),
-                cull_face: CullFace::Nothing,
-                ..Default::default()
-            },
-        );
-
-        let bindings = Bindings {
-            vertex_buffers: vec![vertex_buffer],
-            index_buffer,
-            images: vec![],
-        };
+        let renderer = Renderer::new();
 
         // Small demo tilemaps (dual-grid): base terrain and overlay
         let base_grid = vec![
@@ -112,111 +55,8 @@ impl Stage {
             input: InputState::default(),
         };
 
-        Stage { ctx, pipeline, bindings, state }
+        Stage { state, renderer }
     }
-
-    fn ortho_mvp(&self) -> [f32; 16] {
-        // Build an orthographic projection with origin at top-left, y down
-        let l = 0.0;
-        let r = self.state.screen_w;
-        let t = 0.0;
-        let b = self.state.screen_h;
-        let n = -1.0;
-        let f = 1.0;
-        let sx = 2.0 / (r - l);
-        let sy = 2.0 / (t - b); // negative to flip Y downwards
-        let sz = -2.0 / (f - n);
-        let tx = -((r + l) / (r - l));
-        let ty = -((t + b) / (t - b));
-        let tz = -((f + n) / (f - n));
-        [
-            sx, 0.0, 0.0, 0.0,
-            0.0, sy, 0.0, 0.0,
-            0.0, 0.0, sz, 0.0,
-            tx, ty, tz, 1.0,
-        ]
-    }
-
-    fn mat4_mul(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
-        // Column-major multiplication: out = a * b
-        // Indexing: m[col*4 + row]
-        let mut out = [0.0f32; 16];
-        for row in 0..4 {
-            for col in 0..4 {
-                let mut sum = 0.0;
-                for k in 0..4 {
-                    sum += a[k * 4 + row] * b[col * 4 + k];
-                }
-                out[col * 4 + row] = sum;
-            }
-        }
-        out
-    }
-
-    fn mat4_translation(tx: f32, ty: f32) -> [f32; 16] {
-        [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            tx,  ty,  0.0, 1.0,
-        ]
-    }
-
-    fn mat4_scale(sx: f32, sy: f32) -> [f32; 16] {
-        [
-            sx,  0.0, 0.0, 0.0,
-            0.0, sy,  0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
-        ]
-    }
-
-    fn draw_tile(&mut self, x: i32, y: i32, color: [f32; 4]) {
-        let tile_size = self.state.map.tile_size;
-        let px = x as f32 * tile_size;
-        let py = y as f32 * tile_size;
-
-        let ortho = self.ortho_mvp();
-        let model = Stage::mat4_mul(Stage::mat4_translation(px, py), Stage::mat4_scale(tile_size, tile_size));
-        let mvp = Stage::mat4_mul(ortho, model);
-
-        let uniforms = Uniforms { mvp, color };
-        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
-        self.ctx.draw(0, 6, 1);
-    }
-
-    fn draw_rect(&mut self, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
-        let ortho = self.ortho_mvp();
-        let model = Stage::mat4_mul(Stage::mat4_translation(px, py), Stage::mat4_scale(w, h));
-        let mvp = Stage::mat4_mul(ortho, model);
-
-        let uniforms = Uniforms { mvp, color };
-        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
-        self.ctx.draw(0, 6, 1);
-    }
-
-    fn base_color(tile: u8) -> [f32; 4] {
-        match tile {
-            1 => [0.35, 0.25, 0.15, 1.0], // walls/ground - brown
-            2 => [0.40, 0.40, 0.45, 1.0], // stone
-            _ => [0.0, 0.0, 0.0, 0.0],    // empty
-        }
-    }
-
-    fn overlay_color(tile: u8) -> [f32; 4] {
-        match tile {
-            1 => [0.20, 0.60, 1.0, 0.8], // water-like
-            2 => [1.0, 0.85, 0.2, 0.9],  // coin-like
-            3 => [1.0, 0.2, 0.2, 0.9],   // hazard
-            _ => [0.0, 0.0, 0.0, 0.0],
-        }
-    }
-}
-
-#[repr(C)]
-struct Uniforms {
-    mvp: [f32; 16],
-    color: [f32; 4],
 }
 
 impl EventHandler for Stage {
@@ -225,43 +65,12 @@ impl EventHandler for Stage {
     }
 
     fn draw(&mut self) {
-        let clear = PassAction::Clear { color: Some((0.08, 0.09, 0.10, 1.0)), depth: Some(1.0), stencil: Some(0) };
-        self.ctx.begin_default_pass(clear);
-        self.ctx.apply_pipeline(&self.pipeline);
-        self.ctx.apply_bindings(&self.bindings);
-
-        // draw base grid
-        for y in 0..self.state.map.base.len() {
-            for x in 0..self.state.map.base[y].len() {
-                let tile = self.state.map.base[y][x];
-                if tile == 0 { continue; }
-                let color = Self::base_color(tile);
-                self.draw_tile(x as i32, y as i32, color);
-            }
-        }
-
-        // draw overlay grid on top
-        for y in 0..self.state.map.overlay.len() {
-            for x in 0..self.state.map.overlay[y].len() {
-                let tile = self.state.map.overlay[y][x];
-                if tile == 0 { continue; }
-                let color = Self::overlay_color(tile);
-                self.draw_tile(x as i32, y as i32, color);
-            }
-        }
-
-        // draw player on top
-        let px = self.state.player.x;
-        let py = self.state.player.y;
-        let ps = self.state.player.size;
-        self.draw_rect(px, py, ps, ps, [0.20, 1.0, 0.40, 1.0]);
-
-        self.ctx.end_render_pass();
-        self.ctx.commit_frame();
+        self.renderer.draw(&self.state);
     }
 
     fn resize_event(&mut self, width: f32, height: f32) {
         self.state.on_resize(width, height);
+        self.renderer.resize(width, height);
     }
 
     fn key_down_event(&mut self, keycode: KeyCode, _mods: KeyMods, _repeat: bool) {
@@ -285,24 +94,6 @@ impl EventHandler for Stage {
     }
 }
 
-const VERTEX_SHADER: &str = r#"#version 100
-attribute vec2 pos;
-uniform mat4 mvp;
-uniform vec4 color;
-varying vec4 v_color;
-void main() {
-    gl_Position = mvp * vec4(pos, 0.0, 1.0);
-    v_color = color;
-}
-"#;
-
-const FRAGMENT_SHADER: &str = r#"#version 100
-precision mediump float;
-varying vec4 v_color;
-void main() {
-    gl_FragColor = v_color;
-}
-"#;
 
 fn main() {
     miniquad::start(
