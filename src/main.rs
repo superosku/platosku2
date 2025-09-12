@@ -10,6 +10,16 @@ struct Stage {
     tile_size: f32,
     base_grid: Vec<Vec<u8>>,    // base terrain layer
     overlay_grid: Vec<Vec<u8>>, // overlay/decorations layer
+
+    // Player state
+    player_x: f32,
+    player_y: f32,
+    player_size: f32,
+    player_speed: f32,
+    move_left: bool,
+    move_right: bool,
+    move_up: bool,
+    move_down: bool,
 }
 
 impl Stage {
@@ -102,6 +112,15 @@ impl Stage {
             tile_size: 32.0,
             base_grid,
             overlay_grid,
+            // Start player near the top-left open area
+            player_x: 32.0 * 2.0,
+            player_y: 32.0 * 2.0,
+            player_size: 24.0,
+            player_speed: 3.0,
+            move_left: false,
+            move_right: false,
+            move_up: false,
+            move_down: false,
         }
     }
 
@@ -174,6 +193,16 @@ impl Stage {
         self.ctx.draw(0, 6, 1);
     }
 
+    fn draw_rect(&mut self, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
+        let ortho = self.ortho_mvp();
+        let model = Stage::mat4_mul(Stage::mat4_translation(px, py), Stage::mat4_scale(w, h));
+        let mvp = Stage::mat4_mul(ortho, model);
+
+        let uniforms = Uniforms { mvp, color };
+        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+        self.ctx.draw(0, 6, 1);
+    }
+
     fn base_color(tile: u8) -> [f32; 4] {
         match tile {
             1 => [0.35, 0.25, 0.15, 1.0], // walls/ground - brown
@@ -199,7 +228,17 @@ struct Uniforms {
 }
 
 impl EventHandler for Stage {
-    fn update(&mut self) {}
+    fn update(&mut self) {
+        let mut dx = 0.0f32;
+        let mut dy = 0.0f32;
+        if self.move_left { dx -= self.player_speed; }
+        if self.move_right { dx += self.player_speed; }
+        if self.move_up { dy -= self.player_speed; }
+        if self.move_down { dy += self.player_speed; }
+
+        self.player_x = (self.player_x + dx).clamp(0.0, (self.screen_width - self.player_size).max(0.0));
+        self.player_y = (self.player_y + dy).clamp(0.0, (self.screen_height - self.player_size).max(0.0));
+    }
 
     fn draw(&mut self) {
         let clear = PassAction::Clear { color: Some((0.08, 0.09, 0.10, 1.0)), depth: Some(1.0), stencil: Some(0) };
@@ -227,6 +266,12 @@ impl EventHandler for Stage {
             }
         }
 
+        // draw player on top
+        let px = self.player_x;
+        let py = self.player_y;
+        let ps = self.player_size;
+        self.draw_rect(px, py, ps, ps, [0.20, 1.0, 0.40, 1.0]);
+
         self.ctx.end_render_pass();
         self.ctx.commit_frame();
     }
@@ -234,6 +279,26 @@ impl EventHandler for Stage {
     fn resize_event(&mut self, width: f32, height: f32) {
         self.screen_width = width;
         self.screen_height = height;
+    }
+
+    fn key_down_event(&mut self, keycode: KeyCode, _mods: KeyMods, _repeat: bool) {
+        match keycode {
+            KeyCode::A | KeyCode::Left => self.move_left = true,
+            KeyCode::D | KeyCode::Right => self.move_right = true,
+            KeyCode::W | KeyCode::Up => self.move_up = true,
+            KeyCode::S | KeyCode::Down => self.move_down = true,
+            _ => {}
+        }
+    }
+
+    fn key_up_event(&mut self, keycode: KeyCode, _mods: KeyMods) {
+        match keycode {
+            KeyCode::A | KeyCode::Left => self.move_left = false,
+            KeyCode::D | KeyCode::Right => self.move_right = false,
+            KeyCode::W | KeyCode::Up => self.move_up = false,
+            KeyCode::S | KeyCode::Down => self.move_down = false,
+            _ => {}
+        }
     }
 }
 
