@@ -63,6 +63,7 @@ impl Stage {
                     BlendFactor::One,
                     BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
                 )),
+                cull_face: CullFace::Nothing,
                 ..Default::default()
             },
         );
@@ -127,14 +128,16 @@ impl Stage {
     }
 
     fn mat4_mul(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
+        // Column-major multiplication: out = a * b
+        // Indexing: m[col*4 + row]
         let mut out = [0.0f32; 16];
         for row in 0..4 {
             for col in 0..4 {
                 let mut sum = 0.0;
                 for k in 0..4 {
-                    sum += a[row * 4 + k] * b[k * 4 + col];
+                    sum += a[k * 4 + row] * b[col * 4 + k];
                 }
-                out[row * 4 + col] = sum;
+                out[col * 4 + row] = sum;
             }
         }
         out
