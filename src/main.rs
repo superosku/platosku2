@@ -46,7 +46,7 @@ impl Stage {
             x: 32.0 * 2.0,
             y: 32.0 * 2.0,
             size: 24.0,
-            speed: 3.0,
+            speed: 2.1,
             vy: 0.0,
             on_ground: false,
         };

@@ -7,7 +7,7 @@ pub struct PhysicsParams {
 
 impl Default for PhysicsParams {
     fn default() -> Self {
-        PhysicsParams { gravity: 0.5, terminal_velocity: 12.0 }
+        PhysicsParams { gravity: 0.25, terminal_velocity: 12.0 }
     }
 }
 

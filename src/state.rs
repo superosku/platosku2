@@ -19,7 +19,7 @@ impl Player {
 
         // Jump (W/Up) - only when grounded
         if input.up && self.on_ground {
-            self.vy = -10.0;
+            self.vy = -7.0;
         }
 
         let (nx, ny, nvy, on_ground) = integrate_kinematic(
