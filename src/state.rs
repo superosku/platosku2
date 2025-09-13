@@ -51,10 +51,11 @@ impl GameMap {
     pub fn height_px(&self) -> f32 { self.height_tiles() as f32 * self.tile_size }
 
     pub fn get_at(&self, tx: i32, ty: i32) -> (u8, u8) {
-        if tx < 0 || ty < 0 { return (0, 0); }
+        // Outside the map is blocking for base layer; overlay remains empty
+        if tx < 0 || ty < 0 { return (1, 0); }
         let x = tx as usize;
         let y = ty as usize;
-        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(0);
+        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(1);
         let overlay = self.overlay.get(y).and_then(|row| row.get(x)).copied().unwrap_or(0);
         (base, overlay)
     }

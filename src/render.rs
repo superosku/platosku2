@@ -220,30 +220,37 @@ impl Renderer {
         let tex_w = self.tilemap_w;
         let tex_h = self.tilemap_h;
 
-        // Helper closure to read base value with bounds check
-        let mut base_at = |x: i32, y: i32| -> u8 {
-            if x < 0 || y < 0 { return 0; }
-            let ux = x as usize; let uy = y as usize;
-            if uy >= height || ux >= width { return 0; }
-            state.map.base[uy][ux]
-        };
-
         // Apply half-tile offset: 0.5 left (negative X), 0.5 down (positive Y)
         let offset_x = 0.5 * tile_world;
         let offset_y = 0.5 * tile_world;
 
-        for y in 0..(height.saturating_sub(1)) {
-            for x in 0..(width.saturating_sub(1)) {
-                let tl = base_at(x as i32, y as i32) != 0;
-                let tr = base_at(x as i32 + 1, y as i32) != 0;
-                let bl = base_at(x as i32, y as i32 + 1) != 0;
-                let br = base_at(x as i32 + 1, y as i32 + 1) != 0;
+        // Compute visible world bounds from camera (expand slightly to avoid edge gaps)
+        let zoom = state.camera.zoom;
+        let half_w_world = state.screen_w * 0.5 / zoom;
+        let half_h_world = state.screen_h * 0.5 / zoom;
+        let world_min_x = state.camera.x - half_w_world - tile_world;
+        let world_min_y = state.camera.y - half_h_world - tile_world;
+        let world_max_x = state.camera.x + half_w_world + tile_world;
+        let world_max_y = state.camera.y + half_h_world + tile_world;
+
+        // Convert world bounds to dual-grid tile indices
+        let start_x = ((world_min_x - offset_x) / tile_world).floor() as i32;
+        let end_x = ((world_max_x - offset_x) / tile_world).ceil() as i32;
+        let start_y = ((world_min_y - offset_y) / tile_world).floor() as i32;
+        let end_y = ((world_max_y - offset_y) / tile_world).ceil() as i32;
+
+        for y in start_y..end_y {
+            for x in start_x..end_x {
+                let (tl, _o1) = state.map.get_at(x, y);
+                let (tr, _o2) = state.map.get_at(x + 1, y);
+                let (bl, _o3) = state.map.get_at(x, y + 1);
+                let (br, _o4) = state.map.get_at(x + 1, y + 1);
 
                 let mut mask: u32 = 0;
-                if tl { mask |= 1; }
-                if tr { mask |= 2; }
-                if bl { mask |= 4; }
-                if br { mask |= 8; }
+                if tl != 0 { mask |= 1; }
+                if tr != 0 { mask |= 2; }
+                if bl != 0 { mask |= 4; }
+                if br != 0 { mask |= 8; }
 
                 if mask == 0 { continue; }
 
