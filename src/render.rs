@@ -55,11 +55,14 @@ impl Renderer {
         let tile_texture = ctx.new_texture_from_rgba8((img_w as u16), (img_h as u16), &rgba8);
         // Use nearest filtering for crisp pixel art
         ctx.texture_set_filter(tile_texture, FilterMode::Nearest, MipmapFilterMode::None);
+        // Clamp to edge to avoid atlas bleeding at tile borders
+        ctx.texture_set_wrap(tile_texture, TextureWrap::Clamp, TextureWrap::Clamp);
 
         // Create a 1x1 white texture for colored rectangles
         let white_tex_bytes: [u8; 4] = [255, 255, 255, 255];
         let white_texture = ctx.new_texture_from_rgba8(1, 1, &white_tex_bytes);
         ctx.texture_set_filter(white_texture, FilterMode::Nearest, MipmapFilterMode::None);
+        ctx.texture_set_wrap(white_texture, TextureWrap::Clamp, TextureWrap::Clamp);
 
         let shader = ctx
             .new_shader(
@@ -256,8 +259,11 @@ impl Renderer {
 
                 let (u, v) = uv_table[mask as usize];
                 let uv_base_px = [u as f32 * tile_px, v as f32 * tile_px];
-                let uv_base = [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h];
-                let uv_scale = [tile_px / tex_w, tile_px / tex_h];
+                // Inset UVs by half a texel to avoid sampling across tile boundaries
+                let half_u = 0.5 / tex_w;
+                let half_v = 0.5 / tex_h;
+                let uv_base = [uv_base_px[0] / tex_w + half_u, uv_base_px[1] / tex_h + half_v];
+                let uv_scale = [(tile_px - 1.0) / tex_w, (tile_px - 1.0) / tex_h];
 
                 let px = x as f32 * tile_world + offset_x;
                 let py = y as f32 * tile_world + offset_y;
@@ -310,9 +316,13 @@ impl Renderer {
         let cy = state.camera.y;
         let zoom = state.camera.zoom;
 
+        // Pixel-snap the camera to avoid subpixel seams at various zoom levels
+        let snapped_cx = (cx * zoom).round() / zoom;
+        let snapped_cy = (cy * zoom).round() / zoom;
+
         // View should transform world so that camera center maps to screen center
-        // Pipeline: translate (-cx, -cy) -> scale (zoom) -> translate (screen_w/2, screen_h/2)
-        let translate_to_origin = Self::mat4_translation(-cx, -cy);
+        // Pipeline: translate (-snapped_cx, -snapped_cy) -> scale (zoom) -> translate (screen_w/2, screen_h/2)
+        let translate_to_origin = Self::mat4_translation(-snapped_cx, -snapped_cy);
         let scale_zoom = Self::mat4_scale(zoom, zoom);
         let translate_to_screen_center = Self::mat4_translation(state.screen_w * 0.5, state.screen_h * 0.5);
 
