@@ -6,7 +6,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn update(&mut self, input: &InputState, bounds: (f32, f32)) {
+    pub fn update(&mut self, input: &InputState, map: &GameMap) {
         let mut dx = 0.0f32;
         let mut dy = 0.0f32;
         if input.left { dx -= self.speed; }
@@ -14,9 +14,19 @@ impl Player {
         if input.up { dy -= self.speed; }
         if input.down { dy += self.speed; }
 
-        let (max_w, max_h) = bounds;
-        self.x = (self.x + dx).clamp(0.0, (max_w - self.size).max(0.0));
-        self.y = (self.y + dy).clamp(0.0, (max_h - self.size).max(0.0));
+        let attempted_x = self.x + dx;
+        if !collides_with_map(map, attempted_x, self.y, self.size) {
+            self.x = attempted_x;
+        }
+
+        let attempted_y = self.y + dy;
+        if !collides_with_map(map, self.x, attempted_y, self.size) {
+            self.y = attempted_y;
+        }
+
+        // Keep player within map pixel bounds as a final clamp
+        self.x = self.x.clamp(0.0, (map.width_px() - self.size).max(0.0));
+        self.y = self.y.clamp(0.0, (map.height_px() - self.size).max(0.0));
     }
 }
 
@@ -31,6 +41,15 @@ impl GameMap {
     pub fn height_tiles(&self) -> usize { self.base.len() }
     pub fn width_px(&self) -> f32 { self.width_tiles() as f32 * self.tile_size }
     pub fn height_px(&self) -> f32 { self.height_tiles() as f32 * self.tile_size }
+
+    pub fn get_at(&self, tx: i32, ty: i32) -> (u8, u8) {
+        if tx < 0 || ty < 0 { return (0, 0); }
+        let x = tx as usize;
+        let y = ty as usize;
+        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(0);
+        let overlay = self.overlay.get(y).and_then(|row| row.get(x)).copied().unwrap_or(0);
+        (base, overlay)
+    }
 }
 
 #[derive(Default)]
@@ -51,13 +70,33 @@ pub struct GameState {
 
 impl GameState {
     pub fn update(&mut self) {
-        self.player.update(&self.input, (self.screen_w, self.screen_h));
+        self.player.update(&self.input, &self.map);
     }
 
     pub fn on_resize(&mut self, w: f32, h: f32) {
         self.screen_w = w;
         self.screen_h = h;
     }
+}
+
+fn collides_with_map(map: &GameMap, x: f32, y: f32, size: f32) -> bool {
+    // Treat outside of map bounds as blocking
+    if x < 0.0 || y < 0.0 { return true; }
+    if x + size > map.width_px() || y + size > map.height_px() { return true; }
+
+    let epsilon = 0.001f32;
+    let left_tx = (x / map.tile_size).floor() as i32;
+    let right_tx = ((x + size - epsilon) / map.tile_size).floor() as i32;
+    let top_ty = (y / map.tile_size).floor() as i32;
+    let bottom_ty = ((y + size - epsilon) / map.tile_size).floor() as i32;
+
+    for ty in top_ty..=bottom_ty {
+        for tx in left_tx..=right_tx {
+            let (base, _overlay) = map.get_at(tx, ty);
+            if base != 0 { return true; }
+        }
+    }
+    false
 }
 
 
