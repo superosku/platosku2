@@ -53,10 +53,13 @@ impl Renderer {
         let (img_w, img_h) = dyn_img.dimensions();
         let rgba8 = dyn_img.to_rgba8();
         let tile_texture = ctx.new_texture_from_rgba8((img_w as u16), (img_h as u16), &rgba8);
+        // Use nearest filtering for crisp pixel art
+        ctx.texture_set_filter(tile_texture, FilterMode::Nearest, MipmapFilterMode::None);
 
         // Create a 1x1 white texture for colored rectangles
         let white_tex_bytes: [u8; 4] = [255, 255, 255, 255];
         let white_texture = ctx.new_texture_from_rgba8(1, 1, &white_tex_bytes);
+        ctx.texture_set_filter(white_texture, FilterMode::Nearest, MipmapFilterMode::None);
 
         let shader = ctx
             .new_shader(
@@ -221,6 +224,10 @@ impl Renderer {
             state.map.base[uy][ux]
         };
 
+        // Apply half-tile offset: 0.5 left (negative X), 0.5 down (positive Y)
+        let offset_x = 0.5 * tile_world;
+        let offset_y = 0.5 * tile_world;
+
         for y in 0..(height.saturating_sub(1)) {
             for x in 0..(width.saturating_sub(1)) {
                 let tl = base_at(x as i32, y as i32) != 0;
@@ -241,8 +248,8 @@ impl Renderer {
                 let uv_base = [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h];
                 let uv_scale = [tile_px / tex_w, tile_px / tex_h];
 
-                let px = x as f32 * tile_world;
-                let py = y as f32 * tile_world;
+                let px = x as f32 * tile_world + offset_x;
+                let py = y as f32 * tile_world + offset_y;
 
                 self.draw_tile_textured(state, px, py, tile_world, tile_world, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale);
             }
