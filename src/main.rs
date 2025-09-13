@@ -1,6 +1,7 @@
 use miniquad::*;
 mod state;
 mod physics;
+mod camera;
 use crate::state::{GameMap, GameState, InputState, Player, Coin};
 mod render;
 use crate::render::Renderer;
@@ -50,7 +51,7 @@ impl Stage {
             on_ground: false,
         };
 
-        let state = GameState {
+        let mut state = GameState {
             screen_w: width as f32,
             screen_h: height as f32,
             player,
@@ -61,7 +62,13 @@ impl Stage {
                 Coin { x: 32.0 * 6.0, y: 32.0 * 1.5, size: 14.0, vy: 0.0 },
                 Coin { x: 32.0 * 10.0, y: 32.0 * 1.0, size: 14.0, vy: 0.0 },
             ],
+            camera: camera::Camera::new(0.0, 0.0, 1.0),
         };
+
+        // Initialize camera to player center
+        let pcx = state.player.x + state.player.size * 0.5;
+        let pcy = state.player.y + state.player.size * 0.5;
+        state.camera.follow(pcx, pcy);
 
         Stage { state, renderer }
     }
@@ -99,6 +106,10 @@ impl EventHandler for Stage {
             KeyCode::S | KeyCode::Down => self.state.input.down = false,
             _ => {}
         }
+    }
+
+    fn mouse_wheel_event(&mut self, _x: f32, y: f32) {
+        self.state.camera.zoom_scroll(y);
     }
 }
 

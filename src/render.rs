@@ -159,9 +159,11 @@ impl Renderer {
         self.bindings.images[0] = self.tile_texture;
         self.ctx.apply_bindings(&self.bindings);
 
-        let ortho = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let view = Self::camera_view(state);
+        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
         let model = Self::mat4_mul(Self::mat4_translation(px, py), Self::mat4_scale(w, h));
-        let mvp = Self::mat4_mul(ortho, model);
+        let vp = Self::mat4_mul(proj, view);
+        let mvp = Self::mat4_mul(vp, model);
 
         let uniforms = Uniforms { mvp, color, uv_base: [uv_base[0], uv_base[1], 0.0, 0.0], uv_scale: [uv_scale[0], uv_scale[1], 0.0, 0.0] };
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
@@ -173,9 +175,11 @@ impl Renderer {
         self.bindings.images[0] = self.white_texture;
         self.ctx.apply_bindings(&self.bindings);
 
-        let ortho = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let view = Self::camera_view(state);
+        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
         let model = Self::mat4_mul(Self::mat4_translation(px, py), Self::mat4_scale(w, h));
-        let mvp = Self::mat4_mul(ortho, model);
+        let vp = Self::mat4_mul(proj, view);
+        let mvp = Self::mat4_mul(vp, model);
 
         let uniforms = Uniforms { mvp, color, uv_base: [0.0, 0.0, 0.0, 0.0], uv_scale: [1.0, 1.0, 0.0, 0.0] };
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
@@ -292,6 +296,21 @@ impl Renderer {
             0.0, 0.0, sz, 0.0,
             tx, ty, tz, 1.0,
         ]
+    }
+
+    fn camera_view(state: &GameState) -> [f32; 16] {
+        let cx = state.camera.x;
+        let cy = state.camera.y;
+        let zoom = state.camera.zoom;
+
+        // View should transform world so that camera center maps to screen center
+        // Pipeline: translate (-cx, -cy) -> scale (zoom) -> translate (screen_w/2, screen_h/2)
+        let translate_to_origin = Self::mat4_translation(-cx, -cy);
+        let scale_zoom = Self::mat4_scale(zoom, zoom);
+        let translate_to_screen_center = Self::mat4_translation(state.screen_w * 0.5, state.screen_h * 0.5);
+
+        let ts = Self::mat4_mul(scale_zoom, translate_to_origin);
+        Self::mat4_mul(translate_to_screen_center, ts)
     }
 
     fn mat4_mul(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {

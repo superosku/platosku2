@@ -1,4 +1,5 @@
 use crate::physics::{integrate_kinematic, PhysicsParams};
+use crate::camera::Camera;
 
 pub struct Player {
     pub x: f32,
@@ -74,6 +75,7 @@ pub struct GameState {
     pub map: GameMap,
     pub input: InputState,
     pub coins: Vec<Coin>,
+    pub camera: Camera,
 }
 
 impl GameState {
@@ -85,6 +87,11 @@ impl GameState {
         }
         // Collect coins on overlap with player (AABB)
         self.coins.retain(|c| !c.overlaps(self.player.x, self.player.y, self.player.size));
+
+        // Camera follows player center
+        let pcx = self.player.x + self.player.size * 0.5;
+        let pcy = self.player.y + self.player.size * 0.5;
+        self.camera.follow(pcx, pcy);
     }
 
     pub fn on_resize(&mut self, w: f32, h: f32) {
