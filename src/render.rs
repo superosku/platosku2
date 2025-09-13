@@ -110,6 +110,11 @@ impl Renderer {
             }
         }
 
+        // draw coins
+        for coin in &state.coins {
+            self.draw_rect(state, coin.x, coin.y, coin.size, coin.size, [1.0, 0.85, 0.2, 1.0]);
+        }
+
         // draw player on top
         let px = state.player.x;
         let py = state.player.y;

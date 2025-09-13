@@ -1,6 +1,7 @@
 use miniquad::*;
 mod state;
-use crate::state::{GameMap, GameState, InputState, Player};
+mod physics;
+use crate::state::{GameMap, GameState, InputState, Player, Coin};
 mod render;
 use crate::render::Renderer;
 
@@ -55,6 +56,11 @@ impl Stage {
             player,
             map,
             input: InputState::default(),
+            coins: vec![
+                Coin { x: 32.0 * 4.0, y: 32.0 * 1.0, size: 14.0, vy: 0.0 },
+                Coin { x: 32.0 * 6.0, y: 32.0 * 1.5, size: 14.0, vy: 0.0 },
+                Coin { x: 32.0 * 10.0, y: 32.0 * 1.0, size: 14.0, vy: 0.0 },
+            ],
         };
 
         Stage { state, renderer }

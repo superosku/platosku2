@@ -1,3 +1,5 @@
+use crate::physics::{integrate_kinematic, PhysicsParams};
+
 pub struct Player {
     pub x: f32,
     pub y: f32,
@@ -16,79 +18,22 @@ impl Player {
 
         // Jump (W/Up) - only when grounded
         if input.up && self.on_ground {
-            // Negative velocity goes upwards (y grows downwards on screen)
             self.vy = -10.0;
-            self.on_ground = false;
         }
 
-        // Apply gravity
-        let gravity = 0.5f32;
-        let terminal_velocity = 12.0f32;
-        self.vy = (self.vy + gravity).min(terminal_velocity);
-
-        // Move horizontally first, resolve collisions on X
-        let attempted_x = self.x + dx;
-        if !collides_with_map(map, attempted_x, self.y, self.size) {
-            self.x = attempted_x;
-        }
-
-        // Then move vertically with velocity, resolve collisions on Y
-        let attempted_y = self.y + self.vy;
-        if !collides_with_map(map, self.x, attempted_y, self.size) {
-            self.y = attempted_y;
-            self.on_ground = false;
-        } else {
-            // Collision while moving vertically: place the player flush against the blocking tiles
-            let epsilon = 0.001f32;
-            let tile_size = map.tile_size;
-            let left_tx = (self.x / tile_size).floor() as i32;
-            let right_tx = ((self.x + self.size - epsilon) / tile_size).floor() as i32;
-
-            if self.vy > 0.0 {
-                // Falling: snap to the top of the first blocking tile below
-                let bottom_ty_attempted = ((self.y + self.size + self.vy - epsilon) / tile_size).floor() as i32;
-
-                let mut landed = false;
-                for tx in left_tx..=right_tx {
-                    let (base, _overlay) = map.get_at(tx, bottom_ty_attempted);
-                    if base != 0 {
-                        let tile_top = bottom_ty_attempted as f32 * tile_size;
-                        self.y = tile_top - self.size;
-                        landed = true;
-                        break;
-                    }
-                }
-                if !landed {
-                    // Possibly hit the map bottom boundary; clamp
-                    self.y = (map.height_px() - self.size).max(0.0);
-                }
-                self.vy = 0.0;
-                self.on_ground = true;
-            } else if self.vy < 0.0 {
-                // Moving up: snap to the bottom of the first blocking tile above
-                let top_ty_attempted = ((self.y + self.vy) / tile_size).floor() as i32;
-
-                let mut hit_ceiling = false;
-                for tx in left_tx..=right_tx {
-                    let (base, _overlay) = map.get_at(tx, top_ty_attempted);
-                    if base != 0 {
-                        let tile_bottom = (top_ty_attempted + 1) as f32 * tile_size;
-                        self.y = tile_bottom;
-                        hit_ceiling = true;
-                        break;
-                    }
-                }
-                if !hit_ceiling {
-                    // Possibly hit the map top boundary; clamp
-                    self.y = 0.0;
-                }
-                self.vy = 0.0;
-            }
-        }
-
-        // Keep player within map pixel bounds as a final clamp
-        self.x = self.x.clamp(0.0, (map.width_px() - self.size).max(0.0));
-        self.y = self.y.clamp(0.0, (map.height_px() - self.size).max(0.0));
+        let (nx, ny, nvy, on_ground) = integrate_kinematic(
+            map,
+            self.x,
+            self.y,
+            self.size,
+            self.vy,
+            dx,
+            &PhysicsParams::default(),
+        );
+        self.x = nx;
+        self.y = ny;
+        self.vy = nvy;
+        self.on_ground = on_ground;
     }
 }
 
@@ -128,11 +73,18 @@ pub struct GameState {
     pub player: Player,
     pub map: GameMap,
     pub input: InputState,
+    pub coins: Vec<Coin>,
 }
 
 impl GameState {
     pub fn update(&mut self) {
         self.player.update(&self.input, &self.map);
+        // Update coins physics
+        for coin in &mut self.coins {
+            coin.update(&self.map);
+        }
+        // Collect coins on overlap with player (AABB)
+        self.coins.retain(|c| !c.overlaps(self.player.x, self.player.y, self.player.size));
     }
 
     pub fn on_resize(&mut self, w: f32, h: f32) {
@@ -141,24 +93,35 @@ impl GameState {
     }
 }
 
-fn collides_with_map(map: &GameMap, x: f32, y: f32, size: f32) -> bool {
-    // Treat outside of map bounds as blocking
-    if x < 0.0 || y < 0.0 { return true; }
-    if x + size > map.width_px() || y + size > map.height_px() { return true; }
+pub struct Coin {
+    pub x: f32,
+    pub y: f32,
+    pub size: f32,
+    pub vy: f32,
+}
 
-    let epsilon = 0.001f32;
-    let left_tx = (x / map.tile_size).floor() as i32;
-    let right_tx = ((x + size - epsilon) / map.tile_size).floor() as i32;
-    let top_ty = (y / map.tile_size).floor() as i32;
-    let bottom_ty = ((y + size - epsilon) / map.tile_size).floor() as i32;
-
-    for ty in top_ty..=bottom_ty {
-        for tx in left_tx..=right_tx {
-            let (base, _overlay) = map.get_at(tx, ty);
-            if base != 0 { return true; }
-        }
+impl Coin {
+    pub fn update(&mut self, map: &GameMap) {
+        let (nx, ny, nvy, _on_ground) = integrate_kinematic(
+            map,
+            self.x,
+            self.y,
+            self.size,
+            self.vy,
+            0.0,
+            &PhysicsParams::default(),
+        );
+        self.x = nx;
+        self.y = ny;
+        self.vy = nvy;
     }
-    false
+
+    pub fn overlaps(&self, ox: f32, oy: f32, os: f32) -> bool {
+        !(self.x + self.size <= ox ||
+          ox + os <= self.x ||
+          self.y + self.size <= oy ||
+          oy + os <= self.y)
+    }
 }
 
 
