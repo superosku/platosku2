@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 miniquad = "0.4.8"
+image = { version = "0.24", default-features = false, features = ["png"] }
