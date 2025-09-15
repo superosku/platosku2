@@ -26,6 +26,25 @@ pub struct Renderer {
 
 const TILE_SIZE: f32 = 32.0;
 
+const DUAL_GRID_UV_TABLE: [(u32, u32); 16] = [
+    (0, 0), // 0
+    (1, 1), // 1 # DONE
+    (0, 1), // 2 # DONE
+    (0, 3), // 3 # DONE
+    (1, 0), // 4 # DONE
+    (1, 3), // 5 # DONE
+    (3, 2), // 6
+    (2, 0), // 7 # DONE
+    (0, 0), // 8 # DONE
+    (2, 2), // 9
+    (1, 2), // A # DONE
+    (3, 0), // B
+    (0, 2), // C # DONE
+    (2, 1), // D # DONE
+    (3, 1), // E # DONE
+    (2, 3), // F # DONE
+];
+
 impl Renderer {
     pub fn new() -> Renderer {
         let mut ctx = window::new_rendering_backend();
@@ -189,29 +208,6 @@ impl Renderer {
 
         let tile_px: f32 = 24.0; // source tile size in pixels inside the atlas
 
-        // Placeholder 4x4 mapping: mask -> (u, v)
-        // let mut uv_table: [(u32, u32); 16] = [(0, 0); 16];
-        // for m in 0..16u32 { uv_table[m as usize] = (m % 4, m / 4); }
-        // Real uv table
-        let uv_table: [(u32, u32); 16] = [
-            (0, 0), // 0
-            (1, 1), // 1 # DONE
-            (0, 1), // 2 # DONE
-            (0, 3), // 3 # DONE
-            (1, 0), // 4 # DONE
-            (1, 3), // 5 # DONE
-            (3, 2), // 6
-            (2, 0), // 7 # DONE
-            (0, 0), // 8 # DONE
-            (2, 2), // 9
-            (1, 2), // A # DONE
-            (3, 0), // B
-            (0, 2), // C # DONE
-            (2, 1), // D # DONE
-            (3, 1), // E # DONE
-            (2, 3), // F # DONE
-        ];
-
         let tex_w = self.tilemap_w;
         let tex_h = self.tilemap_h;
 
@@ -249,7 +245,7 @@ impl Renderer {
 
                 if mask == 0 { continue; }
 
-                let (u, v) = uv_table[mask as usize];
+                let (u, v) = DUAL_GRID_UV_TABLE[mask as usize];
                 let uv_base_px = [u as f32 * tile_px, v as f32 * tile_px];
                 // Inset UVs by half a texel to avoid sampling across tile boundaries
                 let half_u = 0.5 / tex_w;
