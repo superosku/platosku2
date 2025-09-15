@@ -24,6 +24,8 @@ pub struct Renderer {
     tilemap_h: f32,
 }
 
+const TILE_SIZE: f32 = 32.0;
+
 impl Renderer {
     pub fn new() -> Renderer {
         let mut ctx = window::new_rendering_backend();
@@ -52,7 +54,7 @@ impl Renderer {
         let dyn_img = image::open("assets/tilemap.png").expect("failed to load assets/tilemap.png");
         let (img_w, img_h) = dyn_img.dimensions();
         let rgba8 = dyn_img.to_rgba8();
-        let tile_texture = ctx.new_texture_from_rgba8((img_w as u16), (img_h as u16), &rgba8);
+        let tile_texture = ctx.new_texture_from_rgba8(img_w as u16, img_h as u16, &rgba8);
         // Use nearest filtering for crisp pixel art
         ctx.texture_set_filter(tile_texture, FilterMode::Nearest, MipmapFilterMode::None);
         // Clamp to edge to avoid atlas bleeding at tile borders
@@ -132,16 +134,6 @@ impl Renderer {
         // draw base grid using dual-grid textured tiles
         self.draw_base_dual_grid(state);
 
-        // draw overlay grid on top (keep as simple colored rects)
-        // for y in 0..state.map.overlay.len() {
-        //     for x in 0..state.map.overlay[y].len() {
-        //         let tile = state.map.overlay[y][x];
-        //         if tile == 0 { continue; }
-        //         let color = Self::overlay_color(tile);
-        //         self.draw_rect(state, x as i32 as f32 * state.map.tile_size, y as i32 as f32 * state.map.tile_size, state.map.tile_size, state.map.tile_size, color);
-        //     }
-        // }
-
         // draw coins
         for coin in &state.coins {
             self.draw_rect(state, coin.x, coin.y, coin.size, coin.size, [1.0, 0.85, 0.2, 1.0]);
@@ -157,14 +149,14 @@ impl Renderer {
         self.ctx.commit_frame();
     }
 
-    fn draw_tile_textured(&mut self, state: &GameState, px: f32, py: f32, w: f32, h: f32, color: [f32; 4], uv_base: [f32; 2], uv_scale: [f32; 2]) {
+    fn draw_tile_textured(&mut self, state: &GameState, px: f32, py: f32, color: [f32; 4], uv_base: [f32; 2], uv_scale: [f32; 2]) {
         // ensure tile texture bound
         self.bindings.images[0] = self.tile_texture;
         self.ctx.apply_bindings(&self.bindings);
 
         let view = Self::camera_view(state);
         let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
-        let model = Self::mat4_mul(Self::mat4_translation(px, py), Self::mat4_scale(w, h));
+        let model = Self::mat4_mul(Self::mat4_translation(px, py), Self::mat4_scale(TILE_SIZE, TILE_SIZE));
         let vp = Self::mat4_mul(proj, view);
         let mvp = Self::mat4_mul(vp, model);
 
@@ -180,7 +172,7 @@ impl Renderer {
 
         let view = Self::camera_view(state);
         let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
-        let model = Self::mat4_mul(Self::mat4_translation(px, py), Self::mat4_scale(w, h));
+        let model = Self::mat4_mul(Self::mat4_translation(px * TILE_SIZE, py * TILE_SIZE), Self::mat4_scale(w * TILE_SIZE, h * TILE_SIZE));
         let vp = Self::mat4_mul(proj, view);
         let mvp = Self::mat4_mul(vp, model);
 
@@ -190,7 +182,6 @@ impl Renderer {
     }
 
     fn draw_base_dual_grid(&mut self, state: &GameState) {
-        let tile_world = state.map.tile_size;
         let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         let height = state.map.base.len();
         if width == 0 || height == 0 { return; }
@@ -224,23 +215,23 @@ impl Renderer {
         let tex_h = self.tilemap_h;
 
         // Apply half-tile offset: 0.5 left (negative X), 0.5 down (positive Y)
-        let offset_x = 0.5 * tile_world;
-        let offset_y = 0.5 * tile_world;
+        let offset_x = 0.5 * TILE_SIZE;
+        let offset_y = 0.5 * TILE_SIZE;
 
         // Compute visible world bounds from camera (expand slightly to avoid edge gaps)
         let zoom = state.camera.zoom;
         let half_w_world = state.screen_w * 0.5 / zoom;
         let half_h_world = state.screen_h * 0.5 / zoom;
-        let world_min_x = state.camera.x - half_w_world - tile_world;
-        let world_min_y = state.camera.y - half_h_world - tile_world;
-        let world_max_x = state.camera.x + half_w_world + tile_world;
-        let world_max_y = state.camera.y + half_h_world + tile_world;
+        let world_min_x = state.camera.x * TILE_SIZE - half_w_world - TILE_SIZE;
+        let world_min_y = state.camera.y * TILE_SIZE - half_h_world - TILE_SIZE;
+        let world_max_x = state.camera.x * TILE_SIZE + half_w_world + TILE_SIZE;
+        let world_max_y = state.camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
 
         // Convert world bounds to dual-grid tile indices
-        let start_x = ((world_min_x - offset_x) / tile_world).floor() as i32;
-        let end_x = ((world_max_x - offset_x) / tile_world).ceil() as i32;
-        let start_y = ((world_min_y - offset_y) / tile_world).floor() as i32;
-        let end_y = ((world_max_y - offset_y) / tile_world).ceil() as i32;
+        let start_x = ((world_min_x - offset_x) / TILE_SIZE).floor() as i32;
+        let end_x = ((world_max_x - offset_x) / TILE_SIZE).ceil() as i32;
+        let start_y = ((world_min_y - offset_y) / TILE_SIZE).floor() as i32;
+        let end_y = ((world_max_y - offset_y) / TILE_SIZE).ceil() as i32;
 
         for y in start_y..end_y {
             for x in start_x..end_x {
@@ -265,10 +256,10 @@ impl Renderer {
                 let uv_base = [uv_base_px[0] / tex_w + half_u, uv_base_px[1] / tex_h + half_v];
                 let uv_scale = [(tile_px - 1.0) / tex_w, (tile_px - 1.0) / tex_h];
 
-                let px = x as f32 * tile_world + offset_x;
-                let py = y as f32 * tile_world + offset_y;
+                let px = x as f32 * TILE_SIZE + offset_x;
+                let py = y as f32 * TILE_SIZE + offset_y;
 
-                self.draw_tile_textured(state, px, py, tile_world, tile_world, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale);
+                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale);
             }
         }
     }
@@ -312,8 +303,8 @@ impl Renderer {
     }
 
     fn camera_view(state: &GameState) -> [f32; 16] {
-        let cx = state.camera.x;
-        let cy = state.camera.y;
+        let cx = state.camera.x * TILE_SIZE;
+        let cy = state.camera.y * TILE_SIZE;
         let zoom = state.camera.zoom;
 
         // Pixel-snap the camera to avoid subpixel seams at various zoom levels

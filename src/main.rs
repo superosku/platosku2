@@ -22,7 +22,7 @@ impl Stage {
             vec![1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1],
             vec![1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1],
             vec![1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
             vec![1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -36,17 +36,16 @@ impl Stage {
         overlay_grid[4][8] = 3;
 
         let map = GameMap {
-            tile_size: 32.0,
             base: base_grid,
             overlay: overlay_grid,
         };
 
         // Start player near the top-left open area
         let player = Player {
-            x: 32.0 * 2.0,
-            y: 32.0 * 2.0,
-            size: 24.0,
-            speed: 2.1,
+            x: 2.0,
+            y: 2.0,
+            size: 0.8,
+            speed: 0.1,
             vy: 0.0,
             on_ground: false,
         };

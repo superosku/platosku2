@@ -7,7 +7,7 @@ pub struct PhysicsParams {
 
 impl Default for PhysicsParams {
     fn default() -> Self {
-        PhysicsParams { gravity: 0.25, terminal_velocity: 12.0 }
+        PhysicsParams { gravity: 0.010, terminal_velocity: 1.20 }
     }
 }
 
@@ -40,36 +40,35 @@ pub fn integrate_kinematic(
     } else {
         // Collision while moving vertically: place the body flush against blocking tiles
         let epsilon = 0.001f32;
-        let tile_size = map.tile_size;
-        let left_tx = (out_x / tile_size).floor() as i32;
-        let right_tx = ((out_x + size - epsilon) / tile_size).floor() as i32;
+        let left_tx = (out_x).floor() as i32;
+        let right_tx = ((out_x + size - epsilon)).floor() as i32;
 
         if out_vy > 0.0 {
             // Falling: snap to the top of the first blocking tile below
-            let bottom_ty_attempted = ((y + size + out_vy - epsilon) / tile_size).floor() as i32;
+            let bottom_ty_attempted = ((y + size + out_vy - epsilon)).floor() as i32;
             let mut landed = false;
             for tx in left_tx..=right_tx {
                 let (base, _overlay) = map.get_at(tx, bottom_ty_attempted);
                 if base != 0 {
-                    let tile_top = bottom_ty_attempted as f32 * tile_size;
+                    let tile_top = bottom_ty_attempted as f32;
                     out_y = tile_top - size;
                     landed = true;
                     break;
                 }
             }
             if !landed {
-                out_y = (map.height_px() - size).max(0.0);
+                out_y = (map.height() - size).max(0.0);
             }
             out_vy = 0.0;
             on_ground = true;
         } else if out_vy < 0.0 {
             // Moving up: snap to the bottom of the first blocking tile above
-            let top_ty_attempted = ((y + out_vy) / tile_size).floor() as i32;
+            let top_ty_attempted = ((y + out_vy)).floor() as i32;
             let mut hit_ceiling = false;
             for tx in left_tx..=right_tx {
                 let (base, _overlay) = map.get_at(tx, top_ty_attempted);
                 if base != 0 {
-                    let tile_bottom = (top_ty_attempted + 1) as f32 * tile_size;
+                    let tile_bottom = (top_ty_attempted + 1) as f32;
                     out_y = tile_bottom;
                     hit_ceiling = true;
                     break;
@@ -83,8 +82,8 @@ pub fn integrate_kinematic(
     }
 
     // Final clamp to map bounds
-    let clamped_x = out_x.clamp(0.0, (map.width_px() - size).max(0.0));
-    let clamped_y = out_y.clamp(0.0, (map.height_px() - size).max(0.0));
+    let clamped_x = out_x.clamp(0.0, (map.width() - size).max(0.0));
+    let clamped_y = out_y.clamp(0.0, (map.height() - size).max(0.0));
 
     (clamped_x, clamped_y, out_vy, on_ground)
 }
@@ -92,13 +91,13 @@ pub fn integrate_kinematic(
 pub fn collides_with_map(map: &GameMap, x: f32, y: f32, size: f32) -> bool {
     // Treat outside of map bounds as blocking
     if x < 0.0 || y < 0.0 { return true; }
-    if x + size > map.width_px() || y + size > map.height_px() { return true; }
+    if x + size > map.width() || y + size > map.height() { return true; }
 
     let epsilon = 0.001f32;
-    let left_tx = (x / map.tile_size).floor() as i32;
-    let right_tx = ((x + size - epsilon) / map.tile_size).floor() as i32;
-    let top_ty = (y / map.tile_size).floor() as i32;
-    let bottom_ty = ((y + size - epsilon) / map.tile_size).floor() as i32;
+    let left_tx = (x).floor() as i32;
+    let right_tx = ((x + size - epsilon)).floor() as i32;
+    let top_ty = (y ).floor() as i32;
+    let bottom_ty = ((y + size - epsilon)).floor() as i32;
 
     for ty in top_ty..=bottom_ty {
         for tx in left_tx..=right_tx {

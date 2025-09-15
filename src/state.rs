@@ -19,7 +19,7 @@ impl Player {
 
         // Jump (W/Up) - only when grounded
         if input.up && self.on_ground {
-            self.vy = -7.0;
+            self.vy = -0.24;
         }
 
         let (nx, ny, nvy, on_ground) = integrate_kinematic(
@@ -39,7 +39,6 @@ impl Player {
 }
 
 pub struct GameMap {
-    pub tile_size: f32,
     pub base: Vec<Vec<u8>>,    // base terrain layer
     pub overlay: Vec<Vec<u8>>, // overlay/decorations layer
 }
@@ -47,8 +46,8 @@ pub struct GameMap {
 impl GameMap {
     pub fn width_tiles(&self) -> usize { self.base.first().map(|r| r.len()).unwrap_or(0) }
     pub fn height_tiles(&self) -> usize { self.base.len() }
-    pub fn width_px(&self) -> f32 { self.width_tiles() as f32 * self.tile_size }
-    pub fn height_px(&self) -> f32 { self.height_tiles() as f32 * self.tile_size }
+    pub fn width(&self) -> f32 { self.width_tiles() as f32 }
+    pub fn height(&self) -> f32 { self.height_tiles() as f32 }
 
     pub fn get_at(&self, tx: i32, ty: i32) -> (u8, u8) {
         // Outside the map is blocking for base layer; overlay remains empty
