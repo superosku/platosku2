@@ -136,14 +136,15 @@ impl Renderer {
 
         // draw coins
         for coin in &state.coins {
-            self.draw_rect(state, coin.x, coin.y, coin.size, coin.size, [1.0, 0.85, 0.2, 1.0]);
+            self.draw_rect(state, coin.bb.x, coin.bb.y, coin.bb.w, coin.bb.h, [1.0, 0.85, 0.2, 1.0]);
         }
 
         // draw player on top
-        let px = state.player.pos.x;
-        let py = state.player.pos.y;
-        let ps = state.player.size;
-        self.draw_rect(state, px, py, ps, ps, [0.20, 1.0, 0.40, 1.0]);
+        let px = state.player.bb.x;
+        let py = state.player.bb.y;
+        let pw = state.player.bb.w;
+        let ph = state.player.bb.h;
+        self.draw_rect(state, px, py, pw, ph, [0.20, 1.0, 0.40, 1.0]);
 
         self.ctx.end_render_pass();
         self.ctx.commit_frame();

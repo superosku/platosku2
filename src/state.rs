@@ -1,4 +1,4 @@
-use crate::physics::{integrate_kinematic, PhysicsParams};
+use crate::physics::{integrate_kinematic};
 use crate::camera::Camera;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -13,29 +13,54 @@ pub struct Pos {
     pub y: f32,
 }
 
+pub struct BoundingBox {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub vx: f32,
+    pub vy: f32,
+}
+
+impl BoundingBox {
+    pub fn iterate(&self) -> BoundingBox {
+        BoundingBox {
+            x: self.x + self.vx,
+            y: self.y + self.vy,
+            w: self.w,
+            h: self.h,
+            vx: self.vx,
+            vy: self.vy,
+        }
+    }
+
+    pub fn overlaps(&self, other: &BoundingBox) -> bool {
+        !(self.x + self.w <= other.x ||
+          other.x + other.w <= self.x ||
+          self.y + self.h <= other.y ||
+          other.y + other.h <= self.y)
+    }
+}
+
 pub enum PlayerState {
     Normal,
     Hanging { dir: Dir, pos: Pos },
 }
 
 pub struct Player {
-    pub pos: Pos,
-    pub size: f32,
-    pub speed: f32,
-    pub vy: f32,
+    pub bb: BoundingBox,
     pub on_ground: bool,
     pub state: PlayerState,
+    pub speed: f32, // horizontal speed per frame
 }
 
 impl Player {
     pub fn new(x: f32, y: f32) -> Self {
         Player {
-            pos: Pos { x, y },
-            size: 0.8,
-            speed: 0.06,
-            vy: 0.0,
+            bb: BoundingBox { x, y, w: 0.6, h: 0.8, vx: 0.0, vy: 0.0 },
             on_ground: false,
             state: PlayerState::Normal,
+            speed: 0.04,
         }
     }
 
@@ -43,8 +68,9 @@ impl Player {
         // If currently hanging, freeze position and handle jump/drop
         match &self.state {
             PlayerState::Hanging { pos, .. } => {
-                self.pos = *pos;
-                self.vy = 0.0;
+                self.bb.x = pos.x;
+                self.bb.y = pos.y;
+                self.bb.vy = 0.0;
                 self.on_ground = false;
 
                 // Jump to release, or drop if also holding down
@@ -52,51 +78,45 @@ impl Player {
                     self.state = PlayerState::Normal;
                     if input.down {
                         // Drop: start falling
-                        self.vy = 0.0;
+                        self.bb.vy = 0.0;
                     } else {
                         // Jump upward from hang
-                        self.vy = -0.17;
+                        self.bb.vy = -0.17;
                     }
                 }
             },
             PlayerState::Normal => {
                 // Horizontal movement (A/D or Left/Right)
-                let mut dx = 0.0f32;
-                if input.left { dx -= self.speed; }
-                if input.right { dx += self.speed; }
+                // let mut dx = 0.0f32;
+                if input.left { self.bb.vx = -self.speed; }
+                else if input.right { self.bb.vx = self.speed; }
+                else {self.bb.vx = 0.0;}
 
                 // Jump (W/Up) - only when grounded
                 if input.jump && self.on_ground {
-                    self.vy = -0.19;
+                    self.bb.vy = -0.19;
                 }
 
                 // Try to start hanging while falling and pressing into a wall near a ledge
-                if self.vy > 0.0 {
+                if self.bb.vy > 0.0 {
                     let pressing_left = input.left && !input.right;
                     let pressing_right = input.right && !input.left;
                     if pressing_left || pressing_right {
                         let dir: Dir = if pressing_right { Dir::Right } else { Dir::Left };
                         if let Some(hang_pos) = self.check_and_snap_hang(map, dir) {
                             self.state = PlayerState::Hanging { dir, pos: hang_pos };
-                            self.vy = 0.0;
+                            self.bb.vy = 0.0;
                             self.on_ground = false;
                             return; // skip physics while entering hang
                         }
                     }
                 }
 
-                let (nx, ny, nvy, on_ground) = integrate_kinematic(
+                let (new_bb, on_ground) = integrate_kinematic(
                     map,
-                    self.pos.x,
-                    self.pos.y,
-                    self.size,
-                    self.vy,
-                    dx,
-                    &PhysicsParams::default(),
+                    &self.bb,
                 );
-                self.pos.x = nx;
-                self.pos.y = ny;
-                self.vy = nvy;
+                self.bb = new_bb;
                 self.on_ground = on_ground;
             }
         }
@@ -104,11 +124,11 @@ impl Player {
 
     fn check_and_snap_hang(&self, map: &GameMap, dir: Dir) -> Option<Pos> {
         // Must be near the top edge of a tile row
-        let top_frac = self.pos.y - self.pos.y.floor();
+        let top_frac = self.bb.y - self.bb.y.floor();
         if top_frac > 0.85 { return None; }
 
-        let tile_y = self.pos.y.floor() as i32; // tile row at player's top
-        let tile_x = self.pos.x.floor() as i32; // tile column at player's left
+        let tile_y = self.bb.y.floor() as i32; // tile row at player's top
+        let tile_x = self.bb.x.floor() as i32; // tile column at player's left
 
         // // Determine tile row at the player's top
         // let ty = self.y.floor() as i32;
@@ -116,12 +136,12 @@ impl Player {
         // Horizontal adjacency check and side tile to test
         let eps_side = 0.10;
 
-        let (tile_x_check) = if dir == Dir::Right {
-            let dist_to_right = (self.pos.x + self.size) - (tile_x as f32 + 1.0);
+        let tile_x_check = if dir == Dir::Right {
+            let dist_to_right = (self.bb.x + self.bb.w) - (tile_x as f32 + 1.0);
             if dist_to_right > eps_side { return None; }
             tile_x + 1
         } else {
-            let dist_to_left = self.pos.x - (tile_x as f32);
+            let dist_to_left = self.bb.x - (tile_x as f32);
             if dist_to_left > eps_side { return None; }
             tile_x - 1
         };
@@ -137,8 +157,8 @@ impl Player {
         // let snapped_y = ty as f32 + 0.02;
         Some(
             Pos{
-                x: if dir == Dir::Left {self.pos.x.floor()} else {self.pos.x.floor() + (1.0 - self.size)} ,
-                y: self.pos.y.floor()
+                x: if dir == Dir::Left {self.bb.x.floor()} else {self.bb.x.floor() + (1.0 - self.bb.w)} ,
+                y: self.bb.y.floor()
             })
     }
 }
@@ -162,6 +182,11 @@ impl GameMap {
         let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(1);
         let overlay = self.overlay.get(y).and_then(|row| row.get(x)).copied().unwrap_or(0);
         (base, overlay)
+    }
+
+    pub fn is_solid_at(&self, tx: i32, ty: i32) -> bool {
+        let (base, _overlay) = self.get_at(tx, ty);
+        base != 0
     }
 }
 
@@ -192,11 +217,11 @@ impl GameState {
             coin.update(&self.map);
         }
         // Collect coins on overlap with player (AABB)
-        self.coins.retain(|c| !c.overlaps(self.player.pos.x, self.player.pos.y, self.player.size));
+        self.coins.retain(|c| !c.overlaps(&self.player.bb));
 
         // Camera follows player center
-        let pcx = self.player.pos.x + self.player.size * 0.5;
-        let pcy = self.player.pos.y + self.player.size * 0.5;
+        let pcx = self.player.bb.x + self.player.bb.w * 0.5;
+        let pcy = self.player.bb.y + self.player.bb.h * 0.5;
         self.camera.follow(pcx, pcy);
     }
 
@@ -207,33 +232,26 @@ impl GameState {
 }
 
 pub struct Coin {
-    pub x: f32,
-    pub y: f32,
-    pub size: f32,
-    pub vy: f32,
+    pub bb: BoundingBox,
 }
 
 impl Coin {
-    pub fn update(&mut self, map: &GameMap) {
-        let (nx, ny, nvy, _on_ground) = integrate_kinematic(
-            map,
-            self.x,
-            self.y,
-            self.size,
-            self.vy,
-            0.0,
-            &PhysicsParams::default(),
-        );
-        self.x = nx;
-        self.y = ny;
-        self.vy = nvy;
+    pub fn new(x: f32, y: f32) -> Self {
+        Coin {
+            bb: BoundingBox { x, y, w: 0.5, h: 0.5, vx: 0.0, vy: 0.0 },
+        }
     }
 
-    pub fn overlaps(&self, ox: f32, oy: f32, os: f32) -> bool {
-        !(self.x + self.size <= ox ||
-          ox + os <= self.x ||
-          self.y + self.size <= oy ||
-          oy + os <= self.y)
+    pub fn update(&mut self, map: &GameMap) {
+        let (new_bb, _on_ground) = integrate_kinematic(
+            map,
+            &self.bb,
+        );
+        self.bb = new_bb;
+    }
+
+    pub fn overlaps(&self, bb: &BoundingBox) -> bool {
+        self.bb.overlaps(bb)
     }
 }
 

@@ -2,7 +2,7 @@ use miniquad::*;
 mod state;
 mod physics;
 mod camera;
-use crate::state::{GameMap, GameState, InputState, Player, Coin, PlayerState};
+use crate::state::{GameMap, GameState, InputState, Player, Coin};
 mod render;
 use crate::render::Renderer;
 
@@ -50,16 +50,16 @@ impl Stage {
             map,
             input: InputState::default(),
             coins: vec![
-                Coin { x: 32.0 * 4.0, y: 32.0 * 1.0, size: 14.0, vy: 0.0 },
-                Coin { x: 32.0 * 6.0, y: 32.0 * 1.5, size: 14.0, vy: 0.0 },
-                Coin { x: 32.0 * 10.0, y: 32.0 * 1.0, size: 14.0, vy: 0.0 },
+                Coin::new(4.0, 1.0),
+                Coin::new(6.0, 1.5),
+                Coin::new(10.0, 1.0),
             ],
             camera: camera::Camera::new(0.0, 0.0, 1.0),
         };
 
         // Initialize camera to player center
-        let pcx = state.player.pos.x + state.player.size * 0.5;
-        let pcy = state.player.pos.y + state.player.size * 0.5;
+        let pcx = state.player.bb.x + state.player.bb.w * 0.5;
+        let pcy = state.player.bb.y + state.player.bb.h * 0.5;
         state.camera.follow(pcx, pcy);
 
         Stage { state, renderer }
