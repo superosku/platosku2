@@ -140,8 +140,8 @@ impl Renderer {
         }
 
         // draw player on top
-        let px = state.player.x;
-        let py = state.player.y;
+        let px = state.player.pos.x;
+        let py = state.player.pos.y;
         let ps = state.player.size;
         self.draw_rect(state, px, py, ps, ps, [0.20, 1.0, 0.40, 1.0]);
 

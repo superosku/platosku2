@@ -2,7 +2,7 @@ use miniquad::*;
 mod state;
 mod physics;
 mod camera;
-use crate::state::{GameMap, GameState, InputState, Player, Coin};
+use crate::state::{GameMap, GameState, InputState, Player, Coin, PlayerState};
 mod render;
 use crate::render::Renderer;
 
@@ -41,14 +41,7 @@ impl Stage {
         };
 
         // Start player near the top-left open area
-        let player = Player {
-            x: 2.0,
-            y: 2.0,
-            size: 0.8,
-            speed: 0.1,
-            vy: 0.0,
-            on_ground: false,
-        };
+        let player = Player::new(2.0, 2.0);
 
         let mut state = GameState {
             screen_w: width as f32,
@@ -65,8 +58,8 @@ impl Stage {
         };
 
         // Initialize camera to player center
-        let pcx = state.player.x + state.player.size * 0.5;
-        let pcy = state.player.y + state.player.size * 0.5;
+        let pcx = state.player.pos.x + state.player.size * 0.5;
+        let pcy = state.player.pos.y + state.player.size * 0.5;
         state.camera.follow(pcx, pcy);
 
         Stage { state, renderer }
@@ -76,6 +69,7 @@ impl Stage {
 impl EventHandler for Stage {
     fn update(&mut self) {
         self.state.update();
+        self.state.input.jump = false;
     }
 
     fn draw(&mut self) {
@@ -92,6 +86,7 @@ impl EventHandler for Stage {
             KeyCode::A | KeyCode::Left => self.state.input.left = true,
             KeyCode::D | KeyCode::Right => self.state.input.right = true,
             KeyCode::W | KeyCode::Up => self.state.input.up = true,
+            KeyCode::Space => self.state.input.jump = true,
             KeyCode::S | KeyCode::Down => self.state.input.down = true,
             _ => {}
         }
@@ -102,6 +97,7 @@ impl EventHandler for Stage {
             KeyCode::A | KeyCode::Left => self.state.input.left = false,
             KeyCode::D | KeyCode::Right => self.state.input.right = false,
             KeyCode::W | KeyCode::Up => self.state.input.up = false,
+            KeyCode::Space => self.state.input.jump = false,
             KeyCode::S | KeyCode::Down => self.state.input.down = false,
             _ => {}
         }
