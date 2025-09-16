@@ -54,7 +54,7 @@ impl Stage {
                 Coin::new(6.0, 1.5),
                 Coin::new(10.0, 1.0),
             ],
-            camera: camera::Camera::new(0.0, 0.0, 1.0),
+            camera: camera::Camera::new(0.0, 0.0, 2.0),
         };
 
         // Initialize camera to player center

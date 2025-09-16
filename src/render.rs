@@ -9,6 +9,12 @@ struct Uniforms {
     color: [f32; 4],
     uv_base: [f32; 4],  // xy used
     uv_scale: [f32; 4], // xy used
+    world_base: [f32; 4],  // xy used (world pixel origin of this quad)
+    world_scale: [f32; 4], // xy used (world pixel size of this quad)
+    color_key: [f32; 4],   // rgb = key color, a = threshold
+    bg_tile_size: [f32; 4], // xy used (repeat period in pixels)
+    bg_region_origin: [f32; 4], // xy used (top-left of 64x64 region in bg texture, in pixels)
+    bg_tex_size: [f32; 4], // xy used (bg texture size in pixels)
 }
 
 #[repr(C)]
@@ -19,12 +25,15 @@ pub struct Renderer {
     pipeline: Pipeline,
     bindings: Bindings,
     tile_texture: TextureId,
+    bg_texture: TextureId,
     white_texture: TextureId,
     tilemap_w: f32,
     tilemap_h: f32,
+    bg_w: f32,
+    bg_h: f32,
 }
 
-const TILE_SIZE: f32 = 32.0;
+const TILE_SIZE: f32 = 16.0;
 
 const DUAL_GRID_UV_TABLE: [(u32, u32); 16] = [
     (0, 0), // 0
@@ -80,6 +89,15 @@ impl Renderer {
         // Clamp to edge to avoid atlas bleeding at tile borders
         ctx.texture_set_wrap(tile_texture, TextureWrap::Clamp, TextureWrap::Clamp);
 
+        // Load background texture (tiled 64x64 area) from assets
+        let bg_img = image::open("assets/tile_backgrounds.png").expect("failed to load assets/tile_backgrounds.png");
+        let (bg_w, bg_h) = bg_img.dimensions();
+        let bg_rgba8 = bg_img.to_rgba8();
+        let bg_texture = ctx.new_texture_from_rgba8(bg_w as u16, bg_h as u16, &bg_rgba8);
+        // Nearest for pixel art, Repeat so UVs can wrap every 64 px
+        ctx.texture_set_filter(bg_texture, FilterMode::Nearest, MipmapFilterMode::None);
+        ctx.texture_set_wrap(bg_texture, TextureWrap::Clamp, TextureWrap::Clamp);
+
         // Create a 1x1 white texture for colored rectangles
         let white_tex_bytes: [u8; 4] = [255, 255, 255, 255];
         let white_texture = ctx.new_texture_from_rgba8(1, 1, &white_tex_bytes);
@@ -90,13 +108,19 @@ impl Renderer {
             .new_shader(
                 ShaderSource::Glsl { vertex: VERTEX_SHADER, fragment: FRAGMENT_SHADER },
                 ShaderMeta {
-                    images: vec!["tex".to_string()],
+                    images: vec!["tex".to_string(), "bg_tex".to_string()],
                     uniforms: UniformBlockLayout {
                         uniforms: vec![
                             UniformDesc::new("mvp", UniformType::Mat4),
                             UniformDesc::new("color", UniformType::Float4),
                             UniformDesc::new("uv_base", UniformType::Float4),
                             UniformDesc::new("uv_scale", UniformType::Float4),
+                            UniformDesc::new("world_base", UniformType::Float4),
+                            UniformDesc::new("world_scale", UniformType::Float4),
+                            UniformDesc::new("color_key", UniformType::Float4),
+                            UniformDesc::new("bg_tile_size", UniformType::Float4),
+                            UniformDesc::new("bg_region_origin", UniformType::Float4),
+                            UniformDesc::new("bg_tex_size", UniformType::Float4),
                         ],
                     },
                 },
@@ -124,7 +148,7 @@ impl Renderer {
         let mut bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
             index_buffer,
-            images: vec![tile_texture],
+            images: vec![tile_texture, bg_texture],
         };
 
         // set default texture to tile texture
@@ -135,9 +159,12 @@ impl Renderer {
             pipeline,
             bindings,
             tile_texture,
+            bg_texture,
             white_texture,
             tilemap_w: img_w as f32,
             tilemap_h: img_h as f32,
+            bg_w: bg_w as f32,
+            bg_h: bg_h as f32,
         }
     }
 
@@ -173,6 +200,7 @@ impl Renderer {
     fn draw_tile_textured(&mut self, state: &GameState, px: f32, py: f32, color: [f32; 4], uv_base: [f32; 2], uv_scale: [f32; 2]) {
         // ensure tile texture bound
         self.bindings.images[0] = self.tile_texture;
+        self.bindings.images[1] = self.bg_texture;
         self.ctx.apply_bindings(&self.bindings);
 
         let view = Self::camera_view(state);
@@ -181,7 +209,18 @@ impl Renderer {
         let vp = Self::mat4_mul(proj, view);
         let mvp = Self::mat4_mul(vp, model);
 
-        let uniforms = Uniforms { mvp, color, uv_base: [uv_base[0], uv_base[1], 0.0, 0.0], uv_scale: [uv_scale[0], uv_scale[1], 0.0, 0.0] };
+        let uniforms = Uniforms {
+            mvp,
+            color,
+            uv_base: [uv_base[0], uv_base[1], 0.0, 0.0],
+            uv_scale: [uv_scale[0], uv_scale[1], 0.0, 0.0],
+            world_base: [px, py, 0.0, 0.0],
+            world_scale: [TILE_SIZE, TILE_SIZE, 0.0, 0.0],
+            color_key: [1.0, 0.0, 1.0, 0.01], // bright magenta with small threshold
+            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
+            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_tex_size: [self.bg_w, self.bg_h, 0.0, 0.0],
+        };
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
         self.ctx.draw(0, 6, 1);
     }
@@ -189,6 +228,7 @@ impl Renderer {
     fn draw_rect(&mut self, state: &GameState, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
         // bind white texture and use full-quad UVs
         self.bindings.images[0] = self.white_texture;
+        self.bindings.images[1] = self.bg_texture;
         self.ctx.apply_bindings(&self.bindings);
 
         let view = Self::camera_view(state);
@@ -197,7 +237,18 @@ impl Renderer {
         let vp = Self::mat4_mul(proj, view);
         let mvp = Self::mat4_mul(vp, model);
 
-        let uniforms = Uniforms { mvp, color, uv_base: [0.0, 0.0, 0.0, 0.0], uv_scale: [1.0, 1.0, 0.0, 0.0] };
+        let uniforms = Uniforms {
+            mvp,
+            color,
+            uv_base: [0.0, 0.0, 0.0, 0.0],
+            uv_scale: [1.0, 1.0, 0.0, 0.0],
+            world_base: [px * TILE_SIZE, py * TILE_SIZE, 0.0, 0.0],
+            world_scale: [w * TILE_SIZE, h * TILE_SIZE, 0.0, 0.0],
+            color_key: [1.0, 0.0, 1.0, 0.01],
+            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
+            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_tex_size: [self.bg_w, self.bg_h, 0.0, 0.0],
+        };
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
         self.ctx.draw(0, 6, 1);
     }
@@ -357,12 +408,16 @@ uniform mat4 mvp;
 uniform vec4 color;
 uniform vec4 uv_base;
 uniform vec4 uv_scale;
+uniform vec4 world_base;
+uniform vec4 world_scale;
 varying vec4 v_color;
 varying vec2 v_uv;
+varying vec2 v_world;
 void main() {
     gl_Position = mvp * vec4(pos, 0.0, 1.0);
     v_color = color;
     v_uv = uv_base.xy + uv * uv_scale.xy;
+    v_world = world_base.xy + pos * world_scale.xy;
 }
 "#;
 
@@ -371,9 +426,22 @@ precision mediump float;
 varying vec4 v_color;
 varying vec2 v_uv;
 uniform sampler2D tex;
+uniform sampler2D bg_tex;
+uniform vec4 color_key; // rgb + threshold in a
+uniform vec4 bg_tile_size; // xy repeat period in pixels
+uniform vec4 bg_region_origin; // xy top-left of the region in pixels
+uniform vec4 bg_tex_size; // xy bg texture size in pixels
+varying vec2 v_world;
 void main() {
     vec4 texel = texture2D(tex, v_uv);
-    gl_FragColor = texel * v_color;
+    float is_key = step(distance(texel.rgb, color_key.rgb), color_key.a);
+    // Repeat inside the specified region, regardless of texture size
+    vec2 region_uv = fract(v_world / bg_tile_size.xy);
+    vec2 bg_px = bg_region_origin.xy + region_uv * bg_tile_size.xy;
+    vec2 uv_bg = bg_px / bg_tex_size.xy;
+    vec4 bg = texture2D(bg_tex, uv_bg);
+    vec4 out_color = mix(texel, bg, is_key);
+    gl_FragColor = out_color * v_color;
 }
 "#;
 
