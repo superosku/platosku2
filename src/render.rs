@@ -70,7 +70,8 @@ impl Renderer {
         );
 
         // Load tilemap texture from assets
-        let dyn_img = image::open("assets/tilemap.png").expect("failed to load assets/tilemap.png");
+        // let dyn_img = image::open("assets/tilemap.png").expect("failed to load assets/tilemap.png");
+        let dyn_img = image::open("assets/tilemap16.png").expect("failed to load assets/tilemap.png");
         let (img_w, img_h) = dyn_img.dimensions();
         let rgba8 = dyn_img.to_rgba8();
         let tile_texture = ctx.new_texture_from_rgba8(img_w as u16, img_h as u16, &rgba8);
@@ -206,7 +207,7 @@ impl Renderer {
         let height = state.map.base.len();
         if width == 0 || height == 0 { return; }
 
-        let tile_px: f32 = 24.0; // source tile size in pixels inside the atlas
+        let tile_px: f32 = 16.0; // source tile size in pixels inside the atlas
 
         let tex_w = self.tilemap_w;
         let tex_h = self.tilemap_h;
