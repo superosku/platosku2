@@ -45,6 +45,7 @@ impl BoundingBox {
 pub enum PlayerState {
     Normal,
     Hanging { dir: Dir, pos: Pos },
+    OnLadder,
 }
 
 pub struct Player {
@@ -102,6 +103,17 @@ impl Player {
                     &self.bb,
                 );
 
+                let could_ladder = map.is_ladder_at(
+                    (new_bb.x + new_bb.w * 0.5).floor() as i32,
+                    (new_bb.y + new_bb.h * 0.5).floor() as i32,
+                );
+                if could_ladder && (input.up || input.down) {
+                    self.state = PlayerState::OnLadder;
+                    // self.bb.vx = 0.0;
+                    // self.bb.vy = 0.0;
+                    return; // skip further physics this frame
+                }
+
                 // Try to start hanging while falling and pressing into a wall near a ledge
                 if self.bb.vy > 0.0 {
                     let pressing_left = input.left && !input.right;
@@ -119,7 +131,27 @@ impl Player {
 
                 self.bb = new_bb;
                 self.on_ground = on_ground;
-            }
+            },
+            PlayerState::OnLadder => {
+                if input.jump {
+                    self.state = PlayerState::Normal;
+                    self.bb.vy = -0.19;
+                    return;
+                }
+
+                if input.up && !input.down {
+                    // Going up
+                    self.bb.vy = -self.speed;
+                } else if input.down && !input.up {
+                    // Going down
+                    self.bb.vy = self.speed;
+                } else {
+                    self.bb.vy = 0.0;
+                }
+                let new_y = self.bb.y + self.bb.vy;
+
+                self.bb.y = new_y;
+            },
         }
     }
 }
@@ -162,6 +194,14 @@ impl GameMap {
         match base {
             BaseTile::Empty => false,
             BaseTile::Solid => true,
+        }
+    }
+
+    pub fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
+        let (_base, overlay) = self.get_at(tx, ty);
+        match overlay {
+            OverlayTile::Ladder => true,
+            _ => false,
         }
     }
 }
