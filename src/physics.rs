@@ -1,5 +1,7 @@
 use crate::state::BoundingBox;
 use crate::state::GameMap;
+use crate::state::Pos;
+use crate::state::Dir;
 
 const GRAVITY: f32 = 0.007;
 const TERMINAL_VELOCITY: f32 = 0.90;
@@ -107,4 +109,42 @@ pub fn collides_with_map(map: &GameMap, x: f32, y: f32, w: f32, h: f32) -> bool 
     false
 }
 
+pub fn check_and_snap_hang(bb: &BoundingBox, new_bb: &BoundingBox, map: &GameMap, dir: Dir) -> Option<Pos> {
+    // Check if top of bb is above a tile and new_bb is below the tile
+    if bb.y.floor() == new_bb.y.floor() { return None; }
+
+    let tile_y = new_bb.y.floor() as i32; // tile row at player's top
+    let tile_x = new_bb.x.floor() as i32; // tile column at player's left
+
+    // // Determine tile row at the player's top
+    // let ty = self.y.floor() as i32;
+
+    // Horizontal adjacency check and side tile to test
+    let eps_side = 0.10;
+
+    let tile_x_check = if dir == Dir::Right {
+        let dist_to_right = (new_bb.x + new_bb.w) - (tile_x as f32 + 1.0);
+        if dist_to_right > eps_side { return None; }
+        tile_x + 1
+    } else {
+        let dist_to_left = new_bb.x - (tile_x as f32);
+        if dist_to_left > eps_side { return None; }
+        tile_x - 1
+    };
+
+    // if !touching_side { return None; }
+
+    // Ledge condition: side tile is blocked at ty, but open above (ty-1)
+    let (base_here, _) = map.get_at(tile_x_check, tile_y);
+    let (base_above, _) = map.get_at(tile_x_check, tile_y - 1);
+    if base_here == 0 || base_above != 0 { return None; }
+
+    // Snap Y to sit slightly below the tile top
+    // let snapped_y = ty as f32 + 0.02;
+    Some(
+        Pos{
+            x: if dir == Dir::Left {new_bb.x.floor()} else {new_bb.x.floor() + (1.0 - new_bb.w)} ,
+            y: new_bb.y.floor()
+        })
+}
 

@@ -1,4 +1,4 @@
-use crate::physics::{integrate_kinematic};
+use crate::physics::{integrate_kinematic, check_and_snap_hang};
 use crate::camera::Camera;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -97,13 +97,18 @@ impl Player {
                     self.bb.vy = -0.19;
                 }
 
+                let (new_bb, on_ground) = integrate_kinematic(
+                    map,
+                    &self.bb,
+                );
+
                 // Try to start hanging while falling and pressing into a wall near a ledge
                 if self.bb.vy > 0.0 {
                     let pressing_left = input.left && !input.right;
                     let pressing_right = input.right && !input.left;
                     if pressing_left || pressing_right {
                         let dir: Dir = if pressing_right { Dir::Right } else { Dir::Left };
-                        if let Some(hang_pos) = self.check_and_snap_hang(map, dir) {
+                        if let Some(hang_pos) = check_and_snap_hang(&self.bb, &new_bb, map, dir) {
                             self.state = PlayerState::Hanging { dir, pos: hang_pos };
                             self.bb.vy = 0.0;
                             self.on_ground = false;
@@ -112,55 +117,12 @@ impl Player {
                     }
                 }
 
-                let (new_bb, on_ground) = integrate_kinematic(
-                    map,
-                    &self.bb,
-                );
                 self.bb = new_bb;
                 self.on_ground = on_ground;
             }
         }
     }
 
-    fn check_and_snap_hang(&self, map: &GameMap, dir: Dir) -> Option<Pos> {
-        // Must be near the top edge of a tile row
-        let top_frac = self.bb.y - self.bb.y.floor();
-        if top_frac > 0.85 { return None; }
-
-        let tile_y = self.bb.y.floor() as i32; // tile row at player's top
-        let tile_x = self.bb.x.floor() as i32; // tile column at player's left
-
-        // // Determine tile row at the player's top
-        // let ty = self.y.floor() as i32;
-
-        // Horizontal adjacency check and side tile to test
-        let eps_side = 0.10;
-
-        let tile_x_check = if dir == Dir::Right {
-            let dist_to_right = (self.bb.x + self.bb.w) - (tile_x as f32 + 1.0);
-            if dist_to_right > eps_side { return None; }
-            tile_x + 1
-        } else {
-            let dist_to_left = self.bb.x - (tile_x as f32);
-            if dist_to_left > eps_side { return None; }
-            tile_x - 1
-        };
-
-        // if !touching_side { return None; }
-
-        // Ledge condition: side tile is blocked at ty, but open above (ty-1)
-        let (base_here, _) = map.get_at(tile_x_check, tile_y);
-        let (base_above, _) = map.get_at(tile_x_check, tile_y - 1);
-        if base_here == 0 || base_above != 0 { return None; }
-
-        // Snap Y to sit slightly below the tile top
-        // let snapped_y = ty as f32 + 0.02;
-        Some(
-            Pos{
-                x: if dir == Dir::Left {self.bb.x.floor()} else {self.bb.x.floor() + (1.0 - self.bb.w)} ,
-                y: self.bb.y.floor()
-            })
-    }
 }
 
 pub struct GameMap {
