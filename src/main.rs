@@ -1,4 +1,6 @@
 use miniquad::*;
+use state::OverlayTile;
+
 mod state;
 mod physics;
 mod camera;
@@ -17,6 +19,7 @@ impl Stage {
         let renderer = Renderer::new();
 
         // Small demo tilemaps (dual-grid): base terrain and overlay
+        // Map this so that 1 is BaseTile::Solid, 0 is BaseTile::Empty
         let base_grid = vec![
             vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             vec![1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -26,14 +29,20 @@ impl Stage {
             vec![1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
             vec![1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ];
+        ].iter().map(|row| row.iter().map(
+            |&v| match v {
+                0 => state::BaseTile::Empty,
+                1 => state::BaseTile::Solid,
+                _ => state::BaseTile::Empty,
+            }
+        ).collect()).collect();
 
-        let mut overlay_grid = vec![vec![0u8; 16]; 8];
+        let mut overlay_grid = vec![vec![OverlayTile::None; 16]; 8];
         // simple decorations in overlay
-        overlay_grid[2][3] = 2;
-        overlay_grid[2][4] = 2;
-        overlay_grid[2][5] = 2;
-        overlay_grid[4][8] = 3;
+        overlay_grid[6][9] = OverlayTile::Ladder;
+        overlay_grid[5][9] = OverlayTile::Ladder;
+        overlay_grid[4][9] = OverlayTile::Ladder;
+        overlay_grid[3][9] = OverlayTile::Ladder;
 
         let map = GameMap {
             base: base_grid,

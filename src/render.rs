@@ -1,6 +1,7 @@
 use miniquad::*;
 use image::GenericImageView;
-
+use crate::state::BaseTile;
+use crate::state::OverlayTile;
 use crate::state::GameState;
 
 #[repr(C)]
@@ -178,8 +179,11 @@ impl Renderer {
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
 
-        // draw base grid using dual-grid textured tiles
+        // Draw base grid using dual-grid textured tiles
         self.draw_base_dual_grid(state);
+
+        // Draw overlay tiles
+        self.draw_overlay(state);
 
         // draw coins
         for coin in &state.coins {
@@ -253,6 +257,66 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
+    fn draw_overlay(&mut self, state: &GameState) {
+        let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
+        let height = state.map.base.len();
+        if width == 0 || height == 0 { return; }
+
+        let tile_px: f32 = 16.0; // source tile size in pixels inside the atlas
+
+        let tex_w = self.tilemap_w;
+        let tex_h = self.tilemap_h;
+
+        // Apply half-tile offset: 0.5 left (negative X), 0.5 down (positive Y)
+        let offset_x = 0.0;
+        let offset_y = 0.0;
+
+        // Compute visible world bounds from camera (expand slightly to avoid edge gaps)
+        let zoom = state.camera.zoom;
+        let half_w_world = state.screen_w * 0.5 / zoom;
+        let half_h_world = state.screen_h * 0.5 / zoom;
+        let world_min_x = state.camera.x * TILE_SIZE - half_w_world - TILE_SIZE;
+        let world_min_y = state.camera.y * TILE_SIZE - half_h_world - TILE_SIZE;
+        let world_max_x = state.camera.x * TILE_SIZE + half_w_world + TILE_SIZE;
+        let world_max_y = state.camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
+
+        // Convert world bounds to dual-grid tile indices
+        let start_x = ((world_min_x - offset_x) / TILE_SIZE).floor() as i32;
+        let end_x = ((world_max_x - offset_x) / TILE_SIZE).ceil() as i32;
+        let start_y = ((world_min_y - offset_y) / TILE_SIZE).floor() as i32;
+        let end_y = ((world_max_y - offset_y) / TILE_SIZE).ceil() as i32;
+
+        for y in start_y..end_y {
+            for x in start_x..end_x {
+                // let (u, v) = DUAL_GRID_UV_TABLE[mask as usize];
+                // let uv_base_px = [u as f32 * tile_px, v as f32 * tile_px];
+
+                // Inset UVs by half a texel to avoid sampling across tile boundaries
+                // let half_u = 0.5 / tex_w;
+                // let half_v = 0.5 / tex_h;
+
+                // let uv_base = [uv_base_px[0] / tex_w + half_u, uv_base_px[1] / tex_h + half_v];
+                // let uv_base = [0.1, 0.0];
+                let uv_scale = [(tile_px - 1.0) / tex_w, (tile_px - 1.0) / tex_h];
+
+                let px = x as f32 * TILE_SIZE;
+                let py = y as f32 * TILE_SIZE;
+
+                let uv_base = match state.map.get_at(x, y).1 {
+                    OverlayTile::None => {
+                        continue;
+                    }
+                    OverlayTile::Ladder => {
+                        let uv_base_px = [0.0 as f32 * tile_px, 4.0 as f32 * tile_px];
+                        [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h]
+                    },
+                };
+
+                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale);
+            }
+        }
+    }
+
     fn draw_base_dual_grid(&mut self, state: &GameState) {
         let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         let height = state.map.base.len();
@@ -290,10 +354,10 @@ impl Renderer {
                 let (br, _o4) = state.map.get_at(x + 1, y + 1);
 
                 let mut mask: u32 = 0;
-                if tl != 0 { mask |= 1; }
-                if tr != 0 { mask |= 2; }
-                if bl != 0 { mask |= 4; }
-                if br != 0 { mask |= 8; }
+                if tl == BaseTile::Solid { mask |= 1; }
+                if tr == BaseTile::Solid { mask |= 2; }
+                if bl == BaseTile::Solid { mask |= 4; }
+                if br == BaseTile::Solid { mask |= 8; }
 
                 if mask == 0 { continue; }
 

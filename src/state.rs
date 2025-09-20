@@ -122,12 +122,23 @@ impl Player {
             }
         }
     }
+}
 
+#[derive(Eq, PartialEq, Clone, Copy)]
+pub enum BaseTile {
+    Empty = 0,
+    Solid = 1,
+}
+
+#[derive(Clone, Copy)]
+pub enum OverlayTile {
+    None = 0,
+    Ladder = 1,
 }
 
 pub struct GameMap {
-    pub base: Vec<Vec<u8>>,    // base terrain layer
-    pub overlay: Vec<Vec<u8>>, // overlay/decorations layer
+    pub base: Vec<Vec<BaseTile>>,    // base terrain layer
+    pub overlay: Vec<Vec<OverlayTile>>, // overlay/decorations layer
 }
 
 impl GameMap {
@@ -136,19 +147,22 @@ impl GameMap {
     pub fn width(&self) -> f32 { self.width_tiles() as f32 }
     pub fn height(&self) -> f32 { self.height_tiles() as f32 }
 
-    pub fn get_at(&self, tx: i32, ty: i32) -> (u8, u8) {
+    pub fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         // Outside the map is blocking for base layer; overlay remains empty
-        if tx < 0 || ty < 0 { return (1, 0); }
+        if tx < 0 || ty < 0 { return (BaseTile::Solid, OverlayTile::None); }
         let x = tx as usize;
         let y = ty as usize;
-        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(1);
-        let overlay = self.overlay.get(y).and_then(|row| row.get(x)).copied().unwrap_or(0);
+        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(BaseTile::Solid);
+        let overlay = self.overlay.get(y).and_then(|row| row.get(x)).copied().unwrap_or(OverlayTile::None);
         (base, overlay)
     }
 
     pub fn is_solid_at(&self, tx: i32, ty: i32) -> bool {
         let (base, _overlay) = self.get_at(tx, ty);
-        base != 0
+        match base {
+            BaseTile::Empty => false,
+            BaseTile::Solid => true,
+        }
     }
 }
 

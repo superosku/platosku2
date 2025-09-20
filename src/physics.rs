@@ -38,8 +38,8 @@ pub fn integrate_kinematic(
             let bottom_ty_attempted = ((bb.y + bb.h + out_vy - epsilon)).floor() as i32;
             let mut landed = false;
             for tx in left_tx..=right_tx {
-                let (base, _overlay) = map.get_at(tx, bottom_ty_attempted);
-                if base != 0 {
+                let is_solid = map.is_solid_at(tx, bottom_ty_attempted);
+                if is_solid {
                     let tile_top = bottom_ty_attempted as f32;
                     out_y = tile_top - bb.h;
                     landed = true;
@@ -56,8 +56,8 @@ pub fn integrate_kinematic(
             let top_ty_attempted = ((bb.y + out_vy)).floor() as i32;
             let mut hit_ceiling = false;
             for tx in left_tx..=right_tx {
-                let (base, _overlay) = map.get_at(tx, top_ty_attempted);
-                if base != 0 {
+                let is_solid = map.is_solid_at(tx, top_ty_attempted);
+                if is_solid {
                     let tile_bottom = (top_ty_attempted + 1) as f32;
                     out_y = tile_bottom;
                     hit_ceiling = true;
@@ -102,8 +102,8 @@ pub fn collides_with_map(map: &GameMap, x: f32, y: f32, w: f32, h: f32) -> bool 
 
     for ty in top_ty..=bottom_ty {
         for tx in left_tx..=right_tx {
-            let (base, _overlay) = map.get_at(tx, ty);
-            if base != 0 { return true; }
+            let is_solid = map.is_solid_at(tx, ty);
+            if is_solid { return true; }
         }
     }
     false
@@ -135,9 +135,9 @@ pub fn check_and_snap_hang(bb: &BoundingBox, new_bb: &BoundingBox, map: &GameMap
     // if !touching_side { return None; }
 
     // Ledge condition: side tile is blocked at ty, but open above (ty-1)
-    let (base_here, _) = map.get_at(tile_x_check, tile_y);
-    let (base_above, _) = map.get_at(tile_x_check, tile_y - 1);
-    if base_here == 0 || base_above != 0 { return None; }
+    let solid_here = map.is_solid_at(tile_x_check, tile_y);
+    let solid_above = map.is_solid_at(tile_x_check, tile_y - 1);
+    if !solid_here || solid_above { return None; }
 
     // Snap Y to sit slightly below the tile top
     // let snapped_y = ty as f32 + 0.02;
