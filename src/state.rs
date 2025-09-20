@@ -145,6 +145,7 @@ impl Player {
                 let middle_tx = (self.bb.x + self.bb.w * 0.5).floor() as i32;
                 let head_ty = (self.bb.y).floor() as i32;
                 let ladder_at_head = map.is_ladder_at(middle_tx, head_ty);
+                let ladder_at_below = map.is_ladder_at(middle_tx, head_ty + 1);
 
                 if input.up && !input.down {
                     // Going up
@@ -160,7 +161,7 @@ impl Player {
                     self.bb.vy = self.speed;
                     // If ground at bottom or not at ladder anymore, exit ladder state
                     let feet_y = self.bb.y + self.bb.h;
-                    if map.is_solid_at(middle_tx, feet_y.floor() as i32) || !ladder_at_head {
+                    if map.is_solid_at(middle_tx, feet_y.floor() as i32) || (!ladder_at_head && !ladder_at_below) {
                         self.state = PlayerState::Normal;
                         self.on_ground = true;
                         self.bb.vy = 0.0;
