@@ -262,8 +262,6 @@ impl Renderer {
         let height = state.map.base.len();
         if width == 0 || height == 0 { return; }
 
-        let tile_px: f32 = 16.0; // source tile size in pixels inside the atlas
-
         let tex_w = self.tilemap_w;
         let tex_h = self.tilemap_h;
 
@@ -297,7 +295,7 @@ impl Renderer {
 
                 // let uv_base = [uv_base_px[0] / tex_w + half_u, uv_base_px[1] / tex_h + half_v];
                 // let uv_base = [0.1, 0.0];
-                let uv_scale = [(tile_px - 1.0) / tex_w, (tile_px - 1.0) / tex_h];
+                let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
 
                 let px = x as f32 * TILE_SIZE;
                 let py = y as f32 * TILE_SIZE;
@@ -308,9 +306,9 @@ impl Renderer {
                     }
                     OverlayTile::Ladder => {
                         let uv_base_px = if state.map.is_ladder_at(x, y - 1) || state.map.is_solid_at(x, y - 1) {
-                            [0.0_f32 * tile_px, 4.0_f32 * tile_px]
+                            [0.0_f32 * TILE_SIZE, 4.0_f32 * TILE_SIZE]
                         } else {
-                            [1.0_f32 * tile_px, 4.0_f32 * tile_px]
+                            [1.0_f32 * TILE_SIZE, 4.0_f32 * TILE_SIZE]
                         };
                         [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h]
                     },
@@ -325,8 +323,6 @@ impl Renderer {
         let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         let height = state.map.base.len();
         if width == 0 || height == 0 { return; }
-
-        let tile_px: f32 = 16.0; // source tile size in pixels inside the atlas
 
         let tex_w = self.tilemap_w;
         let tex_h = self.tilemap_h;
@@ -366,12 +362,12 @@ impl Renderer {
                 if mask == 0 { continue; }
 
                 let (u, v) = DUAL_GRID_UV_TABLE[mask as usize];
-                let uv_base_px = [u as f32 * tile_px, v as f32 * tile_px];
+                let uv_base_px = [u as f32 * TILE_SIZE, v as f32 * TILE_SIZE];
                 // Inset UVs by half a texel to avoid sampling across tile boundaries
                 let half_u = 0.5 / tex_w;
                 let half_v = 0.5 / tex_h;
                 let uv_base = [uv_base_px[0] / tex_w + half_u, uv_base_px[1] / tex_h + half_v];
-                let uv_scale = [(tile_px - 1.0) / tex_w, (tile_px - 1.0) / tex_h];
+                let uv_scale = [(TILE_SIZE - 1.0) / tex_w, (TILE_SIZE - 1.0) / tex_h];
 
                 let px = x as f32 * TILE_SIZE + offset_x;
                 let py = y as f32 * TILE_SIZE + offset_y;
