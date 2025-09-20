@@ -307,7 +307,11 @@ impl Renderer {
                         continue;
                     }
                     OverlayTile::Ladder => {
-                        let uv_base_px = [0.0 as f32 * tile_px, 4.0 as f32 * tile_px];
+                        let uv_base_px = if state.map.is_ladder_at(x, y - 1) || state.map.is_solid_at(x, y - 1) {
+                            [0.0_f32 * tile_px, 4.0_f32 * tile_px]
+                        } else {
+                            [1.0_f32 * tile_px, 4.0_f32 * tile_px]
+                        };
                         [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h]
                     },
                 };

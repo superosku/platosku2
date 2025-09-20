@@ -20,16 +20,14 @@ impl Stage {
 
         // Small demo tilemaps (dual-grid): base terrain and overlay
         // Map this so that 1 is BaseTile::Solid, 0 is BaseTile::Empty
-        let base_grid = vec![
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            vec![1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1],
-            vec![1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-            vec![1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ].iter().map(|row| row.iter().map(
+        let base_grid = [vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]].iter().map(|row| row.iter().map(
             |&v| match v {
                 0 => state::BaseTile::Empty,
                 1 => state::BaseTile::Solid,
@@ -43,6 +41,10 @@ impl Stage {
         overlay_grid[5][9] = OverlayTile::Ladder;
         overlay_grid[4][9] = OverlayTile::Ladder;
         overlay_grid[3][9] = OverlayTile::Ladder;
+
+        // overlay_grid[5][15] = OverlayTile::Ladder;
+        overlay_grid[4][15] = OverlayTile::Ladder;
+        overlay_grid[3][15] = OverlayTile::Ladder;
 
         let map = GameMap {
             base: base_grid,

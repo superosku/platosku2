@@ -107,10 +107,12 @@ impl Player {
                     (new_bb.x + new_bb.w * 0.5).floor() as i32,
                     (new_bb.y + new_bb.h * 0.5).floor() as i32,
                 );
-                if could_ladder && (input.up || input.down) {
+                if could_ladder && (input.up || input.down) && !(input.down && self.on_ground) {
                     self.state = PlayerState::OnLadder;
-                    // self.bb.vx = 0.0;
-                    // self.bb.vy = 0.0;
+                    // Center on the ladder horizontally
+                    let middle_tx = (new_bb.x + new_bb.w * 0.5).floor() as i32;
+                    self.bb.x = (middle_tx as f32 + 0.5) - self.bb.w * 0.5;
+
                     return; // skip further physics this frame
                 }
 
@@ -133,18 +135,37 @@ impl Player {
                 self.on_ground = on_ground;
             },
             PlayerState::OnLadder => {
+                // Jumping gets out of the ladder
                 if input.jump {
                     self.state = PlayerState::Normal;
                     self.bb.vy = -0.19;
                     return;
                 }
 
+                let middle_tx = (self.bb.x + self.bb.w * 0.5).floor() as i32;
+                let head_ty = (self.bb.y).floor() as i32;
+                let ladder_at_head = map.is_ladder_at(middle_tx, head_ty);
+
                 if input.up && !input.down {
                     // Going up
-                    self.bb.vy = -self.speed;
+                    // If top is no longer a ladder, do not go up
+                    if ladder_at_head {
+                        self.bb.vy = -self.speed;
+                    } else {
+                        self.bb.vy = 0.0;
+                        return;
+                    }
                 } else if input.down && !input.up {
                     // Going down
                     self.bb.vy = self.speed;
+                    // If ground at bottom or not at ladder anymore, exit ladder state
+                    let feet_y = self.bb.y + self.bb.h;
+                    if map.is_solid_at(middle_tx, feet_y.floor() as i32) || !ladder_at_head {
+                        self.state = PlayerState::Normal;
+                        self.on_ground = true;
+                        self.bb.vy = 0.0;
+                        return;
+                    }
                 } else {
                     self.bb.vy = 0.0;
                 }
