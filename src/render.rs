@@ -180,7 +180,8 @@ impl Renderer {
         self.ctx.apply_bindings(&self.bindings);
 
         // Draw base grid using dual-grid textured tiles
-        self.draw_base_dual_grid(state);
+        self.draw_base_dual_grid(state, BaseTile::Stone, 0);
+        self.draw_base_dual_grid(state, BaseTile::Wood, 1);
 
         // Draw overlay tiles
         self.draw_overlay(state);
@@ -201,7 +202,7 @@ impl Renderer {
         self.ctx.commit_frame();
     }
 
-    fn draw_tile_textured(&mut self, state: &GameState, px: f32, py: f32, color: [f32; 4], uv_base: [f32; 2], uv_scale: [f32; 2]) {
+    fn draw_tile_textured(&mut self, state: &GameState, px: f32, py: f32, color: [f32; 4], uv_base: [f32; 2], uv_scale: [f32; 2], tile_type_index: u8) {
         // ensure tile texture bound
         self.bindings.images[0] = self.tile_texture;
         self.bindings.images[1] = self.bg_texture;
@@ -222,7 +223,7 @@ impl Renderer {
             world_scale: [TILE_SIZE, TILE_SIZE, 0.0, 0.0],
             color_key: [1.0, 0.0, 1.0, 0.01], // bright magenta with small threshold
             bg_tile_size: [64.0, 64.0, 0.0, 0.0],
-            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_region_origin: [64.0 * tile_type_index as f32, 0.0, 0.0, 0.0],
             bg_tex_size: [self.bg_w, self.bg_h, 0.0, 0.0],
         };
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
@@ -314,12 +315,12 @@ impl Renderer {
                     },
                 };
 
-                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale);
+                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
             }
         }
     }
 
-    fn draw_base_dual_grid(&mut self, state: &GameState) {
+    fn draw_base_dual_grid(&mut self, state: &GameState, tile_type: BaseTile, tile_type_index: u8) {
         let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         let height = state.map.base.len();
         if width == 0 || height == 0 { return; }
@@ -354,10 +355,10 @@ impl Renderer {
                 let (br, _o4) = state.map.get_at(x + 1, y + 1);
 
                 let mut mask: u32 = 0;
-                if tl == BaseTile::Solid { mask |= 1; }
-                if tr == BaseTile::Solid { mask |= 2; }
-                if bl == BaseTile::Solid { mask |= 4; }
-                if br == BaseTile::Solid { mask |= 8; }
+                if tl == tile_type { mask |= 1; }
+                if tr == tile_type { mask |= 2; }
+                if bl == tile_type { mask |= 4; }
+                if br == tile_type { mask |= 8; }
 
                 if mask == 0 { continue; }
 
@@ -366,13 +367,16 @@ impl Renderer {
                 // Inset UVs by half a texel to avoid sampling across tile boundaries
                 let half_u = 0.5 / tex_w;
                 let half_v = 0.5 / tex_h;
-                let uv_base = [uv_base_px[0] / tex_w + half_u, uv_base_px[1] / tex_h + half_v];
+                let uv_base = [
+                    uv_base_px[0] / tex_w + half_u + tile_type_index as f32 * 4.0 * TILE_SIZE / tex_w,
+                    uv_base_px[1] / tex_h + half_v
+                ];
                 let uv_scale = [(TILE_SIZE - 1.0) / tex_w, (TILE_SIZE - 1.0) / tex_h];
 
                 let px = x as f32 * TILE_SIZE + offset_x;
                 let py = y as f32 * TILE_SIZE + offset_y;
 
-                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale);
+                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, tile_type_index);
             }
         }
     }

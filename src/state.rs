@@ -181,7 +181,8 @@ impl Player {
 #[derive(Eq, PartialEq, Clone, Copy)]
 pub enum BaseTile {
     Empty = 0,
-    Solid = 1,
+    Stone = 1,
+    Wood= 2,
 }
 
 #[derive(Clone, Copy)]
@@ -203,10 +204,10 @@ impl GameMap {
 
     pub fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         // Outside the map is blocking for base layer; overlay remains empty
-        if tx < 0 || ty < 0 { return (BaseTile::Solid, OverlayTile::None); }
+        if tx < 0 || ty < 0 { return (BaseTile::Stone, OverlayTile::None); }
         let x = tx as usize;
         let y = ty as usize;
-        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(BaseTile::Solid);
+        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(BaseTile::Stone);
         let overlay = self.overlay.get(y).and_then(|row| row.get(x)).copied().unwrap_or(OverlayTile::None);
         (base, overlay)
     }
@@ -215,7 +216,8 @@ impl GameMap {
         let (base, _overlay) = self.get_at(tx, ty);
         match base {
             BaseTile::Empty => false,
-            BaseTile::Solid => true,
+            BaseTile::Stone => true,
+            BaseTile::Wood => true,
         }
     }
 
