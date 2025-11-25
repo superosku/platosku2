@@ -2,6 +2,7 @@ use crate::camera::Camera;
 use super::player::Player;
 use super::game_map::GameMap;
 use super::coin::Coin;
+use super::enemies::Enemy;
 
 #[derive(Default)]
 pub struct InputState {
@@ -19,6 +20,7 @@ pub struct GameState {
     pub map: GameMap,
     pub input: InputState,
     pub coins: Vec<Coin>,
+    pub enemies: Vec<Box<dyn Enemy>>,
     pub camera: Camera,
 }
 
@@ -29,6 +31,10 @@ impl GameState {
             coin.update(&self.map);
         }
         self.coins.retain(|c| !c.overlaps(&self.player.bb));
+
+        for enemy in &mut self.enemies {
+            enemy.update(&self.map);
+        }
 
         let pcx = self.player.bb.x + self.player.bb.w * 0.5;
         let pcy = self.player.bb.y + self.player.bb.h * 0.5;

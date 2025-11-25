@@ -10,6 +10,7 @@ pub struct Pos {
     pub y: f32,
 }
 
+#[derive(Clone, Copy)]
 pub struct BoundingBox {
     pub x: f32,
     pub y: f32,

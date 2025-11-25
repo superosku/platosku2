@@ -191,6 +191,12 @@ impl Renderer {
             self.draw_rect(state, coin.bb.x, coin.bb.y, coin.bb.w, coin.bb.h, [1.0, 0.85, 0.2, 1.0]);
         }
 
+        // draw enemies
+        for enemy in &state.enemies {
+            let bb = enemy.bb();
+            self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [1.0, 0.25, 0.25, 1.0]);
+        }
+
         // draw player on top
         let px = state.player.bb.x;
         let py = state.player.bb.y;
