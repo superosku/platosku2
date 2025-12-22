@@ -1,3 +1,4 @@
+pub mod animation_handler;
 pub mod coin;
 pub mod common;
 pub mod enemies;
