@@ -281,7 +281,7 @@ impl Renderer {
         self.draw_from_texture_atlas(
             state,
             TextureIndexes::Player,
-            state.player.get_animation_index() as f32,
+            state.player.get_atlas_index() as f32,
             match state.player.dir {
                 Dir::Left => true,
                 Dir::Right => false,

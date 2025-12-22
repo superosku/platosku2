@@ -22,7 +22,74 @@ pub struct Player {
     pub state: PlayerState,
     pub speed: f32,
     pub dir: Dir,
-    pub animation_index: u32,
+    pub animation_handler: AnimationHandler<PlayerAnimationState>,
+}
+
+#[derive(PartialEq)]
+enum PlayerAnimationState {
+    Walking,
+    Standing,
+    JumpingSide,
+    JumpingDown,
+    Laddering,
+}
+
+struct AnimationConfigResult {
+    start: u32,
+    end: u32,
+    dur: u32,
+}
+
+impl AnimationConfigResult {
+    fn new(start: u32, end: u32, dur: u32) -> Self {
+        Self { start, end, dur }
+    }
+}
+
+trait AnimationConfig {
+    fn get_config(&self) -> AnimationConfigResult;
+}
+
+impl AnimationConfig for PlayerAnimationState {
+    fn get_config(&self) -> AnimationConfigResult {
+        match self {
+            PlayerAnimationState::Walking => AnimationConfigResult::new(0, 7, 15),
+            PlayerAnimationState::Standing => AnimationConfigResult::new(8, 9, 40),
+            PlayerAnimationState::JumpingSide => AnimationConfigResult::new(10, 10, 15),
+            PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
+            PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 5),
+        }
+    }
+}
+
+struct AnimationHandler<T> {
+    state: T,
+    current_frame: u32,
+}
+
+impl<T: AnimationConfig + PartialEq> AnimationHandler<T> {
+    pub fn new(initial_state: T) -> Self {
+        AnimationHandler {
+            state: initial_state,
+            current_frame: 0,
+        }
+    }
+
+    pub fn set_state(&mut self, new_state: T) {
+        if self.state != new_state {
+            self.current_frame = 0;
+            self.state = new_state;
+        }
+    }
+
+    pub fn increment_frame(&mut self) {
+        self.current_frame += 1;
+    }
+
+    pub fn get_atlas_index(&self) -> u32 {
+        let config = self.state.get_config();
+        config.start + (self.current_frame / config.dur) % (config.end - config.start + 1)
+    }
 }
 
 impl Player {
@@ -40,7 +107,7 @@ impl Player {
             state: PlayerState::Normal,
             speed: 0.04,
             dir: Dir::Right,
-            animation_index: 0,
+            animation_handler: AnimationHandler::new(PlayerAnimationState::Standing),
         }
     }
 
@@ -136,14 +203,33 @@ impl Player {
 
         self.bb = new_bb;
         self.on_ground = on_ground;
+
+        if self.on_ground {
+            if (pressing_right || pressing_left) {
+                self.animation_handler
+                    .set_state(PlayerAnimationState::Walking);
+            } else {
+                self.animation_handler
+                    .set_state(PlayerAnimationState::Standing);
+            }
+        } else {
+            if (pressing_right || pressing_left) {
+                self.animation_handler
+                    .set_state(PlayerAnimationState::JumpingSide);
+            } else {
+                self.animation_handler
+                    .set_state(PlayerAnimationState::JumpingDown);
+            }
+        }
     }
 
-    pub fn get_animation_index(&self) -> u32 {
-        (self.animation_index / 15) % 8
+    pub fn get_atlas_index(&self) -> u32 {
+        self.animation_handler.get_atlas_index()
     }
 
     pub fn update(&mut self, input: &InputState, map: &GameMap) {
-        self.animation_index += 1;
+        let mut increment_frame = true;
+
         match &self.state {
             PlayerState::Hanging { pos, .. } => {
                 self.bb.x = pos.x;
@@ -159,6 +245,8 @@ impl Player {
                         self.bb.vy = -0.17;
                     }
                 }
+                self.animation_handler
+                    .set_state(PlayerAnimationState::Standing); // TODO: Add hanging animation
             }
             PlayerState::Swinging {
                 total_frames,
@@ -179,6 +267,8 @@ impl Player {
                 self._handle_normal(input, map);
             }
             PlayerState::OnLadder => {
+                self.animation_handler
+                    .set_state(PlayerAnimationState::Laddering);
                 if input.jump {
                     self.state = PlayerState::Normal;
                     self.bb.vy = -0.19;
@@ -210,11 +300,16 @@ impl Player {
                     }
                 } else {
                     self.bb.vy = 0.0;
+                    increment_frame = false;
                 }
                 let new_y = self.bb.y + self.bb.vy;
 
                 self.bb.y = new_y;
             }
+        }
+
+        if increment_frame {
+            self.animation_handler.increment_frame();
         }
     }
 }
