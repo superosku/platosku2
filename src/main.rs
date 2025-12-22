@@ -11,6 +11,11 @@ use crate::render::Renderer;
 struct Stage {
     state: GameState,
     renderer: Renderer,
+    last_time: f64,
+    last_time_ups: f64,
+    updates: u32,
+    frames: u32,
+    accumulator: f64,
 }
 
 impl Stage {
@@ -86,18 +91,53 @@ impl Stage {
         let pcy = state.player.bb.y + state.player.bb.h * 0.5;
         state.camera.follow(pcx, pcy);
 
-        Stage { state, renderer }
+        Stage {
+            state,
+            renderer,
+            last_time: date::now(),
+            updates: 0,
+            frames: 0,
+            accumulator: 0.0,
+            last_time_ups: date::now(),
+        }
     }
 }
 
 impl EventHandler for Stage {
     fn update(&mut self) {
-        self.state.update();
-        self.state.input.jump = false;
+        let now = date::now();
+        let mut frame_time = now - self.last_time;
+        self.last_time = now;
+
+        if frame_time > 1.0 / 10.0 {
+            frame_time = 1.0 / 10.0;
+        }
+
+        self.accumulator += frame_time;
+
+        let DT = 1.0 / 60.0;
+
+        while self.accumulator >= DT {
+            self.state.update();
+            self.state.input.jump = false;
+            self.updates += 1;
+            self.accumulator -= DT;
+        }
+
+        let elapsed = now - self.last_time_ups;
+        if elapsed >= 1.0 {
+            let fps = self.frames as f64 / elapsed as f64;
+            let ups = self.updates as f64 / elapsed as f64;
+            println!("FPS: {:.2}, UPS: {:.2}", fps, ups);
+            self.frames = 0;
+            self.updates = 0;
+            self.last_time_ups = now;
+        }
     }
 
     fn draw(&mut self) {
         self.renderer.draw(&self.state);
+        self.frames += 1;
     }
 
     fn resize_event(&mut self, width: f32, height: f32) {
