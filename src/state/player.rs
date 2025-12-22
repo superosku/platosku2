@@ -33,6 +33,7 @@ enum PlayerAnimationState {
     JumpingSide,
     JumpingDown,
     Laddering,
+    Hanging,
 }
 
 impl AnimationConfig for PlayerAnimationState {
@@ -43,6 +44,7 @@ impl AnimationConfig for PlayerAnimationState {
             PlayerAnimationState::JumpingSide => AnimationConfigResult::new(10, 10, 15),
             PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
             PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 5),
+            PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
         }
     }
 }
@@ -201,7 +203,7 @@ impl Player {
                     }
                 }
                 self.animation_handler
-                    .set_state(PlayerAnimationState::Standing); // TODO: Add hanging animation
+                    .set_state(PlayerAnimationState::Hanging);
             }
             PlayerState::Swinging {
                 total_frames,
