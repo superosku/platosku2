@@ -115,14 +115,14 @@ impl Player {
         }
 
         if input.jump && self.on_ground {
-            self.bb.vy = -0.19;
+            self.bb.vy = -0.14;
         }
 
         if input.swing {
             if let PlayerState::Normal = self.state {
                 self.state = PlayerState::Swinging {
-                    total_frames: 40,
-                    frames_left: 40,
+                    total_frames: 80,
+                    frames_left: 80,
                 };
             }
         }
@@ -201,7 +201,7 @@ impl Player {
                     if input.down {
                         self.bb.vy = 0.0;
                     } else {
-                        self.bb.vy = -0.17;
+                        self.bb.vy = -0.12;
                     }
                 }
                 self.animation_handler
@@ -230,7 +230,7 @@ impl Player {
                     .set_state(PlayerAnimationState::Laddering);
                 if input.jump {
                     self.state = PlayerState::Normal;
-                    self.bb.vy = -0.19;
+                    self.bb.vy = -0.15;
                     return;
                 }
 

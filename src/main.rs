@@ -107,24 +107,24 @@ impl EventHandler for Stage {
 
     fn key_down_event(&mut self, keycode: KeyCode, _mods: KeyMods, _repeat: bool) {
         match keycode {
-            KeyCode::A | KeyCode::Left => self.state.input.left = true,
-            KeyCode::D | KeyCode::Right => self.state.input.right = true,
-            KeyCode::W | KeyCode::Up => self.state.input.up = true,
+            KeyCode::Left => self.state.input.left = true,
+            KeyCode::Right => self.state.input.right = true,
+            KeyCode::Up => self.state.input.up = true,
             KeyCode::Z => self.state.input.swing = true,
-            KeyCode::Space => self.state.input.jump = true,
-            KeyCode::S | KeyCode::Down => self.state.input.down = true,
+            KeyCode::X => self.state.input.jump = true,
+            KeyCode::Down => self.state.input.down = true,
             _ => {}
         }
     }
 
     fn key_up_event(&mut self, keycode: KeyCode, _mods: KeyMods) {
         match keycode {
-            KeyCode::A | KeyCode::Left => self.state.input.left = false,
-            KeyCode::D | KeyCode::Right => self.state.input.right = false,
-            KeyCode::W | KeyCode::Up => self.state.input.up = false,
+            KeyCode::Left => self.state.input.left = false,
+            KeyCode::Right => self.state.input.right = false,
+            KeyCode::Up => self.state.input.up = false,
             KeyCode::Z => self.state.input.swing = false,
-            KeyCode::Space => self.state.input.jump = false,
-            KeyCode::S | KeyCode::Down => self.state.input.down = false,
+            KeyCode::X => self.state.input.jump = false,
+            KeyCode::Down => self.state.input.down = false,
             _ => {}
         }
     }

@@ -273,7 +273,7 @@ impl Renderer {
         // draw enemies
         for enemy in &state.enemies {
             let bb = enemy.bb();
-            self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
+            // self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
 
             self.draw_from_texture_atlas(
                 state,
@@ -296,7 +296,7 @@ impl Renderer {
         let pw = state.player.bb.w;
         let ph = state.player.bb.h;
 
-        self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0]);
+        // self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0]);
         self.draw_from_texture_atlas(
             state,
             TextureIndexes::Player,
