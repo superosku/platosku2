@@ -127,7 +127,9 @@ impl Player {
             }
         }
 
-        let (new_bb, on_ground) = integrate_kinematic(map, &self.bb);
+        let res = integrate_kinematic(map, &self.bb, true);
+        let new_bb = res.new_bb;
+        let on_ground = res.on_bottom;
 
         let could_ladder = map.is_ladder_at(
             (new_bb.x + new_bb.w * 0.5).floor() as i32,

@@ -1,6 +1,8 @@
 use super::common::BoundingBox;
 use super::game_map::GameMap;
 use crate::physics::integrate_kinematic;
+use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
+use rand::prelude::*;
 
 pub trait Enemy {
     fn bb(&self) -> &BoundingBox;
@@ -11,31 +13,109 @@ pub trait Enemy {
     fn overlaps(&self, bb: &BoundingBox) -> bool {
         self.bb().overlaps(bb)
     }
+
+    fn get_atlas_index(&self) -> u32;
 }
 
-// Simple walker that patrols horizontally and flips when hitting walls
-pub struct Walker {
-    pub bb: BoundingBox,
-    pub speed: f32,
+// // Simple walker that patrols horizontally and flips when hitting walls
+// pub struct Walker {
+//     pub bb: BoundingBox,
+//     pub speed: f32,
+// }
+//
+// impl Walker {
+//     pub fn new(x: f32, y: f32) -> Self {
+//         Walker {
+//             bb: BoundingBox {
+//                 x,
+//                 y,
+//                 w: 0.8,
+//                 h: 0.8,
+//                 vx: 0.02,
+//                 vy: 0.0,
+//             },
+//             speed: 0.02,
+//         }
+//     }
+// }
+//
+// impl Enemy for Walker {
+//     fn bb(&self) -> &BoundingBox {
+//         &self.bb
+//     }
+//     fn bb_mut(&mut self) -> &mut BoundingBox {
+//         &mut self.bb
+//     }
+//
+//     fn update(&mut self, map: &GameMap) {
+//         // Try moving horizontally with current velocity; if blocked, flip direction
+//         let desired_vx = if self.bb.vx.abs() > 0.0 {
+//             self.bb.vx
+//         } else {
+//             self.speed
+//         };
+//         let mut probe = self.bb;
+//         probe.vx = desired_vx;
+//         let (new_bb, _on_ground) = integrate_kinematic(map, &probe);
+//
+//         // If horizontal movement was blocked, new_bb.x stays same; flip vx
+//         if (new_bb.x - self.bb.x).abs() < 0.0001 {
+//             self.bb.vx = -desired_vx.signum() * self.speed;
+//         } else {
+//             self.bb = new_bb;
+//             self.bb.vx = desired_vx;
+//         }
+//         // Gravity handled by integrate_kinematic via vy
+//     }
+// }
+
+// Bat flies around
+
+#[derive(PartialEq)]
+enum BatAnimationState {
+    Flying,
+    Standing,
 }
 
-impl Walker {
-    pub fn new(x: f32, y: f32) -> Self {
-        Walker {
-            bb: BoundingBox {
-                x,
-                y,
-                w: 0.8,
-                h: 0.8,
-                vx: 0.02,
-                vy: 0.0,
-            },
-            speed: 0.02,
+impl AnimationConfig for BatAnimationState {
+    fn get_config(&self) -> AnimationConfigResult {
+        match self {
+            BatAnimationState::Flying => AnimationConfigResult::new(0, 3, 15),
+            BatAnimationState::Standing => AnimationConfigResult::new(4, 4, 5),
         }
     }
 }
 
-impl Enemy for Walker {
+pub struct Bat {
+    pub bb: BoundingBox,
+    // pub base_x: f32,
+    // pub t: f32,
+    dir_rad: f32,
+    is_grounded: bool,
+    pub animation_handler: AnimationHandler<BatAnimationState>,
+}
+
+impl Bat {
+    pub fn new(x: f32, y: f32) -> Self {
+        let mut rng = rand::rng();
+
+        Bat {
+            bb: BoundingBox {
+                x,
+                y,
+                w: 14.0 / 16.0,
+                h: 8.0 / 16.0,
+                vx: 0.0,
+                vy: 0.0,
+            },
+            is_grounded: false,
+            dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
+            animation_handler: AnimationHandler::new(BatAnimationState::Standing),
+        }
+    }
+}
+
+impl Enemy for Bat {
     fn bb(&self) -> &BoundingBox {
         &self.bb
     }
@@ -44,69 +124,48 @@ impl Enemy for Walker {
     }
 
     fn update(&mut self, map: &GameMap) {
-        // Try moving horizontally with current velocity; if blocked, flip direction
-        let desired_vx = if self.bb.vx.abs() > 0.0 {
-            self.bb.vx
+        self.bb.vx = self.dir_rad.cos() * 0.01;
+        self.bb.vy = self.dir_rad.sin() * 0.01;
+
+        if self.is_grounded {
+            let mut rng = rand::rng();
+
+            if rng.random_range(0..30) == 0 {
+                self.is_grounded = false;
+                // When leaving ground go up upwards left 45 degree or right 45 degree
+                self.dir_rad =
+                    rng.random_range(std::f32::consts::PI * 1.25..std::f32::consts::PI * 1.75)
+            }
         } else {
-            self.speed
-        };
-        let mut probe = self.bb;
-        probe.vx = desired_vx;
-        let (new_bb, _on_ground) = integrate_kinematic(map, &probe);
+            let res = integrate_kinematic(map, &self.bb, false);
 
-        // If horizontal movement was blocked, new_bb.x stays same; flip vx
-        if (new_bb.x - self.bb.x).abs() < 0.0001 {
-            self.bb.vx = -desired_vx.signum() * self.speed;
+            if !res.on_left && !res.on_right && !res.on_top && !res.on_bottom {
+                self.bb = res.new_bb;
+            }
+
+            if res.on_left | res.on_right {
+                self.dir_rad = (self.dir_rad.sin()).atan2(-self.dir_rad.cos());
+            }
+            if res.on_bottom | res.on_top {
+                self.dir_rad = (-self.dir_rad.sin()).atan2(self.dir_rad.cos());
+            }
+
+            if res.on_bottom {
+                self.is_grounded = true;
+            }
+        }
+
+        if self.is_grounded {
+            self.animation_handler
+                .set_state(BatAnimationState::Standing);
         } else {
-            self.bb = new_bb;
-            self.bb.vx = desired_vx;
+            self.animation_handler.set_state(BatAnimationState::Flying);
         }
-        // Gravity handled by integrate_kinematic via vy
-    }
-}
 
-// Floater oscillates horizontally in air using sine-like timer and very small gravity influence
-pub struct Floater {
-    pub bb: BoundingBox,
-    pub base_x: f32,
-    pub t: f32,
-}
-
-impl Floater {
-    pub fn new(x: f32, y: f32) -> Self {
-        Floater {
-            bb: BoundingBox {
-                x,
-                y,
-                w: 0.7,
-                h: 0.7,
-                vx: 0.0,
-                vy: 0.0,
-            },
-            base_x: x,
-            t: 0.0,
-        }
-    }
-}
-
-impl Enemy for Floater {
-    fn bb(&self) -> &BoundingBox {
-        &self.bb
-    }
-    fn bb_mut(&mut self) -> &mut BoundingBox {
-        &mut self.bb
+        self.animation_handler.increment_frame();
     }
 
-    fn update(&mut self, _map: &GameMap) {
-        // Lightweight oscillation: move x back and forth; ignore collisions for simplicity
-        self.t += 0.05;
-        let amplitude = 1.2;
-        let speed = 0.03;
-        // Triangle-like wave using abs
-        let phase = ((self.t * speed) % 2.0) - 1.0; // -1..1
-        let tri = (phase).abs();
-        self.bb.x = self.base_x + (tri * 2.0 - 1.0) * amplitude * 0.5;
-        // Gentle bobbing
-        self.bb.y += (0.0025) * ((self.t * 0.25).sin() as f32);
+    fn get_atlas_index(&self) -> u32 {
+        self.animation_handler.get_atlas_index()
     }
 }

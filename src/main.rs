@@ -4,7 +4,7 @@ use state::OverlayTile;
 mod camera;
 mod physics;
 mod state;
-use crate::state::{Coin, Enemy, Floater, GameMap, GameState, InputState, Player, Walker};
+use crate::state::{Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
 mod render;
 use crate::render::Renderer;
 
@@ -74,9 +74,9 @@ impl Stage {
                 Coin::new(10.0, 1.0),
             ],
             enemies: vec![
-                Box::new(Walker::new(8.0, 2.0)) as Box<dyn Enemy>,
-                Box::new(Walker::new(12.0, 2.0)) as Box<dyn Enemy>,
-                Box::new(Floater::new(5.0, 2.5)) as Box<dyn Enemy>,
+                Box::new(Bat::new(8.0, 2.0)) as Box<dyn Enemy>,
+                Box::new(Bat::new(12.0, 2.0)) as Box<dyn Enemy>,
+                Box::new(Bat::new(5.0, 2.5)) as Box<dyn Enemy>,
             ],
             camera: camera::Camera::new(0.0, 0.0, 2.0),
         };

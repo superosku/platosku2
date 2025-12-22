@@ -21,8 +21,8 @@ impl Coin {
     }
 
     pub fn update(&mut self, map: &GameMap) {
-        let (new_bb, _on_ground) = integrate_kinematic(map, &self.bb);
-        self.bb = new_bb;
+        let res = integrate_kinematic(map, &self.bb, true);
+        self.bb = res.new_bb;
     }
 
     pub fn overlaps(&self, bb: &BoundingBox) -> bool {

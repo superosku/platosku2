@@ -38,6 +38,7 @@ enum TextureIndexes {
     Tile,
     TileBackground,
     Player,
+    Bat,
 }
 
 struct TextureInfo {
@@ -216,6 +217,10 @@ impl Renderer {
             load_texture(&mut ctx, "assets/character.png"),
         );
         textures.insert(
+            TextureIndexes::Bat,
+            load_texture(&mut ctx, "assets/bat.png"),
+        );
+        textures.insert(
             TextureIndexes::White1x1,
             TextureInfo {
                 w: 1.0,
@@ -268,7 +273,21 @@ impl Renderer {
         // draw enemies
         for enemy in &state.enemies {
             let bb = enemy.bb();
-            self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [1.0, 0.25, 0.25, 1.0]);
+            self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
+
+            self.draw_from_texture_atlas(
+                state,
+                TextureIndexes::Bat,
+                enemy.get_atlas_index() as f32,
+                match state.player.dir {
+                    Dir::Left => true,
+                    Dir::Right => false,
+                },
+                bb.x - 1.0 / TILE_SIZE,
+                bb.y - 1.0 / TILE_SIZE,
+                bb.w + 2.0 / TILE_SIZE,
+                bb.h + 2.0 / TILE_SIZE,
+            );
         }
 
         // draw player on top
@@ -350,7 +369,6 @@ impl Renderer {
             uv_scale_x = -uv_scale_x;
         }
 
-        println!("{} {}", w * TILE_SIZE, texture.w);
         let uniforms = Uniforms {
             mvp,
             color: [1.0, 1.0, 1.0, 0.0],
