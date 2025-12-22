@@ -1,12 +1,19 @@
-use crate::physics::{integrate_kinematic, check_and_snap_hang};
+use super::common::{BoundingBox, Dir, Pos};
 use super::game_map::GameMap;
 use super::game_state::InputState;
-use super::common::{Dir, Pos, BoundingBox};
+use crate::physics::{check_and_snap_hang, integrate_kinematic};
 
 pub enum PlayerState {
     Normal,
-    Hanging { dir: Dir, pos: Pos },
+    Swinging { total_frames: u32, frames_left: u32 },
+    Hanging { pos: Pos },
     OnLadder,
+}
+
+pub struct SwingState {
+    pub pivot_x: f32,
+    pub pivot_y: f32,
+    pub angle_rad: f32,
 }
 
 pub struct Player {
@@ -14,16 +21,119 @@ pub struct Player {
     pub on_ground: bool,
     pub state: PlayerState,
     pub speed: f32,
+    pub dir: Dir,
 }
 
 impl Player {
     pub fn new(x: f32, y: f32) -> Self {
         Player {
-            bb: BoundingBox { x, y, w: 0.6, h: 0.8, vx: 0.0, vy: 0.0 },
+            bb: BoundingBox {
+                x,
+                y,
+                w: 0.6,
+                h: 0.8,
+                vx: 0.0,
+                vy: 0.0,
+            },
             on_ground: false,
             state: PlayerState::Normal,
             speed: 0.04,
+            dir: Dir::Right,
         }
+    }
+
+    pub fn get_swing_info(&self) -> Option<SwingState> {
+        match self.state {
+            PlayerState::Swinging {
+                total_frames,
+                frames_left,
+            } => {
+                let (dir_move, angle_rad) = match self.dir {
+                    Dir::Left => (
+                        -0.1,
+                        ((frames_left) as f32 / total_frames as f32 + 0.7)
+                            * 0.9
+                            * std::f32::consts::PI,
+                    ),
+                    Dir::Right => (
+                        0.1,
+                        ((total_frames - frames_left) as f32 / total_frames as f32 + 0.7)
+                            * 0.9
+                            * std::f32::consts::PI,
+                    ),
+                };
+                let pivot_x = self.bb.x + self.bb.w / 2.0 + dir_move;
+                let pivot_y = self.bb.y + self.bb.h / 2.0 - 0.1;
+                Some(SwingState {
+                    angle_rad,
+                    pivot_x,
+                    pivot_y,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub fn _handle_normal(&mut self, input: &InputState, map: &GameMap) {
+        let pressing_left = input.left && !input.right;
+        let pressing_right = input.right && !input.left;
+
+        if pressing_left {
+            self.bb.vx = -self.speed;
+            self.dir = Dir::Left;
+        } else if pressing_right {
+            self.bb.vx = self.speed;
+            self.dir = Dir::Right;
+        } else {
+            self.bb.vx = 0.0;
+        }
+
+        if input.jump && self.on_ground {
+            self.bb.vy = -0.19;
+        }
+
+        if input.swing {
+            if let PlayerState::Normal = self.state {
+                self.state = PlayerState::Swinging {
+                    total_frames: 40,
+                    frames_left: 40,
+                };
+            }
+        }
+
+        let (new_bb, on_ground) = integrate_kinematic(map, &self.bb);
+
+        let could_ladder = map.is_ladder_at(
+            (new_bb.x + new_bb.w * 0.5).floor() as i32,
+            (new_bb.y + new_bb.h * 0.5).floor() as i32,
+        );
+        if could_ladder && (input.up || input.down) && !(input.down && self.on_ground) {
+            self.state = PlayerState::OnLadder;
+            let middle_tx = (new_bb.x + new_bb.w * 0.5).floor() as i32;
+            self.bb.x = (middle_tx as f32 + 0.5) - self.bb.w * 0.5;
+
+            return;
+        }
+
+        if self.bb.vy > 0.0 {
+            if pressing_left || pressing_right {
+                let dir: Dir = if pressing_right {
+                    Dir::Right
+                } else {
+                    Dir::Left
+                };
+                if let Some(hang_pos) = check_and_snap_hang(&self.bb, &new_bb, map, dir) {
+                    self.state = PlayerState::Hanging { pos: hang_pos };
+                    self.dir = dir;
+                    self.bb.vy = 0.0;
+                    self.on_ground = false;
+                    return;
+                }
+            }
+        }
+
+        self.bb = new_bb;
+        self.on_ground = on_ground;
     }
 
     pub fn update(&mut self, input: &InputState, map: &GameMap) {
@@ -42,50 +152,25 @@ impl Player {
                         self.bb.vy = -0.17;
                     }
                 }
-            },
+            }
+            PlayerState::Swinging {
+                total_frames,
+                frames_left,
+            } => {
+                if *frames_left > 0 {
+                    self.state = PlayerState::Swinging {
+                        total_frames: *total_frames,
+                        frames_left: frames_left - 1,
+                    };
+                } else {
+                    self.state = PlayerState::Normal;
+                }
+
+                self._handle_normal(input, map);
+            }
             PlayerState::Normal => {
-                if input.left { self.bb.vx = -self.speed; }
-                else if input.right { self.bb.vx = self.speed; }
-                else {self.bb.vx = 0.0;}
-
-                if input.jump && self.on_ground {
-                    self.bb.vy = -0.19;
-                }
-
-                let (new_bb, on_ground) = integrate_kinematic(
-                    map,
-                    &self.bb,
-                );
-
-                let could_ladder = map.is_ladder_at(
-                    (new_bb.x + new_bb.w * 0.5).floor() as i32,
-                    (new_bb.y + new_bb.h * 0.5).floor() as i32,
-                );
-                if could_ladder && (input.up || input.down) && !(input.down && self.on_ground) {
-                    self.state = PlayerState::OnLadder;
-                    let middle_tx = (new_bb.x + new_bb.w * 0.5).floor() as i32;
-                    self.bb.x = (middle_tx as f32 + 0.5) - self.bb.w * 0.5;
-
-                    return;
-                }
-
-                if self.bb.vy > 0.0 {
-                    let pressing_left = input.left && !input.right;
-                    let pressing_right = input.right && !input.left;
-                    if pressing_left || pressing_right {
-                        let dir: Dir = if pressing_right { Dir::Right } else { Dir::Left };
-                        if let Some(hang_pos) = check_and_snap_hang(&self.bb, &new_bb, map, dir) {
-                            self.state = PlayerState::Hanging { dir, pos: hang_pos };
-                            self.bb.vy = 0.0;
-                            self.on_ground = false;
-                            return;
-                        }
-                    }
-                }
-
-                self.bb = new_bb;
-                self.on_ground = on_ground;
-            },
+                self._handle_normal(input, map);
+            }
             PlayerState::OnLadder => {
                 if input.jump {
                     self.state = PlayerState::Normal;
@@ -108,7 +193,9 @@ impl Player {
                 } else if input.down && !input.up {
                     self.bb.vy = self.speed;
                     let feet_y = self.bb.y + self.bb.h;
-                    if map.is_solid_at(middle_tx, feet_y.floor() as i32) || (!ladder_at_head && !ladder_at_below) {
+                    if map.is_solid_at(middle_tx, feet_y.floor() as i32)
+                        || (!ladder_at_head && !ladder_at_below)
+                    {
                         self.state = PlayerState::Normal;
                         self.on_ground = true;
                         self.bb.vy = 0.0;
@@ -120,9 +207,7 @@ impl Player {
                 let new_y = self.bb.y + self.bb.vy;
 
                 self.bb.y = new_y;
-            },
+            }
         }
     }
 }
-
-

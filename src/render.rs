@@ -1,25 +1,28 @@
-use miniquad::*;
-use image::GenericImageView;
-use crate::state::BaseTile;
-use crate::state::OverlayTile;
 use crate::state::GameState;
+use crate::state::OverlayTile;
+use crate::state::{BaseTile, Dir, PlayerState};
+use image::GenericImageView;
+use miniquad::*;
 
 #[repr(C)]
 struct Uniforms {
     mvp: [f32; 16],
     color: [f32; 4],
-    uv_base: [f32; 4],  // xy used
-    uv_scale: [f32; 4], // xy used
-    world_base: [f32; 4],  // xy used (world pixel origin of this quad)
-    world_scale: [f32; 4], // xy used (world pixel size of this quad)
-    color_key: [f32; 4],   // rgb = key color, a = threshold
-    bg_tile_size: [f32; 4], // xy used (repeat period in pixels)
+    uv_base: [f32; 4],          // xy used
+    uv_scale: [f32; 4],         // xy used
+    world_base: [f32; 4],       // xy used (world pixel origin of this quad)
+    world_scale: [f32; 4],      // xy used (world pixel size of this quad)
+    color_key: [f32; 4],        // rgb = key color, a = threshold
+    bg_tile_size: [f32; 4],     // xy used (repeat period in pixels)
     bg_region_origin: [f32; 4], // xy used (top-left of 64x64 region in bg texture, in pixels)
-    bg_tex_size: [f32; 4], // xy used (bg texture size in pixels)
+    bg_tex_size: [f32; 4],      // xy used (bg texture size in pixels)
 }
 
 #[repr(C)]
-struct Vertex { pos: [f32; 2], uv: [f32; 2] }
+struct Vertex {
+    pos: [f32; 2],
+    uv: [f32; 2],
+}
 
 pub struct Renderer {
     ctx: Box<Context>,
@@ -61,10 +64,22 @@ impl Renderer {
 
         // unit quad with UVs (0..1)
         let vertices: [Vertex; 4] = [
-            Vertex { pos: [0.0, 0.0], uv: [0.0, 0.0] },
-            Vertex { pos: [1.0, 0.0], uv: [1.0, 0.0] },
-            Vertex { pos: [1.0, 1.0], uv: [1.0, 1.0] },
-            Vertex { pos: [0.0, 1.0], uv: [0.0, 1.0] },
+            Vertex {
+                pos: [0.0, 0.0],
+                uv: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [1.0, 0.0],
+                uv: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [1.0, 1.0],
+                uv: [1.0, 1.0],
+            },
+            Vertex {
+                pos: [0.0, 1.0],
+                uv: [0.0, 1.0],
+            },
         ];
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
 
@@ -81,7 +96,8 @@ impl Renderer {
 
         // Load tilemap texture from assets
         // let dyn_img = image::open("assets/tilemap.png").expect("failed to load assets/tilemap.png");
-        let dyn_img = image::open("assets/tilemap16.png").expect("failed to load assets/tilemap.png");
+        let dyn_img =
+            image::open("assets/tilemap16.png").expect("failed to load assets/tilemap.png");
         let (img_w, img_h) = dyn_img.dimensions();
         let rgba8 = dyn_img.to_rgba8();
         let tile_texture = ctx.new_texture_from_rgba8(img_w as u16, img_h as u16, &rgba8);
@@ -91,7 +107,8 @@ impl Renderer {
         ctx.texture_set_wrap(tile_texture, TextureWrap::Clamp, TextureWrap::Clamp);
 
         // Load background texture (tiled 64x64 area) from assets
-        let bg_img = image::open("assets/tile_backgrounds.png").expect("failed to load assets/tile_backgrounds.png");
+        let bg_img = image::open("assets/tile_backgrounds.png")
+            .expect("failed to load assets/tile_backgrounds.png");
         let (bg_w, bg_h) = bg_img.dimensions();
         let bg_rgba8 = bg_img.to_rgba8();
         let bg_texture = ctx.new_texture_from_rgba8(bg_w as u16, bg_h as u16, &bg_rgba8);
@@ -107,7 +124,10 @@ impl Renderer {
 
         let shader = ctx
             .new_shader(
-                ShaderSource::Glsl { vertex: VERTEX_SHADER, fragment: FRAGMENT_SHADER },
+                ShaderSource::Glsl {
+                    vertex: VERTEX_SHADER,
+                    fragment: FRAGMENT_SHADER,
+                },
                 ShaderMeta {
                     images: vec!["tex".to_string(), "bg_tex".to_string()],
                     uniforms: UniformBlockLayout {
@@ -174,7 +194,11 @@ impl Renderer {
     }
 
     pub fn draw(&mut self, state: &GameState) {
-        let clear = PassAction::Clear { color: Some((0.08, 0.09, 0.10, 1.0)), depth: Some(1.0), stencil: Some(0) };
+        let clear = PassAction::Clear {
+            color: Some((0.08, 0.09, 0.10, 1.0)),
+            depth: Some(1.0),
+            stencil: Some(0),
+        };
         self.ctx.begin_default_pass(clear);
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
@@ -188,7 +212,14 @@ impl Renderer {
 
         // draw coins
         for coin in &state.coins {
-            self.draw_rect(state, coin.bb.x, coin.bb.y, coin.bb.w, coin.bb.h, [1.0, 0.85, 0.2, 1.0]);
+            self.draw_rect(
+                state,
+                coin.bb.x,
+                coin.bb.y,
+                coin.bb.w,
+                coin.bb.h,
+                [1.0, 0.85, 0.2, 1.0],
+            );
         }
 
         // draw enemies
@@ -203,12 +234,34 @@ impl Renderer {
         let pw = state.player.bb.w;
         let ph = state.player.bb.h;
         self.draw_rect(state, px, py, pw, ph, [0.20, 1.0, 0.40, 1.0]);
+        if let Some(swing_info) = state.player.get_swing_info() {
+            self.draw_rect_rotated(
+                state,
+                swing_info.pivot_x - 0.1,
+                swing_info.pivot_y - 0.2,
+                0.2,
+                1.0,
+                swing_info.pivot_x,
+                swing_info.pivot_y,
+                swing_info.angle_rad,
+                [0.5, 0.5, 0.5, 1.0],
+            )
+        }
 
         self.ctx.end_render_pass();
         self.ctx.commit_frame();
     }
 
-    fn draw_tile_textured(&mut self, state: &GameState, px: f32, py: f32, color: [f32; 4], uv_base: [f32; 2], uv_scale: [f32; 2], tile_type_index: u8) {
+    fn draw_tile_textured(
+        &mut self,
+        state: &GameState,
+        px: f32,
+        py: f32,
+        color: [f32; 4],
+        uv_base: [f32; 2],
+        uv_scale: [f32; 2],
+        tile_type_index: u8,
+    ) {
         // ensure tile texture bound
         self.bindings.images[0] = self.tile_texture;
         self.bindings.images[1] = self.bg_texture;
@@ -216,7 +269,10 @@ impl Renderer {
 
         let view = Self::camera_view(state);
         let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
-        let model = Self::mat4_mul(Self::mat4_translation(px, py), Self::mat4_scale(TILE_SIZE, TILE_SIZE));
+        let model = Self::mat4_mul(
+            Self::mat4_translation(px, py),
+            Self::mat4_scale(TILE_SIZE, TILE_SIZE),
+        );
         let vp = Self::mat4_mul(proj, view);
         let mvp = Self::mat4_mul(vp, model);
 
@@ -244,7 +300,10 @@ impl Renderer {
 
         let view = Self::camera_view(state);
         let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
-        let model = Self::mat4_mul(Self::mat4_translation(px * TILE_SIZE, py * TILE_SIZE), Self::mat4_scale(w * TILE_SIZE, h * TILE_SIZE));
+        let model = Self::mat4_mul(
+            Self::mat4_translation(px * TILE_SIZE, py * TILE_SIZE),
+            Self::mat4_scale(w * TILE_SIZE, h * TILE_SIZE),
+        );
         let vp = Self::mat4_mul(proj, view);
         let mvp = Self::mat4_mul(vp, model);
 
@@ -264,10 +323,71 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
+    fn draw_rect_rotated(
+        &mut self,
+        state: &GameState,
+        px: f32,
+        py: f32,
+        w: f32,
+        h: f32,
+        pivot_x: f32,
+        pivot_y: f32,
+        angle_rad: f32,
+        color: [f32; 4],
+    ) {
+        // bind white texture and use full-quad UVs
+        self.bindings.images[0] = self.white_texture;
+        self.bindings.images[1] = self.bg_texture;
+        self.ctx.apply_bindings(&self.bindings);
+
+        let view = Self::camera_view(state);
+        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+
+        // --- build model matrix with pivot rotation ---
+        let pxw = px * TILE_SIZE;
+        let pyw = py * TILE_SIZE;
+        let ww = w * TILE_SIZE;
+        let hw = h * TILE_SIZE;
+
+        let pivot_wx = pivot_x * TILE_SIZE;
+        let pivot_wy = pivot_y * TILE_SIZE;
+
+        // Order (column-vector convention): M = T(pivot) * R * T(-pivot) * T(pos) * S
+        // But because your rect is positioned by translating its origin (px,py),
+        // a clean way is: T(pivot) * R * T(pos - pivot) * S
+        let t_pivot = Self::mat4_translation(pivot_wx, pivot_wy);
+        let r = Self::mat4_rotation_z(angle_rad);
+        let t_from_pivot = Self::mat4_translation(pxw - pivot_wx, pyw - pivot_wy);
+        let s = Self::mat4_scale(ww, hw);
+
+        let model = Self::mat4_mul(Self::mat4_mul(Self::mat4_mul(t_pivot, r), t_from_pivot), s);
+
+        let vp = Self::mat4_mul(proj, view);
+        let mvp = Self::mat4_mul(vp, model);
+
+        let uniforms = Uniforms {
+            mvp,
+            color,
+            uv_base: [0.0, 0.0, 0.0, 0.0],
+            uv_scale: [1.0, 1.0, 0.0, 0.0],
+            world_base: [pxw, pyw, 0.0, 0.0],
+            world_scale: [ww, hw, 0.0, 0.0],
+            color_key: [1.0, 0.0, 1.0, 0.01],
+            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
+            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_tex_size: [self.bg_w, self.bg_h, 0.0, 0.0],
+        };
+
+        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+        self.ctx.draw(0, 6, 1);
+    }
+
     fn draw_overlay(&mut self, state: &GameState) {
         let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         let height = state.map.base.len();
-        if width == 0 || height == 0 { return; }
+        if width == 0 || height == 0 {
+            return;
+        }
 
         let tex_w = self.tilemap_w;
         let tex_h = self.tilemap_h;
@@ -312,13 +432,15 @@ impl Renderer {
                         continue;
                     }
                     OverlayTile::Ladder => {
-                        let uv_base_px = if state.map.is_ladder_at(x, y - 1) || state.map.is_solid_at(x, y - 1) {
+                        let uv_base_px = if state.map.is_ladder_at(x, y - 1)
+                            || state.map.is_solid_at(x, y - 1)
+                        {
                             [0.0_f32 * TILE_SIZE, 4.0_f32 * TILE_SIZE]
                         } else {
                             [1.0_f32 * TILE_SIZE, 4.0_f32 * TILE_SIZE]
                         };
                         [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h]
-                    },
+                    }
                 };
 
                 self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
@@ -329,7 +451,9 @@ impl Renderer {
     fn draw_base_dual_grid(&mut self, state: &GameState, tile_type: BaseTile, tile_type_index: u8) {
         let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         let height = state.map.base.len();
-        if width == 0 || height == 0 { return; }
+        if width == 0 || height == 0 {
+            return;
+        }
 
         let tex_w = self.tilemap_w;
         let tex_h = self.tilemap_h;
@@ -361,12 +485,22 @@ impl Renderer {
                 let (br, _o4) = state.map.get_at(x + 1, y + 1);
 
                 let mut mask: u32 = 0;
-                if tl == tile_type { mask |= 1; }
-                if tr == tile_type { mask |= 2; }
-                if bl == tile_type { mask |= 4; }
-                if br == tile_type { mask |= 8; }
+                if tl == tile_type {
+                    mask |= 1;
+                }
+                if tr == tile_type {
+                    mask |= 2;
+                }
+                if bl == tile_type {
+                    mask |= 4;
+                }
+                if br == tile_type {
+                    mask |= 8;
+                }
 
-                if mask == 0 { continue; }
+                if mask == 0 {
+                    continue;
+                }
 
                 let (u, v) = DUAL_GRID_UV_TABLE[mask as usize];
                 let uv_base_px = [u as f32 * TILE_SIZE, v as f32 * TILE_SIZE];
@@ -374,15 +508,25 @@ impl Renderer {
                 let half_u = 0.5 / tex_w;
                 let half_v = 0.5 / tex_h;
                 let uv_base = [
-                    uv_base_px[0] / tex_w + half_u + tile_type_index as f32 * 4.0 * TILE_SIZE / tex_w,
-                    uv_base_px[1] / tex_h + half_v
+                    uv_base_px[0] / tex_w
+                        + half_u
+                        + tile_type_index as f32 * 4.0 * TILE_SIZE / tex_w,
+                    uv_base_px[1] / tex_h + half_v,
                 ];
                 let uv_scale = [(TILE_SIZE - 1.0) / tex_w, (TILE_SIZE - 1.0) / tex_h];
 
                 let px = x as f32 * TILE_SIZE + offset_x;
                 let py = y as f32 * TILE_SIZE + offset_y;
 
-                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, tile_type_index);
+                self.draw_tile_textured(
+                    state,
+                    px,
+                    py,
+                    [1.0, 1.0, 1.0, 1.0],
+                    uv_base,
+                    uv_scale,
+                    tile_type_index,
+                );
             }
         }
     }
@@ -418,10 +562,7 @@ impl Renderer {
         let ty = -((t + b) / (t - b));
         let tz = -((f + n) / (f - n));
         [
-            sx, 0.0, 0.0, 0.0,
-            0.0, sy, 0.0, 0.0,
-            0.0, 0.0, sz, 0.0,
-            tx, ty, tz, 1.0,
+            sx, 0.0, 0.0, 0.0, 0.0, sy, 0.0, 0.0, 0.0, 0.0, sz, 0.0, tx, ty, tz, 1.0,
         ]
     }
 
@@ -438,10 +579,21 @@ impl Renderer {
         // Pipeline: translate (-snapped_cx, -snapped_cy) -> scale (zoom) -> translate (screen_w/2, screen_h/2)
         let translate_to_origin = Self::mat4_translation(-snapped_cx, -snapped_cy);
         let scale_zoom = Self::mat4_scale(zoom, zoom);
-        let translate_to_screen_center = Self::mat4_translation(state.screen_w * 0.5, state.screen_h * 0.5);
+        let translate_to_screen_center =
+            Self::mat4_translation(state.screen_w * 0.5, state.screen_h * 0.5);
 
         let ts = Self::mat4_mul(scale_zoom, translate_to_origin);
         Self::mat4_mul(translate_to_screen_center, ts)
+    }
+
+    fn mat4_rotation_z(angle_rad: f32) -> [f32; 16] {
+        let c = angle_rad.cos();
+        let s = angle_rad.sin();
+
+        // Column-major 4x4 rotation around Z
+        [
+            c, s, 0.0, 0.0, -s, c, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ]
     }
 
     fn mat4_mul(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
@@ -449,7 +601,9 @@ impl Renderer {
         for row in 0..4 {
             for col in 0..4 {
                 let mut sum = 0.0;
-                for k in 0..4 { sum += a[k * 4 + row] * b[col * 4 + k]; }
+                for k in 0..4 {
+                    sum += a[k * 4 + row] * b[col * 4 + k];
+                }
                 out[col * 4 + row] = sum;
             }
         }
@@ -458,19 +612,13 @@ impl Renderer {
 
     fn mat4_translation(tx: f32, ty: f32) -> [f32; 16] {
         [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            tx,  ty,  0.0, 1.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, tx, ty, 0.0, 1.0,
         ]
     }
 
     fn mat4_scale(sx: f32, sy: f32) -> [f32; 16] {
         [
-            sx,  0.0, 0.0, 0.0,
-            0.0, sy,  0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            sx, 0.0, 0.0, 0.0, 0.0, sy, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ]
     }
 }
@@ -518,5 +666,3 @@ void main() {
     gl_FragColor = out_color * v_color;
 }
 "#;
-
-

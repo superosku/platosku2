@@ -1,6 +1,6 @@
-use crate::physics::integrate_kinematic;
-use super::game_map::GameMap;
 use super::common::BoundingBox;
+use super::game_map::GameMap;
+use crate::physics::integrate_kinematic;
 
 pub trait Enemy {
     fn bb(&self) -> &BoundingBox;
@@ -22,19 +22,34 @@ pub struct Walker {
 impl Walker {
     pub fn new(x: f32, y: f32) -> Self {
         Walker {
-            bb: BoundingBox { x, y, w: 0.8, h: 0.8, vx: 0.02, vy: 0.0 },
+            bb: BoundingBox {
+                x,
+                y,
+                w: 0.8,
+                h: 0.8,
+                vx: 0.02,
+                vy: 0.0,
+            },
             speed: 0.02,
         }
     }
 }
 
 impl Enemy for Walker {
-    fn bb(&self) -> &BoundingBox { &self.bb }
-    fn bb_mut(&mut self) -> &mut BoundingBox { &mut self.bb }
+    fn bb(&self) -> &BoundingBox {
+        &self.bb
+    }
+    fn bb_mut(&mut self) -> &mut BoundingBox {
+        &mut self.bb
+    }
 
     fn update(&mut self, map: &GameMap) {
         // Try moving horizontally with current velocity; if blocked, flip direction
-        let desired_vx = if self.bb.vx.abs() > 0.0 { self.bb.vx } else { self.speed };
+        let desired_vx = if self.bb.vx.abs() > 0.0 {
+            self.bb.vx
+        } else {
+            self.speed
+        };
         let mut probe = self.bb;
         probe.vx = desired_vx;
         let (new_bb, _on_ground) = integrate_kinematic(map, &probe);
@@ -60,7 +75,14 @@ pub struct Floater {
 impl Floater {
     pub fn new(x: f32, y: f32) -> Self {
         Floater {
-            bb: BoundingBox { x, y, w: 0.7, h: 0.7, vx: 0.0, vy: 0.0 },
+            bb: BoundingBox {
+                x,
+                y,
+                w: 0.7,
+                h: 0.7,
+                vx: 0.0,
+                vy: 0.0,
+            },
             base_x: x,
             t: 0.0,
         }
@@ -68,8 +90,12 @@ impl Floater {
 }
 
 impl Enemy for Floater {
-    fn bb(&self) -> &BoundingBox { &self.bb }
-    fn bb_mut(&mut self) -> &mut BoundingBox { &mut self.bb }
+    fn bb(&self) -> &BoundingBox {
+        &self.bb
+    }
+    fn bb_mut(&mut self) -> &mut BoundingBox {
+        &mut self.bb
+    }
 
     fn update(&mut self, _map: &GameMap) {
         // Lightweight oscillation: move x back and forth; ignore collisions for simplicity
@@ -84,5 +110,3 @@ impl Enemy for Floater {
         self.bb.y += (0.0025) * ((self.t * 0.25).sin() as f32);
     }
 }
-
-

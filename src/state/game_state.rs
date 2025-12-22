@@ -1,8 +1,8 @@
-use crate::camera::Camera;
-use super::player::Player;
-use super::game_map::GameMap;
 use super::coin::Coin;
 use super::enemies::Enemy;
+use super::game_map::GameMap;
+use super::player::Player;
+use crate::camera::Camera;
 
 #[derive(Default)]
 pub struct InputState {
@@ -11,6 +11,7 @@ pub struct InputState {
     pub up: bool,
     pub jump: bool,
     pub down: bool,
+    pub swing: bool,
 }
 
 pub struct GameState {
@@ -46,5 +47,3 @@ impl GameState {
         self.screen_h = h;
     }
 }
-
-

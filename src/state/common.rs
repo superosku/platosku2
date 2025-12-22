@@ -1,7 +1,7 @@
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Dir {
     Left,
-    Right
+    Right,
 }
 
 #[derive(Clone, Copy)]
@@ -33,11 +33,9 @@ impl BoundingBox {
     }
 
     pub fn overlaps(&self, other: &BoundingBox) -> bool {
-        !(self.x + self.w <= other.x ||
-          other.x + other.w <= self.x ||
-          self.y + self.h <= other.y ||
-          other.y + other.h <= self.y)
+        !(self.x + self.w <= other.x
+            || other.x + other.w <= self.x
+            || self.y + self.h <= other.y
+            || other.y + other.h <= self.y)
     }
 }
-
-

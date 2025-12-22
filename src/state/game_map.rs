@@ -2,7 +2,7 @@
 pub enum BaseTile {
     Empty = 0,
     Stone = 1,
-    Wood= 2,
+    Wood = 2,
 }
 
 #[derive(Clone, Copy)]
@@ -17,17 +17,37 @@ pub struct GameMap {
 }
 
 impl GameMap {
-    pub fn width_tiles(&self) -> usize { self.base.first().map(|r| r.len()).unwrap_or(0) }
-    pub fn height_tiles(&self) -> usize { self.base.len() }
-    pub fn width(&self) -> f32 { self.width_tiles() as f32 }
-    pub fn height(&self) -> f32 { self.height_tiles() as f32 }
+    pub fn width_tiles(&self) -> usize {
+        self.base.first().map(|r| r.len()).unwrap_or(0)
+    }
+    pub fn height_tiles(&self) -> usize {
+        self.base.len()
+    }
+    pub fn width(&self) -> f32 {
+        self.width_tiles() as f32
+    }
+    pub fn height(&self) -> f32 {
+        self.height_tiles() as f32
+    }
 
     pub fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
-        if tx < 0 || ty < 0 { return (BaseTile::Stone, OverlayTile::None); }
+        if tx < 0 || ty < 0 {
+            return (BaseTile::Stone, OverlayTile::None);
+        }
         let x = tx as usize;
         let y = ty as usize;
-        let base = self.base.get(y).and_then(|row| row.get(x)).copied().unwrap_or(BaseTile::Stone);
-        let overlay = self.overlay.get(y).and_then(|row| row.get(x)).copied().unwrap_or(OverlayTile::None);
+        let base = self
+            .base
+            .get(y)
+            .and_then(|row| row.get(x))
+            .copied()
+            .unwrap_or(BaseTile::Stone);
+        let overlay = self
+            .overlay
+            .get(y)
+            .and_then(|row| row.get(x))
+            .copied()
+            .unwrap_or(OverlayTile::None);
         (base, overlay)
     }
 
@@ -48,5 +68,3 @@ impl GameMap {
         }
     }
 }
-
-

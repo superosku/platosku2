@@ -8,7 +8,13 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(x: f32, y: f32, zoom: f32) -> Self {
-        Camera { x, y, zoom, min_zoom: 1.0, max_zoom: 16.0 }
+        Camera {
+            x,
+            y,
+            zoom,
+            min_zoom: 1.0,
+            max_zoom: 16.0,
+        }
     }
 
     pub fn follow(&mut self, target_x: f32, target_y: f32) {
@@ -26,5 +32,3 @@ impl Camera {
         self.set_zoom(new_zoom);
     }
 }
-
-

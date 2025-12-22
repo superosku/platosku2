@@ -1,10 +1,10 @@
 use miniquad::*;
 use state::OverlayTile;
 
-mod state;
-mod physics;
 mod camera;
-use crate::state::{GameMap, GameState, InputState, Player, Coin, Walker, Floater, Enemy};
+mod physics;
+mod state;
+use crate::state::{Coin, Enemy, Floater, GameMap, GameState, InputState, Player, Walker};
 mod render;
 use crate::render::Renderer;
 
@@ -20,21 +20,28 @@ impl Stage {
 
         // Small demo tilemaps (dual-grid): base terrain and overlay
         // Map this so that 1 is BaseTile::Solid, 0 is BaseTile::Empty
-        let base_grid = [vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        let base_grid = [
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             vec![1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 1],
             vec![1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 0, 2, 2, 0, 1],
             vec![1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 2, 0, 1],
             vec![1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]].iter().map(|row| row.iter().map(
-            |&v| match v {
-                0 => state::BaseTile::Empty,
-                1 => state::BaseTile::Stone,
-                2 => state::BaseTile::Wood,
-                _ => state::BaseTile::Empty,
-            }
-        ).collect()).collect();
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ]
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|&v| match v {
+                    0 => state::BaseTile::Empty,
+                    1 => state::BaseTile::Stone,
+                    2 => state::BaseTile::Wood,
+                    _ => state::BaseTile::Empty,
+                })
+                .collect()
+        })
+        .collect();
 
         let mut overlay_grid = vec![vec![OverlayTile::None; 16]; 8];
         // simple decorations in overlay
@@ -103,6 +110,7 @@ impl EventHandler for Stage {
             KeyCode::A | KeyCode::Left => self.state.input.left = true,
             KeyCode::D | KeyCode::Right => self.state.input.right = true,
             KeyCode::W | KeyCode::Up => self.state.input.up = true,
+            KeyCode::Z => self.state.input.swing = true,
             KeyCode::Space => self.state.input.jump = true,
             KeyCode::S | KeyCode::Down => self.state.input.down = true,
             _ => {}
@@ -114,6 +122,7 @@ impl EventHandler for Stage {
             KeyCode::A | KeyCode::Left => self.state.input.left = false,
             KeyCode::D | KeyCode::Right => self.state.input.right = false,
             KeyCode::W | KeyCode::Up => self.state.input.up = false,
+            KeyCode::Z => self.state.input.swing = false,
             KeyCode::Space => self.state.input.jump = false,
             KeyCode::S | KeyCode::Down => self.state.input.down = false,
             _ => {}
@@ -124,7 +133,6 @@ impl EventHandler for Stage {
         self.state.camera.zoom_scroll(y);
     }
 }
-
 
 fn main() {
     miniquad::start(
