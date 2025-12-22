@@ -3,6 +3,7 @@ use crate::state::OverlayTile;
 use crate::state::{BaseTile, Dir, PlayerState};
 use image::GenericImageView;
 use miniquad::*;
+use std::collections::HashMap;
 
 #[repr(C)]
 struct Uniforms {
@@ -28,13 +29,38 @@ pub struct Renderer {
     ctx: Box<Context>,
     pipeline: Pipeline,
     bindings: Bindings,
-    tile_texture: TextureId,
-    bg_texture: TextureId,
-    white_texture: TextureId,
-    tilemap_w: f32,
-    tilemap_h: f32,
-    bg_w: f32,
-    bg_h: f32,
+    textures: HashMap<TextureIndexes, TextureInfo>,
+}
+
+#[derive(Eq, PartialEq, Hash)]
+enum TextureIndexes {
+    White1x1,
+    Tile,
+    TileBackground,
+    Player,
+}
+
+struct TextureInfo {
+    w: f32,
+    h: f32,
+    texture: TextureId,
+}
+
+fn load_texture(ctx: &mut Box<dyn RenderingBackend>, path: &str) -> TextureInfo {
+    // Load background texture (tiled 64x64 area) from assets
+    let img = image::open(path).expect("failed to load assets/tile_backgrounds.png");
+    let (w, h) = img.dimensions();
+    let bg_rgba8 = img.to_rgba8();
+    let texture = ctx.new_texture_from_rgba8(w as u16, h as u16, &bg_rgba8);
+    // Nearest for pixel art, Repeat so UVs can wrap every 64 px
+    ctx.texture_set_filter(texture, FilterMode::Nearest, MipmapFilterMode::None);
+    ctx.texture_set_wrap(texture, TextureWrap::Clamp, TextureWrap::Clamp);
+
+    TextureInfo {
+        w: w as f32,
+        h: h as f32,
+        texture,
+    }
 }
 
 const TILE_SIZE: f32 = 16.0;
@@ -175,17 +201,34 @@ impl Renderer {
         // set default texture to tile texture
         bindings.images[0] = tile_texture;
 
+        let mut textures = HashMap::new();
+
+        textures.insert(
+            TextureIndexes::Tile,
+            load_texture(&mut ctx, "assets/tilemap16.png"),
+        );
+        textures.insert(
+            TextureIndexes::TileBackground,
+            load_texture(&mut ctx, "assets/tile_backgrounds.png"),
+        );
+        textures.insert(
+            TextureIndexes::Player,
+            load_texture(&mut ctx, "assets/character.png"),
+        );
+        textures.insert(
+            TextureIndexes::White1x1,
+            TextureInfo {
+                w: 1.0,
+                h: 1.0,
+                texture: white_texture,
+            },
+        );
+
         Renderer {
             ctx,
             pipeline,
             bindings,
-            tile_texture,
-            bg_texture,
-            white_texture,
-            tilemap_w: img_w as f32,
-            tilemap_h: img_h as f32,
-            bg_w: bg_w as f32,
-            bg_h: bg_h as f32,
+            textures,
         }
     }
 
@@ -233,7 +276,22 @@ impl Renderer {
         let py = state.player.bb.y;
         let pw = state.player.bb.w;
         let ph = state.player.bb.h;
-        self.draw_rect(state, px, py, pw, ph, [0.20, 1.0, 0.40, 1.0]);
+
+        self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0]);
+        self.draw_from_texture_atlas(
+            state,
+            TextureIndexes::Player,
+            state.player.get_animation_index() as f32,
+            match state.player.dir {
+                Dir::Left => true,
+                Dir::Right => false,
+            },
+            px - 1.0 / TILE_SIZE,
+            py - 1.0 / TILE_SIZE,
+            pw + 2.0 / TILE_SIZE,
+            ph + 2.0 / TILE_SIZE,
+        );
+
         if let Some(swing_info) = state.player.get_swing_info() {
             self.draw_rect_rotated(
                 state,
@@ -252,6 +310,67 @@ impl Renderer {
         self.ctx.commit_frame();
     }
 
+    fn draw_from_texture_atlas(
+        &mut self,
+        state: &GameState,
+        texture_index: TextureIndexes,
+        atlas_index: f32,
+        flip: bool,
+        px: f32,
+        py: f32,
+        w: f32,
+        h: f32,
+    ) {
+        // ensure tile texture bound
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+        let texture = self.textures.get(&texture_index).unwrap();
+
+        self.bindings.images[0] = texture.texture;
+        self.bindings.images[1] = background.texture;
+
+        self.ctx.apply_bindings(&self.bindings);
+
+        let view = Self::camera_view(state);
+        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let model = Self::mat4_mul(
+            Self::mat4_translation(px * TILE_SIZE, py * TILE_SIZE),
+            Self::mat4_scale(w * TILE_SIZE, h * TILE_SIZE),
+        );
+        let vp = Self::mat4_mul(proj, view);
+        let mvp = Self::mat4_mul(vp, model);
+
+        let width_ratio = w * TILE_SIZE / texture.w;
+        let height_ratio = h * TILE_SIZE / texture.h;
+
+        let mut uv_base_x = atlas_index * width_ratio;
+        let mut uv_scale_x = width_ratio;
+
+        if flip {
+            uv_base_x += width_ratio;
+            uv_scale_x = -uv_scale_x;
+        }
+
+        println!("{} {}", w * TILE_SIZE, texture.w);
+        let uniforms = Uniforms {
+            mvp,
+            color: [1.0, 1.0, 1.0, 0.0],
+
+            uv_base: [uv_base_x, 0.0, 0.0, 0.0],
+            uv_scale: [uv_scale_x, height_ratio, 0.0, 0.0],
+
+            world_base: [px * TILE_SIZE, py * TILE_SIZE, 0.0, 0.0],
+            world_scale: [w * TILE_SIZE, h * TILE_SIZE, 0.0, 0.0],
+
+            color_key: [1.0, 0.0, 1.0, 0.01], // bright magenta with small threshold
+
+            bg_tile_size: [background.w, background.h, 0.0, 0.0],
+            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
+        };
+        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+        self.ctx.draw(0, 6, 1);
+    }
+
     fn draw_tile_textured(
         &mut self,
         state: &GameState,
@@ -263,8 +382,10 @@ impl Renderer {
         tile_type_index: u8,
     ) {
         // ensure tile texture bound
-        self.bindings.images[0] = self.tile_texture;
-        self.bindings.images[1] = self.bg_texture;
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+        let tile = self.textures.get(&TextureIndexes::Tile).unwrap();
+        self.bindings.images[0] = tile.texture;
+        self.bindings.images[1] = background.texture;
         self.ctx.apply_bindings(&self.bindings);
 
         let view = Self::camera_view(state);
@@ -286,7 +407,7 @@ impl Renderer {
             color_key: [1.0, 0.0, 1.0, 0.01], // bright magenta with small threshold
             bg_tile_size: [64.0, 64.0, 0.0, 0.0],
             bg_region_origin: [64.0 * tile_type_index as f32, 0.0, 0.0, 0.0],
-            bg_tex_size: [self.bg_w, self.bg_h, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
         };
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
         self.ctx.draw(0, 6, 1);
@@ -294,8 +415,12 @@ impl Renderer {
 
     fn draw_rect(&mut self, state: &GameState, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
         // bind white texture and use full-quad UVs
-        self.bindings.images[0] = self.white_texture;
-        self.bindings.images[1] = self.bg_texture;
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+        let white = self.textures.get(&TextureIndexes::White1x1).unwrap();
+
+        self.bindings.images[0] = white.texture;
+        self.bindings.images[1] = background.texture;
+
         self.ctx.apply_bindings(&self.bindings);
 
         let view = Self::camera_view(state);
@@ -317,7 +442,7 @@ impl Renderer {
             color_key: [1.0, 0.0, 1.0, 0.01],
             bg_tile_size: [64.0, 64.0, 0.0, 0.0],
             bg_region_origin: [0.0, 0.0, 0.0, 0.0],
-            bg_tex_size: [self.bg_w, self.bg_h, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
         };
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
         self.ctx.draw(0, 6, 1);
@@ -335,9 +460,11 @@ impl Renderer {
         angle_rad: f32,
         color: [f32; 4],
     ) {
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+        let white = self.textures.get(&TextureIndexes::White1x1).unwrap();
         // bind white texture and use full-quad UVs
-        self.bindings.images[0] = self.white_texture;
-        self.bindings.images[1] = self.bg_texture;
+        self.bindings.images[0] = white.texture;
+        self.bindings.images[1] = background.texture;
         self.ctx.apply_bindings(&self.bindings);
 
         let view = Self::camera_view(state);
@@ -375,7 +502,7 @@ impl Renderer {
             color_key: [1.0, 0.0, 1.0, 0.01],
             bg_tile_size: [64.0, 64.0, 0.0, 0.0],
             bg_region_origin: [0.0, 0.0, 0.0, 0.0],
-            bg_tex_size: [self.bg_w, self.bg_h, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
         };
 
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
@@ -389,8 +516,9 @@ impl Renderer {
             return;
         }
 
-        let tex_w = self.tilemap_w;
-        let tex_h = self.tilemap_h;
+        let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
+        let tex_w = tilemap.w;
+        let tex_h = tilemap.h;
 
         // Apply half-tile offset: 0.5 left (negative X), 0.5 down (positive Y)
         let offset_x = 0.0;
@@ -413,15 +541,6 @@ impl Renderer {
 
         for y in start_y..end_y {
             for x in start_x..end_x {
-                // let (u, v) = DUAL_GRID_UV_TABLE[mask as usize];
-                // let uv_base_px = [u as f32 * tile_px, v as f32 * tile_px];
-
-                // Inset UVs by half a texel to avoid sampling across tile boundaries
-                // let half_u = 0.5 / tex_w;
-                // let half_v = 0.5 / tex_h;
-
-                // let uv_base = [uv_base_px[0] / tex_w + half_u, uv_base_px[1] / tex_h + half_v];
-                // let uv_base = [0.1, 0.0];
                 let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
 
                 let px = x as f32 * TILE_SIZE;
@@ -455,8 +574,9 @@ impl Renderer {
             return;
         }
 
-        let tex_w = self.tilemap_w;
-        let tex_h = self.tilemap_h;
+        let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
+        let tex_w = tilemap.w;
+        let tex_h = tilemap.h;
 
         // Apply half-tile offset: 0.5 left (negative X), 0.5 down (positive Y)
         let offset_x = 0.5 * TILE_SIZE;

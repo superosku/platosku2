@@ -22,6 +22,7 @@ pub struct Player {
     pub state: PlayerState,
     pub speed: f32,
     pub dir: Dir,
+    pub animation_index: u32,
 }
 
 impl Player {
@@ -30,8 +31,8 @@ impl Player {
             bb: BoundingBox {
                 x,
                 y,
-                w: 0.6,
-                h: 0.8,
+                w: 9.0 / 16.0,
+                h: 11.0 / 16.0,
                 vx: 0.0,
                 vy: 0.0,
             },
@@ -39,6 +40,7 @@ impl Player {
             state: PlayerState::Normal,
             speed: 0.04,
             dir: Dir::Right,
+            animation_index: 0,
         }
     }
 
@@ -136,7 +138,12 @@ impl Player {
         self.on_ground = on_ground;
     }
 
+    pub fn get_animation_index(&self) -> u32 {
+        (self.animation_index / 15) % 8
+    }
+
     pub fn update(&mut self, input: &InputState, map: &GameMap) {
+        self.animation_index += 1;
         match &self.state {
             PlayerState::Hanging { pos, .. } => {
                 self.bb.x = pos.x;
