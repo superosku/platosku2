@@ -150,8 +150,8 @@ impl EventHandler for Stage {
             KeyCode::Left => self.state.input.left = true,
             KeyCode::Right => self.state.input.right = true,
             KeyCode::Up => self.state.input.up = true,
-            KeyCode::Z => self.state.input.swing = true,
-            KeyCode::X => self.state.input.jump = true,
+            KeyCode::X => self.state.input.swing = true,
+            KeyCode::Z => self.state.input.jump = true,
             KeyCode::Down => self.state.input.down = true,
             _ => {}
         }
@@ -162,8 +162,8 @@ impl EventHandler for Stage {
             KeyCode::Left => self.state.input.left = false,
             KeyCode::Right => self.state.input.right = false,
             KeyCode::Up => self.state.input.up = false,
-            KeyCode::Z => self.state.input.swing = false,
-            KeyCode::X => self.state.input.jump = false,
+            KeyCode::X => self.state.input.swing = false,
+            KeyCode::Z => self.state.input.jump = false,
             KeyCode::Down => self.state.input.down = false,
             _ => {}
         }

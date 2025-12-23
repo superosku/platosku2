@@ -3,7 +3,7 @@ use crate::state::Dir;
 use crate::state::GameMap;
 use crate::state::Pos;
 
-const GRAVITY: f32 = 0.0035;
+const GRAVITY: f32 = 0.0070;
 const TERMINAL_VELOCITY: f32 = 0.90;
 
 pub struct KinematicResult {

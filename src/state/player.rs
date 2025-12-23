@@ -39,11 +39,11 @@ enum PlayerAnimationState {
 impl AnimationConfig for PlayerAnimationState {
     fn get_config(&self) -> AnimationConfigResult {
         match self {
-            PlayerAnimationState::Walking => AnimationConfigResult::new(0, 7, 15),
+            PlayerAnimationState::Walking => AnimationConfigResult::new(0, 7, 8),
             PlayerAnimationState::Standing => AnimationConfigResult::new(8, 9, 40),
             PlayerAnimationState::JumpingSide => AnimationConfigResult::new(10, 10, 15),
             PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
-            PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 5),
+            PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 8),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
         }
     }
@@ -62,7 +62,7 @@ impl Player {
             },
             on_ground: false,
             state: PlayerState::Normal,
-            speed: 0.04,
+            speed: 0.06,
             dir: Dir::Right,
             animation_handler: AnimationHandler::new(PlayerAnimationState::Standing),
         }
@@ -115,7 +115,7 @@ impl Player {
         }
 
         if input.jump && self.on_ground {
-            self.bb.vy = -0.14;
+            self.bb.vy = -0.20;
         }
 
         if input.swing {

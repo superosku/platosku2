@@ -80,7 +80,7 @@ enum BatAnimationState {
 impl AnimationConfig for BatAnimationState {
     fn get_config(&self) -> AnimationConfigResult {
         match self {
-            BatAnimationState::Flying => AnimationConfigResult::new(0, 3, 15),
+            BatAnimationState::Flying => AnimationConfigResult::new(0, 3, 8),
             BatAnimationState::Standing => AnimationConfigResult::new(4, 4, 5),
         }
     }
@@ -130,7 +130,7 @@ impl Enemy for Bat {
         if self.is_grounded {
             let mut rng = rand::rng();
 
-            if rng.random_range(0..30) == 0 {
+            if rng.random_range(0..300) == 0 {
                 self.is_grounded = false;
                 // When leaving ground go up upwards left 45 degree or right 45 degree
                 self.dir_rad =
