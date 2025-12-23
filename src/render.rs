@@ -28,6 +28,7 @@ struct Vertex {
 pub struct Renderer {
     ctx: Box<Context>,
     pipeline: Pipeline,
+    pipeline_tiles: Pipeline,
     bindings: Bindings,
     textures: HashMap<TextureIndexes, TextureInfo>,
 }
@@ -193,6 +194,52 @@ impl Renderer {
             },
         );
 
+        // A second pipeline for batched tilemap rendering (positions in world pixels, UVs precomputed)
+        let shader_tiles = ctx
+            .new_shader(
+                ShaderSource::Glsl {
+                    vertex: VERTEX_SHADER_TILES_BATCHED,
+                    fragment: FRAGMENT_SHADER,
+                },
+                ShaderMeta {
+                    images: vec!["tex".to_string(), "bg_tex".to_string()],
+                    // Keep the same uniform block layout so we can reuse Uniforms struct
+                    uniforms: UniformBlockLayout {
+                        uniforms: vec![
+                            UniformDesc::new("mvp", UniformType::Mat4),
+                            UniformDesc::new("color", UniformType::Float4),
+                            UniformDesc::new("uv_base", UniformType::Float4),
+                            UniformDesc::new("uv_scale", UniformType::Float4),
+                            UniformDesc::new("world_base", UniformType::Float4),
+                            UniformDesc::new("world_scale", UniformType::Float4),
+                            UniformDesc::new("color_key", UniformType::Float4),
+                            UniformDesc::new("bg_tile_size", UniformType::Float4),
+                            UniformDesc::new("bg_region_origin", UniformType::Float4),
+                            UniformDesc::new("bg_tex_size", UniformType::Float4),
+                        ],
+                    },
+                },
+            )
+            .expect("failed to compile batched tile shader");
+
+        let pipeline_tiles = ctx.new_pipeline(
+            &[BufferLayout::default()],
+            &[
+                VertexAttribute::new("pos", VertexFormat::Float2),
+                VertexAttribute::new("uv", VertexFormat::Float2),
+            ],
+            shader_tiles,
+            PipelineParams {
+                color_blend: Some(BlendState::new(
+                    Equation::Add,
+                    BlendFactor::One,
+                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                )),
+                cull_face: CullFace::Nothing,
+                ..Default::default()
+            },
+        );
+
         let mut bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
             index_buffer,
@@ -232,6 +279,7 @@ impl Renderer {
         Renderer {
             ctx,
             pipeline,
+            pipeline_tiles,
             bindings,
             textures,
         }
@@ -615,6 +663,11 @@ impl Renderer {
         let start_y = ((world_min_y - offset_y) / TILE_SIZE).floor() as i32;
         let end_y = ((world_max_y - offset_y) / TILE_SIZE).ceil() as i32;
 
+        // Build a single batched mesh (one quad per visible dual-grid tile) and draw in one call
+        let mut vertices: Vec<Vertex> = Vec::new();
+        let mut indices: Vec<u16> = Vec::new();
+        let mut base_index: u16 = 0;
+
         for y in start_y..end_y {
             for x in start_x..end_x {
                 let (tl, _o1) = state.map.get_at(x, y);
@@ -645,28 +698,99 @@ impl Renderer {
                 // Inset UVs by half a texel to avoid sampling across tile boundaries
                 let half_u = 0.5 / tex_w;
                 let half_v = 0.5 / tex_h;
-                let uv_base = [
-                    uv_base_px[0] / tex_w
-                        + half_u
-                        + tile_type_index as f32 * 4.0 * TILE_SIZE / tex_w,
-                    uv_base_px[1] / tex_h + half_v,
-                ];
-                let uv_scale = [(TILE_SIZE - 1.0) / tex_w, (TILE_SIZE - 1.0) / tex_h];
+                let base_u = uv_base_px[0] / tex_w
+                    + half_u
+                    + tile_type_index as f32 * 4.0 * TILE_SIZE / tex_w;
+                let base_v = uv_base_px[1] / tex_h + half_v;
+                let du = (TILE_SIZE - 1.0) / tex_w;
+                let dv = (TILE_SIZE - 1.0) / tex_h;
 
                 let px = x as f32 * TILE_SIZE + offset_x;
                 let py = y as f32 * TILE_SIZE + offset_y;
 
-                self.draw_tile_textured(
-                    state,
-                    px,
-                    py,
-                    [1.0, 1.0, 1.0, 1.0],
-                    uv_base,
-                    uv_scale,
-                    tile_type_index,
-                );
+                // Quad vertices in world pixels and precomputed UVs
+                vertices.push(Vertex {
+                    pos: [px, py],
+                    uv: [base_u, base_v],
+                }); // top-left
+                vertices.push(Vertex {
+                    pos: [px + TILE_SIZE, py],
+                    uv: [base_u + du, base_v],
+                }); // top-right
+                vertices.push(Vertex {
+                    pos: [px + TILE_SIZE, py + TILE_SIZE],
+                    uv: [base_u + du, base_v + dv],
+                }); // bottom-right
+                vertices.push(Vertex {
+                    pos: [px, py + TILE_SIZE],
+                    uv: [base_u, base_v + dv],
+                }); // bottom-left
+
+                indices.extend_from_slice(&[
+                    base_index,
+                    base_index + 1,
+                    base_index + 2,
+                    base_index,
+                    base_index + 2,
+                    base_index + 3,
+                ]);
+                base_index = base_index.wrapping_add(4);
             }
         }
+
+        if vertices.is_empty() {
+            return;
+        }
+
+        // Create transient buffers for this frame's batched draw
+        let vb = self.ctx.new_buffer(
+            BufferType::VertexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&vertices),
+        );
+        let ib = self.ctx.new_buffer(
+            BufferType::IndexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&indices),
+        );
+
+        // Bind textures
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+        let tile = self.textures.get(&TextureIndexes::Tile).unwrap();
+
+        let batched_bindings = Bindings {
+            vertex_buffers: vec![vb],
+            index_buffer: ib,
+            images: vec![tile.texture, background.texture],
+        };
+
+        // Switch to batched pipeline
+        self.ctx.apply_pipeline(&self.pipeline_tiles);
+        self.ctx.apply_bindings(&batched_bindings);
+
+        // Build VP (no per-tile model matrix since positions are in world pixels)
+        let view = Self::camera_view(state);
+        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let vp = Self::mat4_mul(proj, view);
+
+        let uniforms = Uniforms {
+            mvp: vp,
+            color: [1.0, 1.0, 1.0, 1.0],
+            uv_base: [0.0, 0.0, 0.0, 0.0],
+            uv_scale: [1.0, 1.0, 0.0, 0.0],
+            world_base: [0.0, 0.0, 0.0, 0.0],
+            world_scale: [TILE_SIZE, TILE_SIZE, 0.0, 0.0],
+            color_key: [1.0, 0.0, 1.0, 0.01],
+            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
+            bg_region_origin: [64.0 * tile_type_index as f32, 0.0, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
+        };
+        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+        self.ctx.draw(0, indices.len() as i32, 1);
+
+        // Restore default pipeline and bindings for subsequent draws
+        self.ctx.apply_pipeline(&self.pipeline);
+        self.ctx.apply_bindings(&self.bindings);
     }
 
     fn base_color(tile: u8) -> [f32; 4] {
@@ -802,5 +926,22 @@ void main() {
     vec4 bg = texture2D(bg_tex, uv_bg);
     vec4 out_color = mix(texel, bg, is_key);
     gl_FragColor = out_color * v_color;
+}
+"#;
+
+// Batched tile vertex shader: positions are already in world pixels; UVs are precomputed.
+const VERTEX_SHADER_TILES_BATCHED: &str = r#"#version 100
+attribute vec2 pos;
+attribute vec2 uv;
+uniform mat4 mvp;      // here this is VP = Projection * View
+uniform vec4 color;
+varying vec4 v_color;
+varying vec2 v_uv;
+varying vec2 v_world;
+void main() {
+    gl_Position = mvp * vec4(pos, 0.0, 1.0);
+    v_color = color;
+    v_uv = uv;
+    v_world = pos;
 }
 "#;
