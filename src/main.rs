@@ -16,6 +16,8 @@ struct Stage {
     updates: u32,
     frames: u32,
     accumulator: f64,
+    time_spent_drawing: f64,
+    time_spent_updating: f64,
 }
 
 impl Stage {
@@ -99,15 +101,17 @@ impl Stage {
             frames: 0,
             accumulator: 0.0,
             last_time_ups: date::now(),
+            time_spent_drawing: 0.0,
+            time_spent_updating: 0.0,
         }
     }
 }
 
 impl EventHandler for Stage {
     fn update(&mut self) {
-        let now = date::now();
-        let mut frame_time = now - self.last_time;
-        self.last_time = now;
+        let update_start = date::now();
+        let mut frame_time = update_start - self.last_time;
+        self.last_time = update_start;
 
         if frame_time > 1.0 / 10.0 {
             frame_time = 1.0 / 10.0;
@@ -124,20 +128,33 @@ impl EventHandler for Stage {
             self.accumulator -= DT;
         }
 
-        let elapsed = now - self.last_time_ups;
+        let elapsed = update_start - self.last_time_ups;
+        let update_total = date::now() - update_start;
+        self.time_spent_updating += update_total;
+
         if elapsed >= 1.0 {
             let fps = self.frames as f64 / elapsed as f64;
             let ups = self.updates as f64 / elapsed as f64;
-            println!("FPS: {:.2}, UPS: {:.2}", fps, ups);
+            let ratio_of_time_updating = self.time_spent_updating / elapsed;
+            let ratio_of_time_drawing = self.time_spent_drawing / elapsed;
+            self.time_spent_updating = 0.0;
+            self.time_spent_drawing = 0.0;
+            println!(
+                "FPS: {:.2}, UPS: {:.2}, updat: {:.2} draw: {:.2}",
+                fps, ups, ratio_of_time_updating, ratio_of_time_drawing
+            );
             self.frames = 0;
             self.updates = 0;
-            self.last_time_ups = now;
+            self.last_time_ups = update_start;
         }
     }
 
     fn draw(&mut self) {
+        let draw_start = date::now();
         self.renderer.draw(&self.state);
         self.frames += 1;
+        let draw_total = date::now() - draw_start;
+        self.time_spent_drawing += draw_total;
     }
 
     fn resize_event(&mut self, width: f32, height: f32) {
