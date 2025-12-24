@@ -34,12 +34,13 @@ pub struct Renderer {
 }
 
 #[derive(Eq, PartialEq, Hash)]
-enum TextureIndexes {
+pub enum TextureIndexes {
     White1x1,
     Tile,
     TileBackground,
     Player,
     Bat,
+    Slime,
 }
 
 struct TextureInfo {
@@ -121,28 +122,6 @@ impl Renderer {
             BufferUsage::Immutable,
             BufferSource::slice(&indices),
         );
-
-        // Load tilemap texture from assets
-        // let dyn_img = image::open("assets/tilemap.png").expect("failed to load assets/tilemap.png");
-        let dyn_img =
-            image::open("assets/tilemap16.png").expect("failed to load assets/tilemap.png");
-        let (img_w, img_h) = dyn_img.dimensions();
-        let rgba8 = dyn_img.to_rgba8();
-        let tile_texture = ctx.new_texture_from_rgba8(img_w as u16, img_h as u16, &rgba8);
-        // Use nearest filtering for crisp pixel art
-        ctx.texture_set_filter(tile_texture, FilterMode::Nearest, MipmapFilterMode::None);
-        // Clamp to edge to avoid atlas bleeding at tile borders
-        ctx.texture_set_wrap(tile_texture, TextureWrap::Clamp, TextureWrap::Clamp);
-
-        // Load background texture (tiled 64x64 area) from assets
-        let bg_img = image::open("assets/tile_backgrounds.png")
-            .expect("failed to load assets/tile_backgrounds.png");
-        let (bg_w, bg_h) = bg_img.dimensions();
-        let bg_rgba8 = bg_img.to_rgba8();
-        let bg_texture = ctx.new_texture_from_rgba8(bg_w as u16, bg_h as u16, &bg_rgba8);
-        // Nearest for pixel art, Repeat so UVs can wrap every 64 px
-        ctx.texture_set_filter(bg_texture, FilterMode::Nearest, MipmapFilterMode::None);
-        ctx.texture_set_wrap(bg_texture, TextureWrap::Clamp, TextureWrap::Clamp);
 
         // Create a 1x1 white texture for colored rectangles
         let white_tex_bytes: [u8; 4] = [255, 255, 255, 255];
@@ -240,17 +219,7 @@ impl Renderer {
             },
         );
 
-        let mut bindings = Bindings {
-            vertex_buffers: vec![vertex_buffer],
-            index_buffer,
-            images: vec![tile_texture, bg_texture],
-        };
-
-        // set default texture to tile texture
-        bindings.images[0] = tile_texture;
-
         let mut textures = HashMap::new();
-
         textures.insert(
             TextureIndexes::Tile,
             load_texture(&mut ctx, "assets/tilemap16.png"),
@@ -268,6 +237,10 @@ impl Renderer {
             load_texture(&mut ctx, "assets/bat.png"),
         );
         textures.insert(
+            TextureIndexes::Slime,
+            load_texture(&mut ctx, "assets/slime.png"),
+        );
+        textures.insert(
             TextureIndexes::White1x1,
             TextureInfo {
                 w: 1.0,
@@ -275,6 +248,18 @@ impl Renderer {
                 texture: white_texture,
             },
         );
+
+        let mut bindings = Bindings {
+            vertex_buffers: vec![vertex_buffer],
+            index_buffer,
+            images: vec![
+                textures.get(&TextureIndexes::Tile).unwrap().texture,
+                textures
+                    .get(&TextureIndexes::TileBackground)
+                    .unwrap()
+                    .texture,
+            ],
+        };
 
         Renderer {
             ctx,
@@ -325,12 +310,9 @@ impl Renderer {
 
             self.draw_from_texture_atlas(
                 state,
-                TextureIndexes::Bat,
+                enemy.get_texture_index(),
                 enemy.get_atlas_index() as f32,
-                match state.player.dir {
-                    Dir::Left => true,
-                    Dir::Right => false,
-                },
+                !enemy.goes_right(),
                 bb.x - 1.0 / TILE_SIZE,
                 bb.y - 1.0 / TILE_SIZE,
                 bb.w + 2.0 / TILE_SIZE,

@@ -7,6 +7,7 @@ mod state;
 use crate::state::{Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
 mod render;
 use crate::render::Renderer;
+use crate::state::enemies::Slime;
 
 struct Stage {
     state: GameState,
@@ -84,6 +85,9 @@ impl Stage {
                 Box::new(Bat::new(8.0, 2.0)) as Box<dyn Enemy>,
                 Box::new(Bat::new(12.0, 2.0)) as Box<dyn Enemy>,
                 Box::new(Bat::new(5.0, 2.5)) as Box<dyn Enemy>,
+                Box::new(Slime::new(5.0, 4.5)) as Box<dyn Enemy>,
+                Box::new(Slime::new(9.0, 4.0)) as Box<dyn Enemy>,
+                Box::new(Slime::new(10.0, 4.0)) as Box<dyn Enemy>,
             ],
             camera: camera::Camera::new(0.0, 0.0, 2.0),
         };
