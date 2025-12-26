@@ -87,7 +87,7 @@ impl Player {
                 let total_rads = std::f32::consts::PI;
 
                 let start_angle = match self.dir {
-                    Dir::Left => std::f32::consts::PI * 0.5 + 0.3,
+                    Dir::Left => std::f32::consts::PI * 0.5 - 0.3,
                     Dir::Right => std::f32::consts::PI * 0.5 + 0.3,
                 };
 
