@@ -12,6 +12,9 @@ pub trait Enemy {
 
     fn update(&mut self, map: &GameMap);
     fn got_stomped(&mut self);
+    fn can_be_stomped(&self) -> bool;
+    fn got_hit(&mut self);
+    fn can_be_hit(&self) -> bool;
     fn should_remove(&self) -> bool;
 
     fn overlaps(&self, bb: &BoundingBox) -> bool {
@@ -134,6 +137,18 @@ impl Enemy for Slime {
 
     fn got_stomped(&mut self) {
         self.is_dead = true;
+    }
+
+    fn can_be_stomped(&self) -> bool {
+        true
+    }
+
+    fn got_hit(&mut self) {
+        self.is_dead = true;
+    }
+
+    fn can_be_hit(&self) -> bool {
+        true
     }
 
     fn should_remove(&self) -> bool {
@@ -289,11 +304,23 @@ impl Enemy for Bat {
             BatState::Falling { .. } => {}
             _ => {
                 self.state = BatState::Falling {
-                    frames_remaining: 60,
+                    frames_remaining: 120,
                 };
                 self.health -= 1;
             }
         }
+    }
+
+    fn can_be_stomped(&self) -> bool {
+        !matches!(self.state, BatState::Falling { .. })
+    }
+
+    fn got_hit(&mut self) {
+        self.got_stomped();
+    }
+
+    fn can_be_hit(&self) -> bool {
+        self.can_be_stomped()
     }
 
     fn should_remove(&self) -> bool {

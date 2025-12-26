@@ -11,4 +11,4 @@ pub use common::{BoundingBox, Dir, Pos};
 pub use enemies::{Bat, Enemy};
 pub use game_map::{BaseTile, GameMap, OverlayTile};
 pub use game_state::{GameState, InputState};
-pub use player::{Player};
+pub use player::Player;

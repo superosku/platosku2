@@ -4,13 +4,19 @@ pub enum Dir {
     Right,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Pos {
     pub x: f32,
     pub y: f32,
 }
 
-#[derive(Clone, Copy)]
+impl Pos {
+    pub fn new(x: f32, y: f32) -> Pos {
+        Pos { x, y }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
     pub x: f32,
     pub y: f32,
@@ -26,5 +32,9 @@ impl BoundingBox {
             || other.x + other.w <= self.x
             || self.y + self.h <= other.y
             || other.y + other.h <= self.y)
+    }
+
+    pub fn point_inside(&self, pos: &Pos) -> bool {
+        pos.x >= self.x && pos.x <= self.x + self.w && pos.y >= self.y && pos.y <= self.y + self.h
     }
 }

@@ -12,9 +12,10 @@ pub enum PlayerState {
 }
 
 pub struct SwingState {
-    pub pivot_x: f32,
-    pub pivot_y: f32,
+    pub pivot: Pos,
+    pub end: Pos,
     pub angle_rad: f32,
+    pub length: f32,
 }
 
 pub struct Player {
@@ -104,10 +105,18 @@ impl Player {
 
                 let pivot_x = self.bb.x + self.bb.w / 2.0 + dir_move;
                 let pivot_y = self.bb.y + self.bb.h / 2.0 + 0.05;
+
+                let length = 0.8;
+
+                // Drawing uses angles weirdly. Adding 1/4 circle to the angle here as hacky fix
+                let end_x = pivot_x + (angle_rad + std::f32::consts::PI / 2.0).cos() * length;
+                let end_y = pivot_y + (angle_rad + std::f32::consts::PI / 2.0).sin() * length;
+
                 Some(SwingState {
                     angle_rad,
-                    pivot_x,
-                    pivot_y,
+                    pivot: Pos::new(pivot_x, pivot_y),
+                    end: Pos::new(end_x, end_y),
+                    length,
                 })
             }
             _ => None,

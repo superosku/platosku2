@@ -343,14 +343,23 @@ impl Renderer {
         if let Some(swing_info) = state.player.get_swing_info() {
             self.draw_rect_rotated(
                 state,
-                swing_info.pivot_x - 0.05,
-                swing_info.pivot_y - 0.15,
+                swing_info.pivot.x - 0.05,
+                swing_info.pivot.y - 0.15,
                 0.1,
-                0.9,
-                swing_info.pivot_x,
-                swing_info.pivot_y,
+                swing_info.length + 0.15,
+                swing_info.pivot.x,
+                swing_info.pivot.y,
                 swing_info.angle_rad,
                 [0.5, 0.5, 0.5, 1.0],
+            );
+
+            self.draw_rect(
+                state,
+                swing_info.end.x - 0.05,
+                swing_info.end.y - 0.05,
+                0.1,
+                0.1,
+                [1.0, 0.5, 0.5, 1.0],
             )
         }
 
