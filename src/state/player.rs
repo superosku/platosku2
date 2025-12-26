@@ -40,10 +40,10 @@ impl AnimationConfig for PlayerAnimationState {
     fn get_config(&self) -> AnimationConfigResult {
         match self {
             PlayerAnimationState::Walking => AnimationConfigResult::new(0, 7, 8),
-            PlayerAnimationState::Standing => AnimationConfigResult::new(8, 9, 40),
+            PlayerAnimationState::Standing => AnimationConfigResult::new(8, 9, 80),
             PlayerAnimationState::JumpingSide => AnimationConfigResult::new(10, 10, 15),
             PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
-            PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 8),
+            PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 10),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
         }
     }
@@ -56,7 +56,7 @@ impl Player {
                 x,
                 y,
                 w: 9.0 / 16.0,
-                h: 11.0 / 16.0,
+                h: 13.0 / 16.0,
                 vx: 0.0,
                 vy: 0.0,
             },
@@ -66,6 +66,14 @@ impl Player {
             dir: Dir::Right,
             animation_handler: AnimationHandler::new(PlayerAnimationState::Standing),
         }
+    }
+
+    pub fn maybe_stomp(&mut self, other_bb: &BoundingBox) -> bool {
+        if self.bb.vy > 0.0 && (self.bb.y + self.bb.h) - other_bb.y < self.bb.vy * 2.0 {
+            self.bb.vy = -0.1;
+            return true;
+        }
+        false
     }
 
     pub fn get_swing_info(&self) -> Option<SwingState> {

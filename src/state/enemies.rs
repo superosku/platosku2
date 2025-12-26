@@ -11,6 +11,8 @@ pub trait Enemy {
     fn bb(&self) -> &BoundingBox;
 
     fn update(&mut self, map: &GameMap);
+    fn got_stomped(&mut self);
+    fn should_remove(&self) -> bool;
 
     fn overlaps(&self, bb: &BoundingBox) -> bool {
         self.bb().overlaps(bb)
@@ -47,6 +49,7 @@ pub struct Slime {
     dir: Dir,
     animation_handler: AnimationHandler<SlimeAnimationState>,
     state: SlimeState,
+    is_dead: bool,
 }
 
 impl Slime {
@@ -65,6 +68,7 @@ impl Slime {
             state: Idle {
                 frames_remaining: 100,
             },
+            is_dead: false,
         }
     }
 }
@@ -72,6 +76,14 @@ impl Slime {
 impl Enemy for Slime {
     fn bb(&self) -> &BoundingBox {
         &self.bb
+    }
+
+    fn got_stomped(&mut self) {
+        self.is_dead = true;
+    }
+
+    fn should_remove(&self) -> bool {
+        self.is_dead
     }
 
     fn update(&mut self, map: &GameMap) {
@@ -173,24 +185,30 @@ impl Enemy for Slime {
 enum BatAnimationState {
     Flying,
     Standing,
+    Falling,
 }
 
 impl AnimationConfig for BatAnimationState {
     fn get_config(&self) -> AnimationConfigResult {
         match self {
             BatAnimationState::Flying => AnimationConfigResult::new(0, 3, 8),
-            BatAnimationState::Standing => AnimationConfigResult::new(4, 4, 5),
+            BatAnimationState::Standing => AnimationConfigResult::new(4, 5, 80),
+            BatAnimationState::Falling => AnimationConfigResult::new(6, 6, 80),
         }
     }
 }
 
+enum BatState {
+    Flying { dir_rad: f32 },
+    Standing,
+    Falling,
+}
+
 pub struct Bat {
-    pub bb: BoundingBox,
-    // pub base_x: f32,
-    // pub t: f32,
-    dir_rad: f32,
-    is_grounded: bool,
-    pub animation_handler: AnimationHandler<BatAnimationState>,
+    bb: BoundingBox,
+    state: BatState,
+    animation_handler: AnimationHandler<BatAnimationState>,
+    health: i32,
 }
 
 impl Bat {
@@ -206,9 +224,11 @@ impl Bat {
                 vx: 0.0,
                 vy: 0.0,
             },
-            is_grounded: false,
-            dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
+            state: BatState::Flying {
+                dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
+            },
             animation_handler: AnimationHandler::new(BatAnimationState::Standing),
+            health: 3,
         }
     }
 }
@@ -218,43 +238,76 @@ impl Enemy for Bat {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) {
-        self.bb.vx = self.dir_rad.cos() * 0.01;
-        self.bb.vy = self.dir_rad.sin() * 0.01;
-
-        if self.is_grounded {
-            let mut rng = rand::rng();
-
-            if rng.random_range(0..300) == 0 {
-                self.is_grounded = false;
-                // When leaving ground go up upwards left 45 degree or right 45 degree
-                self.dir_rad =
-                    rng.random_range(std::f32::consts::PI * 1.25..std::f32::consts::PI * 1.75)
-            }
-        } else {
-            let res = integrate_kinematic(map, &self.bb, false);
-
-            if !res.on_left && !res.on_right && !res.on_top && !res.on_bottom {
-                self.bb = res.new_bb;
-            }
-
-            if res.on_left | res.on_right {
-                self.dir_rad = (self.dir_rad.sin()).atan2(-self.dir_rad.cos());
-            }
-            if res.on_bottom | res.on_top {
-                self.dir_rad = (-self.dir_rad.sin()).atan2(self.dir_rad.cos());
-            }
-
-            if res.on_bottom {
-                self.is_grounded = true;
+    fn got_stomped(&mut self) {
+        match self.state {
+            BatState::Falling => {}
+            _ => {
+                self.state = BatState::Falling;
+                self.health -= 1;
             }
         }
+    }
 
-        if self.is_grounded {
-            self.animation_handler
-                .set_state(BatAnimationState::Standing);
-        } else {
-            self.animation_handler.set_state(BatAnimationState::Flying);
+    fn should_remove(&self) -> bool {
+        self.health <= 0
+    }
+
+    fn update(&mut self, map: &GameMap) {
+        match self.state {
+            BatState::Flying { dir_rad } => {
+                self.bb.vx = dir_rad.cos() * 0.01;
+                self.bb.vy = dir_rad.sin() * 0.01;
+
+                let res = integrate_kinematic(map, &self.bb, false);
+
+                if !res.on_left && !res.on_right && !res.on_top && !res.on_bottom {
+                    self.bb = res.new_bb;
+                }
+
+                let mut new_dir_rad = dir_rad;
+                if res.on_left | res.on_right {
+                    new_dir_rad = (new_dir_rad.sin()).atan2(-new_dir_rad.cos());
+                }
+                if res.on_bottom | res.on_top {
+                    new_dir_rad = (-new_dir_rad.sin()).atan2(new_dir_rad.cos());
+                }
+
+                if res.on_bottom {
+                    self.state = BatState::Standing;
+                } else {
+                    self.state = BatState::Flying {
+                        dir_rad: new_dir_rad,
+                    };
+                }
+
+                self.animation_handler.set_state(BatAnimationState::Flying);
+            }
+            BatState::Standing => {
+                let mut rng = rand::rng();
+
+                if rng.random_range(0..300) == 0 {
+                    let dir_rad =
+                        rng.random_range(std::f32::consts::PI * 1.25..std::f32::consts::PI * 1.75);
+                    self.state = BatState::Flying { dir_rad }
+                }
+
+                self.animation_handler
+                    .set_state(BatAnimationState::Standing);
+            }
+            BatState::Falling => {
+                self.animation_handler.set_state(BatAnimationState::Falling);
+                let orig_vy = self.bb.vy;
+                let res = integrate_kinematic(map, &self.bb, true);
+                self.bb = res.new_bb;
+
+                if res.on_bottom {
+                    self.bb.vy = -orig_vy * 0.8;
+
+                    if self.bb.vy.abs() < 0.02 {
+                        self.state = BatState::Standing;
+                    }
+                }
+            }
         }
 
         self.animation_handler.increment_frame();

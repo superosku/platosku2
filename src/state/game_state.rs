@@ -35,7 +35,16 @@ impl GameState {
 
         for enemy in &mut self.enemies {
             enemy.update(&self.map);
+
+            if enemy.bb().overlaps(&self.player.bb) {
+                let did_stomp = self.player.maybe_stomp(enemy.bb());
+                if did_stomp {
+                    enemy.got_stomped();
+                }
+            }
         }
+        // Filter the enemies that are dead by enemy.is_dead() value
+        self.enemies.retain(|e| !e.should_remove());
 
         let pcx = self.player.bb.x + self.player.bb.w * 0.5;
         let pcy = self.player.bb.y + self.player.bb.h * 0.5;

@@ -126,7 +126,7 @@ impl EventHandler for Stage {
         let DT = 1.0 / 60.0;
 
         while self.accumulator >= DT {
-            self.state.update();
+            self.state.update(); // HERE is the actual game call
             self.state.input.jump = false;
             self.updates += 1;
             self.accumulator -= DT;
