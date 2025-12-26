@@ -78,14 +78,6 @@ impl Enemy for Slime {
         &self.bb
     }
 
-    fn got_stomped(&mut self) {
-        self.is_dead = true;
-    }
-
-    fn should_remove(&self) -> bool {
-        self.is_dead
-    }
-
     fn update(&mut self, map: &GameMap) {
         let result = integrate_kinematic(map, &self.bb, true);
         self.bb = result.new_bb;
@@ -138,35 +130,22 @@ impl Enemy for Slime {
         }
 
         self.animation_handler.increment_frame();
-
-        // // Try moving horizontally with current velocity; if blocked, flip direction
-        // let desired_vx = if self.bb.vx.abs() > 0.0 {
-        //     self.bb.vx
-        // } else {
-        //     0.01
-        // };
-        //
-        // let mut probe = self.bb;
-        // probe.vx = desired_vx;
-        //
-        // let result = integrate_kinematic(map, &probe, true);
-        //
-        // // If horizontal movement was blocked, new_bb.x stays same; flip vx
-        // if (result.new_bb.x - self.bb.x).abs() < 0.0001 {
-        //     self.bb.vx = -desired_vx.signum() * 0.01;
-        // } else {
-        //     self.bb = result.new_bb;
-        //     self.bb.vx = desired_vx;
-        // }
-        // // Gravity handled by integrate_kinematic via vy
     }
 
-    fn get_atlas_index(&self) -> u32 {
-        self.animation_handler.get_atlas_index()
+    fn got_stomped(&mut self) {
+        self.is_dead = true;
+    }
+
+    fn should_remove(&self) -> bool {
+        self.is_dead
     }
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Slime
+    }
+
+    fn get_atlas_index(&self) -> u32 {
+        self.animation_handler.get_atlas_index()
     }
 
     fn goes_right(&self) -> bool {
@@ -233,22 +212,6 @@ impl Bat {
 impl Enemy for Bat {
     fn bb(&self) -> &BoundingBox {
         &self.bb
-    }
-
-    fn got_stomped(&mut self) {
-        match self.state {
-            BatState::Falling { .. } => {}
-            _ => {
-                self.state = BatState::Falling {
-                    frames_remaining: 60,
-                };
-                self.health -= 1;
-            }
-        }
-    }
-
-    fn should_remove(&self) -> bool {
-        self.health <= 0
     }
 
     fn update(&mut self, map: &GameMap) {
@@ -321,12 +284,28 @@ impl Enemy for Bat {
         self.animation_handler.increment_frame();
     }
 
-    fn get_atlas_index(&self) -> u32 {
-        self.animation_handler.get_atlas_index()
+    fn got_stomped(&mut self) {
+        match self.state {
+            BatState::Falling { .. } => {}
+            _ => {
+                self.state = BatState::Falling {
+                    frames_remaining: 60,
+                };
+                self.health -= 1;
+            }
+        }
+    }
+
+    fn should_remove(&self) -> bool {
+        self.health <= 0
     }
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Bat
+    }
+
+    fn get_atlas_index(&self) -> u32 {
+        self.animation_handler.get_atlas_index()
     }
 
     fn goes_right(&self) -> bool {
