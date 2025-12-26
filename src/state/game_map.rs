@@ -62,9 +62,6 @@ impl GameMap {
 
     pub fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
         let (_base, overlay) = self.get_at(tx, ty);
-        match overlay {
-            OverlayTile::Ladder => true,
-            _ => false,
-        }
+        matches!(overlay, OverlayTile::Ladder)
     }
 }

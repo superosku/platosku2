@@ -123,13 +123,13 @@ impl EventHandler for Stage {
 
         self.accumulator += frame_time;
 
-        let DT = 1.0 / 60.0;
+        let dt = 1.0 / 60.0;
 
-        while self.accumulator >= DT {
+        while self.accumulator >= dt {
             self.state.update(); // HERE is the actual game call
             self.state.input.jump = false;
             self.updates += 1;
-            self.accumulator -= DT;
+            self.accumulator -= dt;
         }
 
         let elapsed = update_start - self.last_time_ups;
@@ -137,8 +137,8 @@ impl EventHandler for Stage {
         self.time_spent_updating += update_total;
 
         if elapsed >= 1.0 {
-            let fps = self.frames as f64 / elapsed as f64;
-            let ups = self.updates as f64 / elapsed as f64;
+            let fps = self.frames as f64 / elapsed;
+            let ups = self.updates as f64 / elapsed;
             let ratio_of_time_updating = self.time_spent_updating / elapsed;
             let ratio_of_time_drawing = self.time_spent_drawing / elapsed;
             self.time_spent_updating = 0.0;

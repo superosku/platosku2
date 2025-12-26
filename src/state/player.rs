@@ -23,7 +23,7 @@ pub struct Player {
     pub state: PlayerState,
     pub speed: f32,
     pub dir: Dir,
-    pub animation_handler: AnimationHandler<PlayerAnimationState>,
+    animation_handler: AnimationHandler<PlayerAnimationState>,
 }
 
 #[derive(PartialEq)]
@@ -70,7 +70,7 @@ impl Player {
 
     pub fn maybe_stomp(&mut self, other_bb: &BoundingBox) -> bool {
         if self.bb.vy > 0.0 && (self.bb.y + self.bb.h) - other_bb.y < self.bb.vy * 2.0 {
-            self.bb.vy = -0.1;
+            self.bb.vy = -0.12;
             return true;
         }
         false
@@ -82,22 +82,28 @@ impl Player {
                 total_frames,
                 frames_left,
             } => {
-                let (dir_move, angle_rad) = match self.dir {
-                    Dir::Left => (
-                        -0.1,
-                        ((frames_left) as f32 / total_frames as f32 + 0.7)
-                            * 0.9
-                            * std::f32::consts::PI,
-                    ),
-                    Dir::Right => (
-                        0.1,
-                        ((total_frames - frames_left) as f32 / total_frames as f32 + 0.7)
-                            * 0.9
-                            * std::f32::consts::PI,
-                    ),
+                // Swing moves half a circle in total
+                let total_rads = std::f32::consts::PI;
+
+                let start_angle = match self.dir {
+                    Dir::Left => std::f32::consts::PI * 0.5 + 0.3,
+                    Dir::Right => std::f32::consts::PI * 0.5 + 0.3,
                 };
+
+                let fraction = match self.dir {
+                    Dir::Left => frames_left as f32 / total_frames as f32,
+                    Dir::Right => (total_frames - frames_left) as f32 / total_frames as f32,
+                };
+
+                let angle_rad = start_angle + fraction * total_rads;
+
+                let dir_move = match self.dir {
+                    Dir::Left => -0.1,
+                    Dir::Right => 0.1,
+                };
+
                 let pivot_x = self.bb.x + self.bb.w / 2.0 + dir_move;
-                let pivot_y = self.bb.y + self.bb.h / 2.0 - 0.1;
+                let pivot_y = self.bb.y + self.bb.h / 2.0 + 0.05;
                 Some(SwingState {
                     angle_rad,
                     pivot_x,
@@ -114,23 +120,33 @@ impl Player {
 
         if pressing_left {
             self.bb.vx = -self.speed;
-            self.dir = Dir::Left;
+            match self.state {
+                PlayerState::Swinging { .. } => {}
+                _ => {
+                    self.dir = Dir::Left;
+                }
+            }
         } else if pressing_right {
             self.bb.vx = self.speed;
-            self.dir = Dir::Right;
+            match self.state {
+                PlayerState::Swinging { .. } => {}
+                _ => {
+                    self.dir = Dir::Right;
+                }
+            }
         } else {
             self.bb.vx = 0.0;
         }
 
         if input.jump && self.on_ground {
-            self.bb.vy = -0.20;
+            self.bb.vy = -0.185;
         }
 
         if input.swing {
             if let PlayerState::Normal = self.state {
                 self.state = PlayerState::Swinging {
-                    total_frames: 80,
-                    frames_left: 80,
+                    total_frames: 20,
+                    frames_left: 20,
                 };
             }
         }
@@ -151,20 +167,18 @@ impl Player {
             return;
         }
 
-        if self.bb.vy > 0.0 {
-            if pressing_left || pressing_right {
-                let dir: Dir = if pressing_right {
-                    Dir::Right
-                } else {
-                    Dir::Left
-                };
-                if let Some(hang_pos) = check_and_snap_hang(&self.bb, &new_bb, map, dir) {
-                    self.state = PlayerState::Hanging { pos: hang_pos };
-                    self.dir = dir;
-                    self.bb.vy = 0.0;
-                    self.on_ground = false;
-                    return;
-                }
+        if self.bb.vy > 0.0 && (pressing_left || pressing_right) {
+            let dir: Dir = if pressing_right {
+                Dir::Right
+            } else {
+                Dir::Left
+            };
+            if let Some(hang_pos) = check_and_snap_hang(&self.bb, &new_bb, map, dir) {
+                self.state = PlayerState::Hanging { pos: hang_pos };
+                self.dir = dir;
+                self.bb.vy = 0.0;
+                self.on_ground = false;
+                return;
             }
         }
 
@@ -172,21 +186,19 @@ impl Player {
         self.on_ground = on_ground;
 
         if self.on_ground {
-            if (pressing_right || pressing_left) {
+            if pressing_right || pressing_left {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Walking);
             } else {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Standing);
             }
+        } else if pressing_right || pressing_left {
+            self.animation_handler
+                .set_state(PlayerAnimationState::JumpingSide);
         } else {
-            if (pressing_right || pressing_left) {
-                self.animation_handler
-                    .set_state(PlayerAnimationState::JumpingSide);
-            } else {
-                self.animation_handler
-                    .set_state(PlayerAnimationState::JumpingDown);
-            }
+            self.animation_handler
+                .set_state(PlayerAnimationState::JumpingDown);
         }
     }
 

@@ -1,6 +1,6 @@
 use crate::state::GameState;
 use crate::state::OverlayTile;
-use crate::state::{BaseTile, Dir, PlayerState};
+use crate::state::{BaseTile, Dir};
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
@@ -249,7 +249,7 @@ impl Renderer {
             },
         );
 
-        let mut bindings = Bindings {
+        let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
             index_buffer,
             images: vec![
@@ -343,10 +343,10 @@ impl Renderer {
         if let Some(swing_info) = state.player.get_swing_info() {
             self.draw_rect_rotated(
                 state,
-                swing_info.pivot_x - 0.1,
-                swing_info.pivot_y - 0.2,
-                0.2,
-                1.0,
+                swing_info.pivot_x - 0.05,
+                swing_info.pivot_y - 0.15,
+                0.1,
+                0.9,
                 swing_info.pivot_x,
                 swing_info.pivot_y,
                 swing_info.angle_rad,
@@ -772,23 +772,6 @@ impl Renderer {
         // Restore default pipeline and bindings for subsequent draws
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
-    }
-
-    fn base_color(tile: u8) -> [f32; 4] {
-        match tile {
-            1 => [0.35, 0.25, 0.15, 1.0],
-            2 => [0.40, 0.40, 0.45, 1.0],
-            _ => [0.0, 0.0, 0.0, 0.0],
-        }
-    }
-
-    fn overlay_color(tile: u8) -> [f32; 4] {
-        match tile {
-            1 => [0.20, 0.60, 1.0, 0.8],
-            2 => [1.0, 0.85, 0.2, 0.9],
-            3 => [1.0, 0.2, 0.2, 0.9],
-            _ => [0.0, 0.0, 0.0, 0.0],
-        }
     }
 
     fn ortho_mvp(screen_w: f32, screen_h: f32) -> [f32; 16] {

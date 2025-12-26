@@ -25,12 +25,10 @@ pub fn integrate_kinematic(map: &GameMap, bb: &BoundingBox, gravity: bool) -> Ki
     let attempted_x = bb.x + bb.vx;
     if !collides_with_map(map, attempted_x, bb.y, bb.w, bb.h) {
         out_x = attempted_x;
-    } else {
-        if bb.vx > 0.0 {
-            on_right = true;
-        } else if bb.vx < 0.0 {
-            on_left = true;
-        }
+    } else if bb.vx > 0.0 {
+        on_right = true;
+    } else if bb.vx < 0.0 {
+        on_left = true;
     }
 
     // Apply gravity

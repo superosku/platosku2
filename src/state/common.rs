@@ -21,17 +21,6 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
-    pub fn iterate(&self) -> BoundingBox {
-        BoundingBox {
-            x: self.x + self.vx,
-            y: self.y + self.vy,
-            w: self.w,
-            h: self.h,
-            vx: self.vx,
-            vy: self.vy,
-        }
-    }
-
     pub fn overlaps(&self, other: &BoundingBox) -> bool {
         !(self.x + self.w <= other.x
             || other.x + other.w <= self.x

@@ -101,10 +101,7 @@ impl Enemy for Slime {
                     self.state = SlimeState::Jumping {
                         frames_remaining: jump_total_frames,
                     };
-                    let mut rng = rand::rng();
-                    self.dir = *vec![Dir::Left, Dir::Right]
-                        .choose(&mut rand::rng())
-                        .unwrap();
+                    self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
                 } else {
                     self.state = SlimeState::Idle {
                         frames_remaining: frames_remaining - 1,
@@ -201,7 +198,7 @@ impl AnimationConfig for BatAnimationState {
 enum BatState {
     Flying { dir_rad: f32 },
     Standing,
-    Falling,
+    Falling { frames_remaining: i32 },
 }
 
 pub struct Bat {
@@ -240,9 +237,11 @@ impl Enemy for Bat {
 
     fn got_stomped(&mut self) {
         match self.state {
-            BatState::Falling => {}
+            BatState::Falling { .. } => {}
             _ => {
-                self.state = BatState::Falling;
+                self.state = BatState::Falling {
+                    frames_remaining: 60,
+                };
                 self.health -= 1;
             }
         }
@@ -253,7 +252,9 @@ impl Enemy for Bat {
     }
 
     fn update(&mut self, map: &GameMap) {
-        match self.state {
+        let mut new_state: Option<BatState> = None;
+
+        match &mut self.state {
             BatState::Flying { dir_rad } => {
                 self.bb.vx = dir_rad.cos() * 0.01;
                 self.bb.vy = dir_rad.sin() * 0.01;
@@ -264,7 +265,7 @@ impl Enemy for Bat {
                     self.bb = res.new_bb;
                 }
 
-                let mut new_dir_rad = dir_rad;
+                let mut new_dir_rad = *dir_rad;
                 if res.on_left | res.on_right {
                     new_dir_rad = (new_dir_rad.sin()).atan2(-new_dir_rad.cos());
                 }
@@ -275,9 +276,10 @@ impl Enemy for Bat {
                 if res.on_bottom {
                     self.state = BatState::Standing;
                 } else {
-                    self.state = BatState::Flying {
-                        dir_rad: new_dir_rad,
-                    };
+                    *dir_rad = new_dir_rad;
+                    // self.state = BatState::Flying {
+                    //     dir_rad: new_dir_rad,
+                    // };
                 }
 
                 self.animation_handler.set_state(BatAnimationState::Flying);
@@ -294,7 +296,7 @@ impl Enemy for Bat {
                 self.animation_handler
                     .set_state(BatAnimationState::Standing);
             }
-            BatState::Falling => {
+            BatState::Falling { frames_remaining } => {
                 self.animation_handler.set_state(BatAnimationState::Falling);
                 let orig_vy = self.bb.vy;
                 let res = integrate_kinematic(map, &self.bb, true);
@@ -303,11 +305,17 @@ impl Enemy for Bat {
                 if res.on_bottom {
                     self.bb.vy = -orig_vy * 0.8;
 
-                    if self.bb.vy.abs() < 0.02 {
-                        self.state = BatState::Standing;
+                    if *frames_remaining <= 0 {
+                        new_state = Some(BatState::Standing);
                     }
                 }
+
+                *frames_remaining -= 1;
             }
+        }
+
+        if let Some(state) = new_state {
+            self.state = state;
         }
 
         self.animation_handler.increment_frame();
