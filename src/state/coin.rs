@@ -1,5 +1,5 @@
 use super::common::BoundingBox;
-use super::game_map::GameMap;
+use super::game_map::{GameMap, MapLike};
 use crate::physics::integrate_kinematic;
 
 pub struct Coin {
@@ -20,7 +20,7 @@ impl Coin {
         }
     }
 
-    pub fn update(&mut self, map: &GameMap) {
+    pub fn update(&mut self, map: &Box<dyn MapLike>) {
         let res = integrate_kinematic(map, &self.bb, true);
         self.bb = res.new_bb;
     }

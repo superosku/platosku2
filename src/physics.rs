@@ -2,6 +2,7 @@ use crate::state::BoundingBox;
 use crate::state::Dir;
 use crate::state::GameMap;
 use crate::state::Pos;
+use crate::state::game_map::MapLike;
 
 const GRAVITY: f32 = 0.0070;
 const TERMINAL_VELOCITY: f32 = 0.90;
@@ -14,7 +15,11 @@ pub struct KinematicResult {
     pub on_right: bool,
 }
 
-pub fn integrate_kinematic(map: &GameMap, bb: &BoundingBox, gravity: bool) -> KinematicResult {
+pub fn integrate_kinematic(
+    map: &Box<dyn MapLike>,
+    bb: &BoundingBox,
+    gravity: bool,
+) -> KinematicResult {
     let mut on_bottom = false;
     let mut on_top = false;
     let mut on_left = false;
@@ -111,7 +116,7 @@ pub fn integrate_kinematic(map: &GameMap, bb: &BoundingBox, gravity: bool) -> Ki
     }
 }
 
-pub fn collides_with_map(map: &GameMap, x: f32, y: f32, w: f32, h: f32) -> bool {
+pub fn collides_with_map(map: &Box<dyn MapLike>, x: f32, y: f32, w: f32, h: f32) -> bool {
     // Treat outside of map bounds as blocking
     // if x < 0.0 || y < 0.0 {
     //     return true;
@@ -140,7 +145,7 @@ pub fn collides_with_map(map: &GameMap, x: f32, y: f32, w: f32, h: f32) -> bool 
 pub fn check_and_snap_hang(
     bb: &BoundingBox,
     new_bb: &BoundingBox,
-    map: &GameMap,
+    map: &Box<dyn MapLike>,
     dir: Dir,
 ) -> Option<Pos> {
     // Check if top of bb is above a tile and new_bb is below the tile

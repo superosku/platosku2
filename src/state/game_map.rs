@@ -11,6 +11,24 @@ pub enum OverlayTile {
     Ladder = 1,
 }
 
+pub trait MapLike {
+    fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile);
+
+    fn is_solid_at(&self, tx: i32, ty: i32) -> bool {
+        let (base, _overlay) = self.get_at(tx, ty);
+        match base {
+            BaseTile::Empty => false,
+            BaseTile::Stone => true,
+            BaseTile::Wood => true,
+        }
+    }
+
+    fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
+        let (_base, overlay) = self.get_at(tx, ty);
+        matches!(overlay, OverlayTile::Ladder)
+    }
+}
+
 struct Room {
     base: Vec<BaseTile>,
     overlay: Vec<OverlayTile>,
@@ -72,16 +90,13 @@ impl Room {
             return None;
         }
         Some(self.get_absolute(rel_x as u32, rel_y as u32))
-        //
-        // println!("({} {}) ({} {}) ({} {})", x, y, self.x, self.y, self.w, self.h);
-        // if self.x <= x && self.y <= y && self.x + self.w as i32 <= x && self.y + self.h as i32 <= y {
-        //     return Some(self.get_absolute(
-        //         (x - self.x) as u32,
-        //         (y - self.y) as u32,
-        //     ))
-        // }
-        //
-        // None
+    }
+}
+
+impl MapLike for Room {
+    fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
+        self.get_relative(tx, ty)
+            .unwrap_or((BaseTile::Stone, OverlayTile::None))
     }
 }
 
@@ -92,19 +107,6 @@ pub struct GameMap {
 }
 
 impl GameMap {
-    // pub fn width_tiles(&self) -> usize {
-    //     self.base.first().map(|r| r.len()).unwrap_or(0)
-    // }
-    // pub fn height_tiles(&self) -> usize {
-    //     self.base.len()
-    // }
-    // pub fn width(&self) -> f32 {
-    //     self.width_tiles() as f32
-    // }
-    // pub fn height(&self) -> f32 {
-    //     self.height_tiles() as f32
-    // }
-
     pub fn new_random() -> GameMap {
         let mut rooms = Vec::new();
 
@@ -116,8 +118,10 @@ impl GameMap {
 
         GameMap { rooms }
     }
+}
 
-    pub fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
+impl MapLike for GameMap {
+    fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         for room in &self.rooms {
             if let Some(result) = room.get_relative(tx, ty) {
                 return result;
@@ -125,19 +129,5 @@ impl GameMap {
         }
 
         (BaseTile::Stone, OverlayTile::None)
-    }
-
-    pub fn is_solid_at(&self, tx: i32, ty: i32) -> bool {
-        let (base, _overlay) = self.get_at(tx, ty);
-        match base {
-            BaseTile::Empty => false,
-            BaseTile::Stone => true,
-            BaseTile::Wood => true,
-        }
-    }
-
-    pub fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
-        let (_base, overlay) = self.get_at(tx, ty);
-        matches!(overlay, OverlayTile::Ladder)
     }
 }

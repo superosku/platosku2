@@ -1,5 +1,5 @@
 use super::common::{BoundingBox, Dir, Pos};
-use super::game_map::GameMap;
+use super::game_map::{GameMap, MapLike};
 use super::game_state::InputState;
 use crate::physics::{check_and_snap_hang, integrate_kinematic};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
@@ -123,7 +123,7 @@ impl Player {
         }
     }
 
-    pub fn _handle_normal(&mut self, input: &InputState, map: &GameMap) {
+    pub fn _handle_normal(&mut self, input: &InputState, map: &Box<dyn MapLike>) {
         let pressing_left = input.left && !input.right;
         let pressing_right = input.right && !input.left;
 
@@ -215,7 +215,7 @@ impl Player {
         self.animation_handler.get_atlas_index()
     }
 
-    pub fn update(&mut self, input: &InputState, map: &GameMap) {
+    pub fn update(&mut self, input: &InputState, map: &Box<dyn MapLike>) {
         let mut increment_frame = true;
 
         match &self.state {

@@ -37,7 +37,7 @@ impl Stage {
             screen_w: width as f32,
             screen_h: height as f32,
             player,
-            map,
+            map: Box::new(map),
             input: InputState::default(),
             coins: vec![
                 Coin::new(4.0, 1.0),

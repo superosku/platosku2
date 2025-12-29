@@ -1,6 +1,6 @@
 use super::coin::Coin;
 use super::enemies::Enemy;
-use super::game_map::GameMap;
+use super::game_map::{GameMap, MapLike};
 use super::player::Player;
 use crate::camera::Camera;
 
@@ -18,7 +18,7 @@ pub struct GameState {
     pub screen_w: f32,
     pub screen_h: f32,
     pub player: Player,
-    pub map: GameMap,
+    pub map: Box<dyn MapLike>,
     pub input: InputState,
     pub coins: Vec<Coin>,
     pub enemies: Vec<Box<dyn Enemy>>,
