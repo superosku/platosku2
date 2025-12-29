@@ -7,3 +7,5 @@ edition = "2024"
 miniquad = "0.4.8"
 image = { version = "0.24", default-features = false, features = ["png"] }
 rand = "0.9.2"
+egui-miniquad = "0.16.0"
+egui = "0.31.1"

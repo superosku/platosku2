@@ -27,7 +27,12 @@ impl Room {
         let mut overlay = vec![OverlayTile::None; (h * w) as usize];
 
         let mut room = Room {
-            x, y, h, w, base, overlay
+            x,
+            y,
+            h,
+            w,
+            base,
+            overlay,
         };
 
         for xx in 0..w {
@@ -61,10 +66,10 @@ impl Room {
         let rel_x = x - self.x;
         let rel_y = y - self.y;
         if rel_x < 0 || rel_y < 0 {
-            return None
+            return None;
         }
         if rel_x >= self.w as i32 || rel_y >= self.h as i32 {
-            return None
+            return None;
         }
         Some(self.get_absolute(rel_x as u32, rel_y as u32))
         //
@@ -83,7 +88,7 @@ impl Room {
 pub struct GameMap {
     // pub base: Vec<Vec<BaseTile>>,
     // pub overlay: Vec<Vec<OverlayTile>>,
-    rooms: Vec<Room>
+    rooms: Vec<Room>,
 }
 
 impl GameMap {
@@ -105,12 +110,7 @@ impl GameMap {
 
         for x in 0..5 {
             for y in 0..5 {
-                rooms.push(Room::new(
-                    x * 6 + y - 8,
-                    y * 4 - 4,
-                    7,
-                    5
-                ))
+                rooms.push(Room::new(x * 6 + y - 8, y * 4 - 4, 7, 5))
             }
         }
 
@@ -120,14 +120,11 @@ impl GameMap {
     pub fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         for room in &self.rooms {
             if let Some(result) = room.get_relative(tx, ty) {
-                return result
+                return result;
             }
         }
 
-        (
-            BaseTile::Stone,
-            OverlayTile::None
-        )
+        (BaseTile::Stone, OverlayTile::None)
     }
 
     pub fn is_solid_at(&self, tx: i32, ty: i32) -> bool {

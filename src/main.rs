@@ -8,8 +8,10 @@ use crate::state::{Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
 mod render;
 use crate::render::Renderer;
 use crate::state::enemies::Slime;
+use egui_miniquad as egui_mq;
 
 struct Stage {
+    egui_mq: egui_mq::EguiMq,
     state: GameState,
     renderer: Renderer,
     last_time: f64,
@@ -24,7 +26,7 @@ struct Stage {
 impl Stage {
     fn new(width: i32, height: i32) -> Stage {
         // Simple unit quad at origin (0..1, 0..1)
-        let renderer = Renderer::new();
+        let mut renderer = Renderer::new();
 
         let map = GameMap::new_random();
 
@@ -59,6 +61,7 @@ impl Stage {
         state.camera.follow(pcx, pcy);
 
         Stage {
+            egui_mq: egui_mq::EguiMq::new(&mut *renderer.ctx),
             state,
             renderer,
             last_time: date::now(),
@@ -115,11 +118,26 @@ impl EventHandler for Stage {
     }
 
     fn draw(&mut self) {
+        // Game
         let draw_start = date::now();
+
         self.renderer.draw(&self.state);
         self.frames += 1;
         let draw_total = date::now() - draw_start;
         self.time_spent_drawing += draw_total;
+
+        // GUI
+        self.egui_mq
+            .run(&mut *self.renderer.ctx, |_mq_ctx, egui_ctx| {
+                egui::Window::new("egui ❤ miniquad").show(egui_ctx, |ui| {
+                    egui::widgets::global_theme_preference_buttons(ui);
+                    ui.checkbox(&mut true, "Show egui demo windows");
+                });
+            });
+
+        self.egui_mq.draw(&mut *self.renderer.ctx);
+
+        self.renderer.ctx.commit_frame();
     }
 
     fn resize_event(&mut self, width: f32, height: f32) {
@@ -127,7 +145,7 @@ impl EventHandler for Stage {
         self.renderer.resize(width, height);
     }
 
-    fn key_down_event(&mut self, keycode: KeyCode, _mods: KeyMods, _repeat: bool) {
+    fn key_down_event(&mut self, keycode: KeyCode, keymods: KeyMods, _repeat: bool) {
         match keycode {
             KeyCode::Left => self.state.input.left = true,
             KeyCode::Right => self.state.input.right = true,
@@ -137,9 +155,10 @@ impl EventHandler for Stage {
             KeyCode::Down => self.state.input.down = true,
             _ => {}
         }
+        self.egui_mq.key_down_event(keycode, keymods);
     }
 
-    fn key_up_event(&mut self, keycode: KeyCode, _mods: KeyMods) {
+    fn key_up_event(&mut self, keycode: KeyCode, keymods: KeyMods) {
         match keycode {
             KeyCode::Left => self.state.input.left = false,
             KeyCode::Right => self.state.input.right = false,
@@ -149,10 +168,28 @@ impl EventHandler for Stage {
             KeyCode::Down => self.state.input.down = false,
             _ => {}
         }
+        self.egui_mq.key_up_event(keycode, keymods);
     }
 
-    fn mouse_wheel_event(&mut self, _x: f32, y: f32) {
-        self.state.camera.zoom_scroll(y);
+    fn mouse_wheel_event(&mut self, dx: f32, dy: f32) {
+        self.state.camera.zoom_scroll(dy);
+        self.egui_mq.mouse_wheel_event(dx, dy);
+    }
+
+    fn mouse_motion_event(&mut self, x: f32, y: f32) {
+        self.egui_mq.mouse_motion_event(x, y);
+    }
+
+    fn mouse_button_down_event(&mut self, mb: MouseButton, x: f32, y: f32) {
+        self.egui_mq.mouse_button_down_event(mb, x, y);
+    }
+
+    fn mouse_button_up_event(&mut self, mb: MouseButton, x: f32, y: f32) {
+        self.egui_mq.mouse_button_up_event(mb, x, y);
+    }
+
+    fn char_event(&mut self, character: char, _keymods: KeyMods, _repeat: bool) {
+        self.egui_mq.char_event(character);
     }
 }
 

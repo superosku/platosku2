@@ -26,7 +26,7 @@ struct Vertex {
 }
 
 pub struct Renderer {
-    ctx: Box<Context>,
+    pub ctx: Box<Context>,
     pipeline: Pipeline,
     pipeline_tiles: Pipeline,
     bindings: Bindings,
@@ -364,7 +364,6 @@ impl Renderer {
         }
 
         self.ctx.end_render_pass();
-        self.ctx.commit_frame();
     }
 
     fn draw_from_texture_atlas(
