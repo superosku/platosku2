@@ -33,8 +33,10 @@ impl UiConfig {
 
 struct Stage {
     egui_mq: egui_mq::EguiMq,
+
     state: GameState,
     renderer: Renderer,
+
     last_time: f64,
     last_time_ups: f64,
     updates: u32,
@@ -42,6 +44,7 @@ struct Stage {
     accumulator: f64,
     time_spent_drawing: f64,
     time_spent_updating: f64,
+
     ui_config: UiConfig,
 }
 
@@ -232,7 +235,7 @@ impl EventHandler for Stage {
     fn mouse_button_down_event(&mut self, mb: MouseButton, x: f32, y: f32) {
         self.egui_mq.mouse_button_down_event(mb, x, y);
 
-        let coords = self.state.camera.screen_to_tile(x, y, 800.0, 600.0);
+        let coords = self.state.camera.screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
         println!("Mouse coords: {:?}", coords);
 
         match self.ui_config.editor_selection {
