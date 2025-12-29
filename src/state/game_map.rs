@@ -13,6 +13,8 @@ pub enum OverlayTile {
 
 pub trait MapLike {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile);
+    fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
+    fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
 
     fn is_solid_at(&self, tx: i32, ty: i32) -> bool {
         let (base, _overlay) = self.get_at(tx, ty);
@@ -29,7 +31,7 @@ pub trait MapLike {
     }
 }
 
-struct Room {
+pub struct Room {
     base: Vec<BaseTile>,
     overlay: Vec<OverlayTile>,
     x: i32,
@@ -54,22 +56,34 @@ impl Room {
         };
 
         for xx in 0..w {
-            room.set_base(xx, 0, BaseTile::Wood);
-            room.set_base(xx, room.h - 1, BaseTile::Wood);
+            room.set_base_absolute(xx, 0, BaseTile::Wood);
+            room.set_base_absolute(xx, room.h - 1, BaseTile::Wood);
         }
         for yy in 0..h {
-            room.set_base(0, yy, BaseTile::Wood);
-            room.set_base(room.w - 1, yy, BaseTile::Wood);
+            room.set_base_absolute(0, yy, BaseTile::Wood);
+            room.set_base_absolute(room.w - 1, yy, BaseTile::Wood);
         }
 
         room
     }
 
-    pub fn set_base(&mut self, x: u32, y: u32, tile: BaseTile) {
+    fn abs_to_rel(&self, xy: (i32, i32)) -> Option<(u32, u32)> {
+        let rel_x = xy.0 - self.x;
+        let rel_y = xy.1 - self.y;
+        if rel_x < 0 || rel_y < 0 {
+            return None;
+        }
+        if rel_x >= self.w as i32 || rel_y >= self.h as i32 {
+            return None;
+        }
+        Some((rel_x as u32, rel_y as u32))
+    }
+
+    pub fn set_base_absolute(&mut self, x: u32, y: u32, tile: BaseTile) {
         self.base[(x + self.w * y) as usize] = tile;
     }
 
-    pub fn set_overlay(&mut self, x: u32, y: u32, tile: OverlayTile) {
+    pub fn set_overlay_absolute(&mut self, x: u32, y: u32, tile: OverlayTile) {
         self.overlay[(x + self.w * y) as usize] = tile;
     }
 
@@ -81,15 +95,10 @@ impl Room {
     }
 
     pub fn get_relative(&self, x: i32, y: i32) -> Option<(BaseTile, OverlayTile)> {
-        let rel_x = x - self.x;
-        let rel_y = y - self.y;
-        if rel_x < 0 || rel_y < 0 {
-            return None;
+        if let Some(rel) = self.abs_to_rel((x, y)) {
+            return Some(self.get_absolute(rel.0, rel.1));
         }
-        if rel_x >= self.w as i32 || rel_y >= self.h as i32 {
-            return None;
-        }
-        Some(self.get_absolute(rel_x as u32, rel_y as u32))
+        None
     }
 }
 
@@ -97,6 +106,18 @@ impl MapLike for Room {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         self.get_relative(tx, ty)
             .unwrap_or((BaseTile::Stone, OverlayTile::None))
+    }
+
+    fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
+        if let Some(rel) = self.abs_to_rel((x, y)) {
+            self.set_base_absolute(rel.0, rel.1, tile);
+        }
+    }
+
+    fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile) {
+        if let Some(rel) = self.abs_to_rel((x, y)) {
+            self.set_overlay_absolute(rel.0, rel.1, tile);
+        }
     }
 }
 
@@ -129,5 +150,13 @@ impl MapLike for GameMap {
         }
 
         (BaseTile::Stone, OverlayTile::None)
+    }
+
+    fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
+        todo!()
+    }
+
+    fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile) {
+        todo!()
     }
 }

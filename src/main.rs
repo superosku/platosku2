@@ -4,11 +4,32 @@ use state::OverlayTile;
 mod camera;
 mod physics;
 mod state;
-use crate::state::{Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
+use crate::state::{BaseTile, Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
 mod render;
 use crate::render::Renderer;
 use crate::state::enemies::Slime;
+use crate::state::game_map::Room;
 use egui_miniquad as egui_mq;
+
+#[derive(Debug, Eq, PartialEq)]
+enum EditorSelection {
+    Clear,
+    Stone,
+    Wood,
+    Ladder,
+}
+
+struct UiConfig {
+    editor_selection: EditorSelection,
+}
+
+impl UiConfig {
+    pub fn new() -> UiConfig {
+        UiConfig {
+            editor_selection: EditorSelection::Clear,
+        }
+    }
+}
 
 struct Stage {
     egui_mq: egui_mq::EguiMq,
@@ -21,6 +42,7 @@ struct Stage {
     accumulator: f64,
     time_spent_drawing: f64,
     time_spent_updating: f64,
+    ui_config: UiConfig,
 }
 
 impl Stage {
@@ -28,7 +50,8 @@ impl Stage {
         // Simple unit quad at origin (0..1, 0..1)
         let mut renderer = Renderer::new();
 
-        let map = GameMap::new_random();
+        // let map = GameMap::new_random();
+        let map = Room::new(-2, -2, 16, 8);
 
         // Start player near the top-left open area
         let player = Player::new(2.0, 2.0);
@@ -71,6 +94,7 @@ impl Stage {
             last_time_ups: date::now(),
             time_spent_drawing: 0.0,
             time_spent_updating: 0.0,
+            ui_config: UiConfig::new(),
         }
     }
 }
@@ -129,9 +153,34 @@ impl EventHandler for Stage {
         // GUI
         self.egui_mq
             .run(&mut *self.renderer.ctx, |_mq_ctx, egui_ctx| {
-                egui::Window::new("egui ❤ miniquad").show(egui_ctx, |ui| {
-                    egui::widgets::global_theme_preference_buttons(ui);
-                    ui.checkbox(&mut true, "Show egui demo windows");
+                egui::Window::new("Level editor").show(egui_ctx, |ui| {
+                    // egui::widgets::global_theme_preference_buttons(ui);
+                    // ui.checkbox(&mut true, "Show egui demo windows");
+
+                    egui::ComboBox::from_label("Select one!")
+                        .selected_text(format!("{:?}", self.ui_config.editor_selection))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.ui_config.editor_selection,
+                                EditorSelection::Clear,
+                                "Clear",
+                            );
+                            ui.selectable_value(
+                                &mut self.ui_config.editor_selection,
+                                EditorSelection::Stone,
+                                "Stone",
+                            );
+                            ui.selectable_value(
+                                &mut self.ui_config.editor_selection,
+                                EditorSelection::Wood,
+                                "Wood",
+                            );
+                            ui.selectable_value(
+                                &mut self.ui_config.editor_selection,
+                                EditorSelection::Ladder,
+                                "Ladder",
+                            );
+                        });
                 });
             });
 
@@ -182,6 +231,36 @@ impl EventHandler for Stage {
 
     fn mouse_button_down_event(&mut self, mb: MouseButton, x: f32, y: f32) {
         self.egui_mq.mouse_button_down_event(mb, x, y);
+
+        let coords = self.state.camera.screen_to_tile(x, y, 800.0, 600.0);
+        println!("Mouse coords: {:?}", coords);
+
+        match self.ui_config.editor_selection {
+            EditorSelection::Clear => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+            EditorSelection::Ladder => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
+            }
+            EditorSelection::Stone => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Stone);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+            EditorSelection::Wood => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Wood);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+        }
     }
 
     fn mouse_button_up_event(&mut self, mb: MouseButton, x: f32, y: f32) {
