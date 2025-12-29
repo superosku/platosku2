@@ -11,44 +11,123 @@ pub enum OverlayTile {
     Ladder = 1,
 }
 
+struct Room {
+    base: Vec<BaseTile>,
+    overlay: Vec<OverlayTile>,
+    x: i32,
+    y: i32,
+    h: u32,
+    w: u32,
+}
+
+impl Room {
+    pub fn new(x: i32, y: i32, w: u32, h: u32) -> Room {
+        // Create new base and overlay that has x * y size and is initialized to Empty and None
+        let mut base = vec![BaseTile::Empty; (h * w) as usize];
+        let mut overlay = vec![OverlayTile::None; (h * w) as usize];
+
+        let mut room = Room {
+            x, y, h, w, base, overlay
+        };
+
+        for xx in 0..w {
+            room.set_base(xx, 0, BaseTile::Wood);
+            room.set_base(xx, room.h - 1, BaseTile::Wood);
+        }
+        for yy in 0..h {
+            room.set_base(0, yy, BaseTile::Wood);
+            room.set_base(room.w - 1, yy, BaseTile::Wood);
+        }
+
+        room
+    }
+
+    pub fn set_base(&mut self, x: u32, y: u32, tile: BaseTile) {
+        self.base[(x + self.w * y) as usize] = tile;
+    }
+
+    pub fn set_overlay(&mut self, x: u32, y: u32, tile: OverlayTile) {
+        self.overlay[(x + self.w * y) as usize] = tile;
+    }
+
+    pub fn get_absolute(&self, x: u32, y: u32) -> (BaseTile, OverlayTile) {
+        (
+            self.base[(x + self.w * y) as usize],
+            self.overlay[(x + self.w * y) as usize],
+        )
+    }
+
+    pub fn get_relative(&self, x: i32, y: i32) -> Option<(BaseTile, OverlayTile)> {
+        let rel_x = x - self.x;
+        let rel_y = y - self.y;
+        if rel_x < 0 || rel_y < 0 {
+            return None
+        }
+        if rel_x >= self.w as i32 || rel_y >= self.h as i32 {
+            return None
+        }
+        Some(self.get_absolute(rel_x as u32, rel_y as u32))
+        //
+        // println!("({} {}) ({} {}) ({} {})", x, y, self.x, self.y, self.w, self.h);
+        // if self.x <= x && self.y <= y && self.x + self.w as i32 <= x && self.y + self.h as i32 <= y {
+        //     return Some(self.get_absolute(
+        //         (x - self.x) as u32,
+        //         (y - self.y) as u32,
+        //     ))
+        // }
+        //
+        // None
+    }
+}
+
 pub struct GameMap {
-    pub base: Vec<Vec<BaseTile>>,
-    pub overlay: Vec<Vec<OverlayTile>>,
+    // pub base: Vec<Vec<BaseTile>>,
+    // pub overlay: Vec<Vec<OverlayTile>>,
+    rooms: Vec<Room>
 }
 
 impl GameMap {
-    pub fn width_tiles(&self) -> usize {
-        self.base.first().map(|r| r.len()).unwrap_or(0)
-    }
-    pub fn height_tiles(&self) -> usize {
-        self.base.len()
-    }
-    pub fn width(&self) -> f32 {
-        self.width_tiles() as f32
-    }
-    pub fn height(&self) -> f32 {
-        self.height_tiles() as f32
+    // pub fn width_tiles(&self) -> usize {
+    //     self.base.first().map(|r| r.len()).unwrap_or(0)
+    // }
+    // pub fn height_tiles(&self) -> usize {
+    //     self.base.len()
+    // }
+    // pub fn width(&self) -> f32 {
+    //     self.width_tiles() as f32
+    // }
+    // pub fn height(&self) -> f32 {
+    //     self.height_tiles() as f32
+    // }
+
+    pub fn new_random() -> GameMap {
+        let mut rooms = Vec::new();
+
+        for x in 0..5 {
+            for y in 0..5 {
+                rooms.push(Room::new(
+                    x * 6 + y - 8,
+                    y * 4 - 4,
+                    7,
+                    5
+                ))
+            }
+        }
+
+        GameMap { rooms }
     }
 
     pub fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
-        if tx < 0 || ty < 0 {
-            return (BaseTile::Stone, OverlayTile::None);
+        for room in &self.rooms {
+            if let Some(result) = room.get_relative(tx, ty) {
+                return result
+            }
         }
-        let x = tx as usize;
-        let y = ty as usize;
-        let base = self
-            .base
-            .get(y)
-            .and_then(|row| row.get(x))
-            .copied()
-            .unwrap_or(BaseTile::Stone);
-        let overlay = self
-            .overlay
-            .get(y)
-            .and_then(|row| row.get(x))
-            .copied()
-            .unwrap_or(OverlayTile::None);
-        (base, overlay)
+
+        (
+            BaseTile::Stone,
+            OverlayTile::None
+        )
     }
 
     pub fn is_solid_at(&self, tx: i32, ty: i32) -> bool {

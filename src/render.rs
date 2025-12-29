@@ -566,11 +566,11 @@ impl Renderer {
     }
 
     fn draw_overlay(&mut self, state: &GameState) {
-        let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
-        let height = state.map.base.len();
-        if width == 0 || height == 0 {
-            return;
-        }
+        // let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
+        // let height = state.map.base.len();
+        // if width == 0 || height == 0 {
+        //     return;
+        // }
 
         let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
         let tex_w = tilemap.w;
@@ -624,11 +624,11 @@ impl Renderer {
     }
 
     fn draw_base_dual_grid(&mut self, state: &GameState, tile_type: BaseTile, tile_type_index: u8) {
-        let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
-        let height = state.map.base.len();
-        if width == 0 || height == 0 {
-            return;
-        }
+        // let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
+        // let height = state.map.base.len();
+        // if width == 0 || height == 0 {
+        //     return;
+        // }
 
         let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
         let tex_w = tilemap.w;

@@ -64,7 +64,7 @@ pub fn integrate_kinematic(map: &GameMap, bb: &BoundingBox, gravity: bool) -> Ki
                 }
             }
             if !landed {
-                out_y = (map.height() - bb.h).max(0.0);
+                // out_y = (map.height() - bb.h).max(0.0);
             }
             out_vy = 0.0;
             on_bottom = true;
@@ -89,9 +89,11 @@ pub fn integrate_kinematic(map: &GameMap, bb: &BoundingBox, gravity: bool) -> Ki
         }
     }
 
-    // Final clamp to map bounds
-    let clamped_x = out_x.clamp(0.0, (map.width() - bb.w).max(0.0));
-    let clamped_y = out_y.clamp(0.0, (map.height() - bb.h).max(0.0));
+    // // Final clamp to map bounds
+    // let clamped_x = out_x.clamp(0.0, (map.width() - bb.w).max(0.0));
+    // let clamped_y = out_y.clamp(0.0, (map.height() - bb.h).max(0.0));
+    let clamped_x = out_x;
+    let clamped_y = out_y;
 
     KinematicResult {
         new_bb: BoundingBox {
@@ -111,12 +113,12 @@ pub fn integrate_kinematic(map: &GameMap, bb: &BoundingBox, gravity: bool) -> Ki
 
 pub fn collides_with_map(map: &GameMap, x: f32, y: f32, w: f32, h: f32) -> bool {
     // Treat outside of map bounds as blocking
-    if x < 0.0 || y < 0.0 {
-        return true;
-    }
-    if x + w > map.width() || y + h > map.height() {
-        return true;
-    }
+    // if x < 0.0 || y < 0.0 {
+    //     return true;
+    // }
+    // if x + w > map.width() || y + h > map.height() {
+    //     return true;
+    // }
 
     let epsilon = 0.001f32;
     let left_tx = (x).floor() as i32;
