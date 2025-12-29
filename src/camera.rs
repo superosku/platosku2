@@ -31,4 +31,32 @@ impl Camera {
         let new_zoom = self.zoom + scroll_dy * 0.1;
         self.set_zoom(new_zoom);
     }
+
+    pub fn screen_to_tile(
+        &self,
+        mouse_x: f32,
+        mouse_y: f32,
+        screen_w: f32,
+        screen_h: f32,
+    ) -> (i32, i32) {
+        // Keep this in sync with TILE_SIZE used in rendering.
+        const TILE_SIZE: f32 = 16.0;
+
+        // Camera center in world pixels (rendering uses pixel-snapped camera center)
+        let cx_px = self.x * TILE_SIZE;
+        let cy_px = self.y * TILE_SIZE;
+        let snapped_cx = (cx_px * self.zoom).round() / self.zoom;
+        let snapped_cy = (cy_px * self.zoom).round() / self.zoom;
+
+        // Invert the View transform used in rendering:
+        // screen = (world - snapped_center) * zoom + screen_center
+        // => world = (screen - screen_center) / zoom + snapped_center
+        let world_x_px = (mouse_x - screen_w * 0.5) / self.zoom + snapped_cx;
+        let world_y_px = (mouse_y - screen_h * 0.5) / self.zoom + snapped_cy;
+
+        // Convert world pixels to tile indices on the base grid
+        let tx = (world_x_px / TILE_SIZE).floor() as i32;
+        let ty = (world_y_px / TILE_SIZE).floor() as i32;
+        (tx, ty)
+    }
 }
