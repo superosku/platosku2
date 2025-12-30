@@ -188,6 +188,7 @@ impl EventHandler for Stage {
                         });
 
                     if ui.add(egui::Button::new("Save map")).clicked() {
+                        self.state.map.resize_shrink();
                         self.state.map.save_json(Path::new("saved_room.json"));
                         println!("Button clicked!");
                     }
