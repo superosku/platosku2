@@ -100,23 +100,72 @@ impl Room {
         }
         None
     }
+
+    pub fn resize_to_fit(&mut self, x: i32, y: i32) {
+        let cols_to_add_left = (self.x - x).max(0);
+        let rows_to_add_top = (self.y - y).max(0);
+        let cols_to_add_right = (x - (self.x + self.w as i32) + 1).max(0);
+        let rows_to_add_bottom = (y - (self.y + self.h as i32) + 1).max(0);
+
+        println!(
+            "{} {} {} {}",
+            cols_to_add_left, cols_to_add_right, rows_to_add_bottom, rows_to_add_top
+        );
+
+        let new_h = self.h + rows_to_add_bottom as u32 + rows_to_add_top as u32;
+        let new_w = self.w + cols_to_add_left as u32 + cols_to_add_right as u32;
+        let new_size = new_h * new_w;
+
+        let mut new_base = vec![BaseTile::Empty; new_size as usize];
+        let mut new_overlay = vec![OverlayTile::None; new_size as usize];
+
+        for xx in 0..self.w {
+            for yy in 0..self.h {
+                new_base[((xx as i32 + cols_to_add_left)
+                    + new_w as i32 * (yy as i32 + rows_to_add_top))
+                    as usize] = self.base[(xx + self.w * yy) as usize];
+                new_overlay[((xx as i32 + cols_to_add_left)
+                    + new_w as i32 * (yy as i32 + rows_to_add_top))
+                    as usize] = self.overlay[(xx + self.w * yy) as usize];
+            }
+        }
+
+        self.x = self.x.min(x);
+        self.y = self.y.min(y);
+        self.h = new_h;
+        self.w = new_w;
+        self.overlay = new_overlay;
+        self.base = new_base;
+    }
 }
 
 impl MapLike for Room {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         self.get_relative(tx, ty)
-            .unwrap_or((BaseTile::Stone, OverlayTile::None))
+            .unwrap_or((BaseTile::Empty, OverlayTile::None))
     }
 
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
         if let Some(rel) = self.abs_to_rel((x, y)) {
             self.set_base_absolute(rel.0, rel.1, tile);
+        } else {
+            // Resize first and then retry
+            self.resize_to_fit(x, y);
+            if let Some(rel) = self.abs_to_rel((x, y)) {
+                self.set_base_absolute(rel.0, rel.1, tile);
+            }
         }
     }
 
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile) {
         if let Some(rel) = self.abs_to_rel((x, y)) {
             self.set_overlay_absolute(rel.0, rel.1, tile);
+        } else {
+            // Resize first and then retry
+            self.resize_to_fit(x, y);
+            if let Some(rel) = self.abs_to_rel((x, y)) {
+                self.set_overlay_absolute(rel.0, rel.1, tile);
+            }
         }
     }
 }
