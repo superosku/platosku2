@@ -242,6 +242,10 @@ impl EventHandler for Stage {
     fn mouse_button_down_event(&mut self, mb: MouseButton, x: f32, y: f32) {
         self.egui_mq.mouse_button_down_event(mb, x, y);
 
+        if self.egui_mq.egui_ctx().wants_pointer_input() {
+            return
+        }
+
         let coords =
             self.state
                 .camera
