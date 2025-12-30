@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path::Path};
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
 pub enum BaseTile {
     Empty = 0,
     Stone = 1,
     Wood = 2,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum OverlayTile {
     None = 0,
     Ladder = 1,
@@ -45,19 +45,23 @@ pub struct Room {
 }
 
 impl Room {
-    pub fn new(x: i32, y: i32, w: u32, h: u32) -> Room {
+    pub fn new_empty( x: i32, y: i32, w: u32, h: u32 ) -> Room {
         // Create new base and overlay that has x * y size and is initialized to Empty and None
         let base = vec![BaseTile::Empty; (h * w) as usize];
         let overlay = vec![OverlayTile::None; (h * w) as usize];
 
-        let mut room = Room {
+        Room {
             x,
             y,
             h,
             w,
             base,
             overlay,
-        };
+        }
+    }
+
+    pub fn new(x: i32, y: i32, w: u32, h: u32) -> Room {
+        let mut room = Room::new_empty(x, y, w, h);
 
         for xx in 0..w {
             room.set_base_absolute(xx, 0, BaseTile::Wood);
@@ -153,6 +157,97 @@ impl Room {
         self.overlay = new_overlay;
         self.base = new_base;
     }
+
+    pub fn resize_shrink(&mut self) {
+        let mut cols_to_remove_left = 0;
+        let mut rows_to_remove_top = 0;
+        let mut cols_to_remove_right = 0;
+        let mut rows_to_remove_bottom = 0;
+
+        let mut still_doing_left = true;
+        let mut still_doing_right = true;
+
+        for xx in 0..self.w {
+            for yy in 0..self.h {
+                match self.get_absolute(xx, yy) {
+                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (_, _) => {
+                        still_doing_left = false;
+                    }
+                }
+                match self.get_absolute(self.w - xx - 1, yy) {
+                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (_, _) => {
+                        still_doing_right = false;
+                    }
+                }
+            }
+            if !still_doing_left && !still_doing_right {
+                break
+            }
+            if still_doing_left {
+                cols_to_remove_left += 1;
+            }
+            if still_doing_right {
+                cols_to_remove_right += 1;
+            }
+        }
+
+        let mut still_doing_top = true;
+        let mut still_doing_bottom = true;
+        for yy in 0..self.h {
+            for xx in 0..self.w {
+                match self.get_absolute(xx, yy) {
+                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (_, _) => {
+                        still_doing_top = false;
+                    }
+                }
+                match self.get_absolute(xx, self.h - yy - 1) {
+                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (_, _) => {
+                        still_doing_bottom= false;
+                    }
+                }
+            }
+            if !still_doing_top && !still_doing_bottom {
+                break
+            }
+            if still_doing_top {
+                rows_to_remove_top += 1;
+            }
+            if still_doing_bottom {
+                rows_to_remove_bottom += 1;
+            }
+        }
+
+        let new_h = self.h - rows_to_remove_bottom as u32 - rows_to_remove_top as u32;
+        let new_w = self.w - cols_to_remove_left as u32 - cols_to_remove_right as u32;
+        let new_size = new_h * new_w;
+
+        let mut new_base = vec![BaseTile::Empty; new_size as usize];
+        let mut new_overlay = vec![OverlayTile::None; new_size as usize];
+
+        for xx in 0..new_w {
+            for yy in 0..new_h {
+                new_base[(xx + yy * new_w) as usize] = self.base[(
+                    (xx + cols_to_remove_left) +
+                    self.w * (yy + rows_to_remove_top)
+                ) as usize];
+                new_overlay[(xx + yy * new_w) as usize] = self.overlay[(
+                    (xx + cols_to_remove_left) +
+                    self.w * (yy + rows_to_remove_top)
+                ) as usize];
+            }
+        }
+
+        self.x = self.x + cols_to_remove_left as i32;
+        self.y = self.y + rows_to_remove_top as i32;
+        self.h = new_h;
+        self.w = new_w;
+        self.overlay = new_overlay;
+        self.base = new_base;
+    }
 }
 
 impl MapLike for Room {
@@ -223,5 +318,58 @@ impl MapLike for GameMap {
 
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile) {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resize_shrink_all() {
+        let mut room = Room::new_empty(-1, -1, 10, 10);
+        room.set_base_absolute(1, 2, BaseTile::Stone);
+        room.set_base_absolute(5, 5, BaseTile::Stone);
+        room.resize_shrink();
+
+        assert_eq!(room.x, 0);
+        assert_eq!(room.y, 1);
+        assert_eq!(room.w, 5);
+        assert_eq!(room.h, 4);
+
+        assert_eq!(room.get_absolute(0, 0).0, BaseTile::Stone);
+        assert_eq!(room.get_absolute(4, 3).0, BaseTile::Stone);
+    }
+
+    #[test]
+    fn test_resize_shrink_left() {
+        let mut room = Room::new_empty(-2, -2, 5, 5);
+        room.set_base_absolute(2, 0, BaseTile::Stone);
+        room.set_base_absolute(4, 4, BaseTile::Stone);
+        room.resize_shrink();
+
+        assert_eq!(room.x, 0);
+        assert_eq!(room.y, -2);
+        assert_eq!(room.w, 3);
+        assert_eq!(room.h, 5);
+
+        assert_eq!(room.get_absolute(0, 0).0, BaseTile::Stone);
+        assert_eq!(room.get_absolute(2, 4).0, BaseTile::Stone);
+    }
+
+    #[test]
+    fn test_resize_shrink_when_shrink_not_needed() {
+        let mut room = Room::new_empty(-2, -2, 5, 5);
+        room.set_base_absolute(0, 0, BaseTile::Stone);
+        room.set_base_absolute(4, 4, BaseTile::Stone);
+        room.resize_shrink();
+
+        assert_eq!(room.x, -2);
+        assert_eq!(room.y, -2);
+        assert_eq!(room.w, 5);
+        assert_eq!(room.h, 5);
+
+        assert_eq!(room.get_absolute(0, 0).0, BaseTile::Stone);
+        assert_eq!(room.get_absolute(4, 4).0, BaseTile::Stone);
     }
 }
