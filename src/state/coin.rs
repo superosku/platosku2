@@ -20,7 +20,7 @@ impl Coin {
         }
     }
 
-    pub fn update(&mut self, map: &Box<dyn MapLike>) {
+    pub fn update(&mut self, map: &dyn MapLike) {
         let res = integrate_kinematic(map, &self.bb, true);
         self.bb = res.new_bb;
     }

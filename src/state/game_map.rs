@@ -1,11 +1,14 @@
-#[derive(Eq, PartialEq, Clone, Copy)]
+use serde::{Deserialize, Serialize};
+use std::{fs, io, path::Path};
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
 pub enum BaseTile {
     Empty = 0,
     Stone = 1,
     Wood = 2,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum OverlayTile {
     None = 0,
     Ladder = 1,
@@ -31,6 +34,7 @@ pub trait MapLike {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Room {
     base: Vec<BaseTile>,
     overlay: Vec<OverlayTile>,
@@ -43,8 +47,8 @@ pub struct Room {
 impl Room {
     pub fn new(x: i32, y: i32, w: u32, h: u32) -> Room {
         // Create new base and overlay that has x * y size and is initialized to Empty and None
-        let mut base = vec![BaseTile::Empty; (h * w) as usize];
-        let mut overlay = vec![OverlayTile::None; (h * w) as usize];
+        let base = vec![BaseTile::Empty; (h * w) as usize];
+        let overlay = vec![OverlayTile::None; (h * w) as usize];
 
         let mut room = Room {
             x,
@@ -65,6 +69,18 @@ impl Room {
         }
 
         room
+    }
+
+    pub fn save_json(&self, path: impl AsRef<Path>) {
+        let s = serde_json::to_string_pretty(self).unwrap();
+        fs::write(path, s).unwrap();
+    }
+
+    pub fn load_json(path: impl AsRef<Path>) -> io::Result<Self> {
+        let s = fs::read_to_string(path)?;
+        let room =
+            serde_json::from_str(&s).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        Ok(room)
     }
 
     fn abs_to_rel(&self, xy: (i32, i32)) -> Option<(u32, u32)> {

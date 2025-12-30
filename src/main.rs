@@ -1,9 +1,11 @@
 use miniquad::*;
 use state::OverlayTile;
+use std::path::Path;
 
 mod camera;
 mod physics;
 mod state;
+use crate::state::game_map::MapLike;
 use crate::state::{BaseTile, Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
 mod render;
 use crate::render::Renderer;
@@ -54,7 +56,7 @@ impl Stage {
         let mut renderer = Renderer::new();
 
         // let map = GameMap::new_random();
-        let map = Room::new(-2, -2, 16, 8);
+        let map = Room::load_json(Path::new("saved_room.json")).unwrap();
 
         // Start player near the top-left open area
         let player = Player::new(2.0, 2.0);
@@ -63,7 +65,7 @@ impl Stage {
             screen_w: width as f32,
             screen_h: height as f32,
             player,
-            map: Box::new(map),
+            map,
             input: InputState::default(),
             coins: vec![
                 Coin::new(4.0, 1.0),
@@ -184,6 +186,11 @@ impl EventHandler for Stage {
                                 "Ladder",
                             );
                         });
+
+                    if ui.add(egui::Button::new("Save map")).clicked() {
+                        self.state.map.save_json(Path::new("saved_room.json"));
+                        println!("Button clicked!");
+                    }
                 });
             });
 
