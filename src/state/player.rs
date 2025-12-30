@@ -21,6 +21,7 @@ pub struct SwingState {
 pub struct Player {
     pub bb: BoundingBox,
     pub on_ground: bool,
+    pub safe_edge_frames: u32,
     pub state: PlayerState,
     pub speed: f32,
     pub dir: Dir,
@@ -62,6 +63,7 @@ impl Player {
                 vy: 0.0,
             },
             on_ground: false,
+            safe_edge_frames: 0,
             state: PlayerState::Normal,
             speed: 0.06,
             dir: Dir::Right,
@@ -147,7 +149,13 @@ impl Player {
             self.bb.vx = 0.0;
         }
 
-        if input.jump && self.on_ground {
+        if self.on_ground {
+			self.safe_edge_frames = 4;
+		} else if self.safe_edge_frames > 0 {
+			self.safe_edge_frames -= 1;
+        }
+
+        if input.jump && (self.on_ground || self.safe_edge_frames > 0) {
             self.bb.vy = -0.185;
         }
 
