@@ -48,6 +48,8 @@ struct Stage {
     time_spent_updating: f64,
 
     ui_config: UiConfig,
+
+    mouse_pressed: bool,
 }
 
 impl Stage {
@@ -100,7 +102,44 @@ impl Stage {
             time_spent_drawing: 0.0,
             time_spent_updating: 0.0,
             ui_config: UiConfig::new(),
+            mouse_pressed: false,
         }
+    }
+
+    fn handle_editor_input(&mut self, x: f32, y: f32) {
+        let coords =
+            self.state
+                .camera
+                .screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
+        println!("Mouse coords: {:?}", coords);
+
+        match self.ui_config.editor_selection {
+            EditorSelection::Clear => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+            EditorSelection::Ladder => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
+            }
+            EditorSelection::Stone => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Stone);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+            EditorSelection::Wood => {
+                self.state.map.set_base(coords.0, coords.1, BaseTile::Wood);
+                self.state
+                    .map
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+        }
+
     }
 }
 
@@ -162,30 +201,18 @@ impl EventHandler for Stage {
                     // egui::widgets::global_theme_preference_buttons(ui);
                     // ui.checkbox(&mut true, "Show egui demo windows");
 
-                    egui::ComboBox::from_label("Select one!")
-                        .selected_text(format!("{:?}", self.ui_config.editor_selection))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.ui_config.editor_selection,
-                                EditorSelection::Clear,
-                                "Clear",
-                            );
-                            ui.selectable_value(
-                                &mut self.ui_config.editor_selection,
-                                EditorSelection::Stone,
-                                "Stone",
-                            );
-                            ui.selectable_value(
-                                &mut self.ui_config.editor_selection,
-                                EditorSelection::Wood,
-                                "Wood",
-                            );
-                            ui.selectable_value(
-                                &mut self.ui_config.editor_selection,
-                                EditorSelection::Ladder,
-                                "Ladder",
-                            );
-                        });
+                    if ui.add(egui::RadioButton::new(self.ui_config.editor_selection == EditorSelection::Clear, "Clear")).clicked() {
+                        self.ui_config.editor_selection = EditorSelection::Clear;
+                    }
+                    if ui.add(egui::RadioButton::new(self.ui_config.editor_selection == EditorSelection::Wood, "Wood")).clicked() {
+                        self.ui_config.editor_selection = EditorSelection::Wood;
+                    }
+                    if ui.add(egui::RadioButton::new(self.ui_config.editor_selection == EditorSelection::Ladder, "Ladder")).clicked() {
+                        self.ui_config.editor_selection = EditorSelection::Ladder;
+                    }
+                    if ui.add(egui::RadioButton::new(self.ui_config.editor_selection == EditorSelection::Stone, "Stone")).clicked() {
+                        self.ui_config.editor_selection = EditorSelection::Stone;
+                    }
 
                     if ui.add(egui::Button::new("Save map")).clicked() {
                         self.state.map.resize_shrink();
@@ -238,50 +265,26 @@ impl EventHandler for Stage {
 
     fn mouse_motion_event(&mut self, x: f32, y: f32) {
         self.egui_mq.mouse_motion_event(x, y);
-    }
-
-    fn mouse_button_down_event(&mut self, mb: MouseButton, x: f32, y: f32) {
-        self.egui_mq.mouse_button_down_event(mb, x, y);
 
         if self.egui_mq.egui_ctx().wants_pointer_input() {
             return
         }
 
-        let coords =
-            self.state
-                .camera
-                .screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
-        println!("Mouse coords: {:?}", coords);
-
-        match self.ui_config.editor_selection {
-            EditorSelection::Clear => {
-                self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
-                self.state
-                    .map
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-            EditorSelection::Ladder => {
-                self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
-                self.state
-                    .map
-                    .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
-            }
-            EditorSelection::Stone => {
-                self.state.map.set_base(coords.0, coords.1, BaseTile::Stone);
-                self.state
-                    .map
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-            EditorSelection::Wood => {
-                self.state.map.set_base(coords.0, coords.1, BaseTile::Wood);
-                self.state
-                    .map
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
+        if self.mouse_pressed {
+            self.handle_editor_input(x, y);
         }
     }
 
+    fn mouse_button_down_event(&mut self, mb: MouseButton, x: f32, y: f32) {
+        self.mouse_pressed = true;
+
+        self.egui_mq.mouse_button_down_event(mb, x, y);
+
+    }
+
     fn mouse_button_up_event(&mut self, mb: MouseButton, x: f32, y: f32) {
+        self.mouse_pressed = false;
+
         self.egui_mq.mouse_button_up_event(mb, x, y);
     }
 
