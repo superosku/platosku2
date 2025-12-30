@@ -235,7 +235,10 @@ impl EventHandler for Stage {
     fn mouse_button_down_event(&mut self, mb: MouseButton, x: f32, y: f32) {
         self.egui_mq.mouse_button_down_event(mb, x, y);
 
-        let coords = self.state.camera.screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
+        let coords =
+            self.state
+                .camera
+                .screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
         println!("Mouse coords: {:?}", coords);
 
         match self.ui_config.editor_selection {
