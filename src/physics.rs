@@ -15,11 +15,7 @@ pub struct KinematicResult {
     pub on_right: bool,
 }
 
-pub fn integrate_kinematic(
-    map: &Box<dyn MapLike>,
-    bb: &BoundingBox,
-    gravity: bool,
-) -> KinematicResult {
+pub fn integrate_kinematic(map: &dyn MapLike, bb: &BoundingBox, gravity: bool) -> KinematicResult {
     let mut on_bottom = false;
     let mut on_top = false;
     let mut on_left = false;
@@ -116,7 +112,7 @@ pub fn integrate_kinematic(
     }
 }
 
-pub fn collides_with_map(map: &Box<dyn MapLike>, x: f32, y: f32, w: f32, h: f32) -> bool {
+pub fn collides_with_map(map: &dyn MapLike, x: f32, y: f32, w: f32, h: f32) -> bool {
     // Treat outside of map bounds as blocking
     // if x < 0.0 || y < 0.0 {
     //     return true;
@@ -145,7 +141,7 @@ pub fn collides_with_map(map: &Box<dyn MapLike>, x: f32, y: f32, w: f32, h: f32)
 pub fn check_and_snap_hang(
     bb: &BoundingBox,
     new_bb: &BoundingBox,
-    map: &Box<dyn MapLike>,
+    map: &dyn MapLike,
     dir: Dir,
 ) -> Option<Pos> {
     // Check if top of bb is above a tile and new_bb is below the tile

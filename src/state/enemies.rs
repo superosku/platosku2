@@ -10,7 +10,7 @@ use rand::prelude::*;
 pub trait Enemy {
     fn bb(&self) -> &BoundingBox;
 
-    fn update(&mut self, map: &Box<dyn MapLike>);
+    fn update(&mut self, map: &dyn MapLike);
     fn got_stomped(&mut self);
     fn can_be_stomped(&self) -> bool;
     fn got_hit(&mut self);
@@ -81,7 +81,7 @@ impl Enemy for Slime {
         &self.bb
     }
 
-    fn update(&mut self, map: &Box<dyn MapLike>) {
+    fn update(&mut self, map: &dyn MapLike) {
         let result = integrate_kinematic(map, &self.bb, true);
         self.bb = result.new_bb;
 
@@ -229,7 +229,7 @@ impl Enemy for Bat {
         &self.bb
     }
 
-    fn update(&mut self, map: &Box<dyn MapLike>) {
+    fn update(&mut self, map: &dyn MapLike) {
         let mut new_state: Option<BatState> = None;
 
         match &mut self.state {
