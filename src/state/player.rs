@@ -156,6 +156,7 @@ impl Player {
         }
 
         if input.jump && (self.on_ground || self.safe_edge_frames > 0) {
+            self.safe_edge_frames = 0;
             self.bb.vy = -0.185;
         }
 
