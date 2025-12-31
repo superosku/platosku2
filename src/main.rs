@@ -1,5 +1,6 @@
 use miniquad::*;
 use state::OverlayTile;
+use std::fs;
 use std::path::Path;
 
 mod camera;
@@ -28,8 +29,8 @@ enum EnemySelection {
 }
 
 enum EditorSelection {
-    Tiles {selection: TileSelection },
-    Enemies {selection: EnemySelection },
+    Tiles { selection: TileSelection },
+    Enemies { selection: EnemySelection },
     PlayerPos,
 }
 
@@ -40,7 +41,9 @@ struct UiConfig {
 impl UiConfig {
     pub fn new() -> UiConfig {
         UiConfig {
-            editor_selection: EditorSelection::Tiles {selection: TileSelection::Clear},
+            editor_selection: EditorSelection::Tiles {
+                selection: TileSelection::Clear,
+            },
         }
     }
 }
@@ -62,6 +65,8 @@ struct Stage {
     ui_config: UiConfig,
 
     mouse_pressed: bool,
+    all_rooms: Vec<(String, Room)>,
+    current_editor_room_index: u32,
 }
 
 impl Stage {
@@ -69,8 +74,8 @@ impl Stage {
         // Simple unit quad at origin (0..1, 0..1)
         let mut renderer = Renderer::new();
 
-        // let map = GameMap::new_random();
-        let map = Room::load_json(Path::new("saved_room.json")).unwrap();
+        let all_rooms = Room::load_rooms_from_folder();
+        let map = all_rooms[0].1.clone();
 
         // Start player near the top-left open area
         let player = Player::new(2.0, 2.0);
@@ -115,6 +120,8 @@ impl Stage {
             time_spent_updating: 0.0,
             ui_config: UiConfig::new(),
             mouse_pressed: false,
+            all_rooms,
+            current_editor_room_index: 0,
         }
     }
 
@@ -126,43 +133,38 @@ impl Stage {
         println!("Mouse coords: {:?}", coords);
 
         match &self.ui_config.editor_selection {
-            EditorSelection::Tiles {selection} => {
-                match &selection {
-                    TileSelection::Clear => {
-                        self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
-                        self.state
-                            .map
-                            .set_overlay(coords.0, coords.1, OverlayTile::None);
-                    }
-                    TileSelection::Ladder => {
-                        self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
-                        self.state
-                            .map
-                            .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
-                    }
-                    TileSelection::Stone => {
-                        self.state.map.set_base(coords.0, coords.1, BaseTile::Stone);
-                        self.state
-                            .map
-                            .set_overlay(coords.0, coords.1, OverlayTile::None);
-                    }
-                    TileSelection::Wood => {
-                        self.state.map.set_base(coords.0, coords.1, BaseTile::Wood);
-                        self.state
-                            .map
-                            .set_overlay(coords.0, coords.1, OverlayTile::None);
-                    }
+            EditorSelection::Tiles { selection } => match &selection {
+                TileSelection::Clear => {
+                    self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
+                    self.state
+                        .map
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
+                }
+                TileSelection::Ladder => {
+                    self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
+                    self.state
+                        .map
+                        .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
+                }
+                TileSelection::Stone => {
+                    self.state.map.set_base(coords.0, coords.1, BaseTile::Stone);
+                    self.state
+                        .map
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
+                }
+                TileSelection::Wood => {
+                    self.state.map.set_base(coords.0, coords.1, BaseTile::Wood);
+                    self.state
+                        .map
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
                 }
             },
-            EditorSelection::Enemies {selection} => {
-
-            },
+            EditorSelection::Enemies { selection } => {}
             EditorSelection::PlayerPos => {
                 self.state.player.bb.x = coords.0 as f32;
                 self.state.player.bb.y = coords.1 as f32;
             }
         }
-
     }
 }
 
@@ -226,41 +228,117 @@ impl EventHandler for Stage {
 
                     ui.add(egui::Label::new("Tool:"));
 
-                    if ui.add(egui::RadioButton::new(matches!(self.ui_config.editor_selection, EditorSelection::Tiles {..}), "Tiles")).clicked() {
-                        self.ui_config.editor_selection = EditorSelection::Tiles {selection: TileSelection::Clear};
+                    if ui
+                        .add(egui::RadioButton::new(
+                            matches!(
+                                self.ui_config.editor_selection,
+                                EditorSelection::Tiles { .. }
+                            ),
+                            "Tiles",
+                        ))
+                        .clicked()
+                    {
+                        self.ui_config.editor_selection = EditorSelection::Tiles {
+                            selection: TileSelection::Clear,
+                        };
                     }
-                    if ui.add(egui::RadioButton::new(matches!(self.ui_config.editor_selection, EditorSelection::Enemies {..}), "Enemies")).clicked() {
-                        self.ui_config.editor_selection = EditorSelection::Enemies {selection: EnemySelection::Bat};
+                    if ui
+                        .add(egui::RadioButton::new(
+                            matches!(
+                                self.ui_config.editor_selection,
+                                EditorSelection::Enemies { .. }
+                            ),
+                            "Enemies",
+                        ))
+                        .clicked()
+                    {
+                        self.ui_config.editor_selection = EditorSelection::Enemies {
+                            selection: EnemySelection::Bat,
+                        };
                     }
-                    if ui.add(egui::RadioButton::new(matches!(self.ui_config.editor_selection, EditorSelection::PlayerPos), "Player position")).clicked() {
+                    if ui
+                        .add(egui::RadioButton::new(
+                            matches!(self.ui_config.editor_selection, EditorSelection::PlayerPos),
+                            "Player position",
+                        ))
+                        .clicked()
+                    {
                         self.ui_config.editor_selection = EditorSelection::PlayerPos;
                     }
 
                     let mut new_selection: Option<EditorSelection> = None;
 
                     match &self.ui_config.editor_selection {
-                        EditorSelection::Tiles {selection} => {
+                        EditorSelection::Tiles { selection } => {
                             ui.add(egui::Label::new("Tile:"));
-                            if ui.add(egui::RadioButton::new(matches!(selection, TileSelection::Clear), "Clear")).clicked() {
-                                new_selection = Some(EditorSelection::Tiles {selection: TileSelection::Clear});
+                            if ui
+                                .add(egui::RadioButton::new(
+                                    matches!(selection, TileSelection::Clear),
+                                    "Clear",
+                                ))
+                                .clicked()
+                            {
+                                new_selection = Some(EditorSelection::Tiles {
+                                    selection: TileSelection::Clear,
+                                });
                             }
-                            if ui.add(egui::RadioButton::new(matches!(selection, TileSelection::Wood), "Wood")).clicked() {
-                                new_selection = Some(EditorSelection::Tiles {selection: TileSelection::Wood});
+                            if ui
+                                .add(egui::RadioButton::new(
+                                    matches!(selection, TileSelection::Wood),
+                                    "Wood",
+                                ))
+                                .clicked()
+                            {
+                                new_selection = Some(EditorSelection::Tiles {
+                                    selection: TileSelection::Wood,
+                                });
                             }
-                            if ui.add(egui::RadioButton::new(matches!(selection, TileSelection::Ladder), "Ladder")).clicked() {
-                                new_selection = Some(EditorSelection::Tiles {selection: TileSelection::Ladder});
+                            if ui
+                                .add(egui::RadioButton::new(
+                                    matches!(selection, TileSelection::Ladder),
+                                    "Ladder",
+                                ))
+                                .clicked()
+                            {
+                                new_selection = Some(EditorSelection::Tiles {
+                                    selection: TileSelection::Ladder,
+                                });
                             }
-                            if ui.add(egui::RadioButton::new(matches!(selection, TileSelection::Stone), "Stone")).clicked() {
-                                new_selection = Some(EditorSelection::Tiles {selection: TileSelection::Stone});
+                            if ui
+                                .add(egui::RadioButton::new(
+                                    matches!(selection, TileSelection::Stone),
+                                    "Stone",
+                                ))
+                                .clicked()
+                            {
+                                new_selection = Some(EditorSelection::Tiles {
+                                    selection: TileSelection::Stone,
+                                });
                             }
-                        },
-                        EditorSelection::Enemies {selection} => {
+                        }
+                        EditorSelection::Enemies { selection } => {
                             ui.add(egui::Label::new("Enemy:"));
-                            if ui.add(egui::RadioButton::new(matches!(selection, EnemySelection::Bat), "Bat")).clicked() {
-                                new_selection = Some(EditorSelection::Enemies {selection: EnemySelection::Bat});
+                            if ui
+                                .add(egui::RadioButton::new(
+                                    matches!(selection, EnemySelection::Bat),
+                                    "Bat",
+                                ))
+                                .clicked()
+                            {
+                                new_selection = Some(EditorSelection::Enemies {
+                                    selection: EnemySelection::Bat,
+                                });
                             }
-                            if ui.add(egui::RadioButton::new(matches!(selection, EnemySelection::Slime), "Slime")).clicked() {
-                                new_selection = Some(EditorSelection::Enemies {selection: EnemySelection::Slime});
+                            if ui
+                                .add(egui::RadioButton::new(
+                                    matches!(selection, EnemySelection::Slime),
+                                    "Slime",
+                                ))
+                                .clicked()
+                            {
+                                new_selection = Some(EditorSelection::Enemies {
+                                    selection: EnemySelection::Slime,
+                                });
                             }
                         }
                         EditorSelection::PlayerPos => {
@@ -272,11 +350,60 @@ impl EventHandler for Stage {
                         self.ui_config.editor_selection = selection;
                     }
 
+                    ui.add(egui::Label::new("Levels:"));
 
-                    if ui.add(egui::Button::new("Save map")).clicked() {
-                        self.state.map.resize_shrink();
-                        self.state.map.save_json(Path::new("saved_room.json"));
-                        println!("Button clicked!");
+                    let mut remove_current = false;
+                    for (room_index, (file_name, room)) in self.all_rooms.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            if ui.add(egui::Link::new(file_name)).clicked() {
+                                println!("Clicked a link");
+                                self.state.map = room.clone();
+                                self.current_editor_room_index = room_index as u32;
+                                self.state.player.bb.x = self.state.map.get_center().0;
+                                self.state.player.bb.y = self.state.map.get_center().1;
+                            }
+                            if room_index as u32 == self.current_editor_room_index {
+                                if ui.add(egui::Button::new("Save")).clicked() {
+                                    self.state.map.resize_shrink();
+                                    let path = Path::new("rooms").join(&file_name);
+                                    self.state.map.save_json(path);
+                                    println!("Button clicked!");
+                                }
+                                if ui.add(egui::Button::new("Del")).clicked() {
+                                    if self.all_rooms.len() > 2 {
+                                        remove_current = true;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    if remove_current {
+                        let file_name_to_remove = self.all_rooms
+                            [self.current_editor_room_index as usize]
+                            .0
+                            .clone();
+
+                        self.all_rooms
+                            .remove(self.current_editor_room_index as usize);
+                        self.state.map = self.all_rooms[0].1.clone();
+                        self.current_editor_room_index = 0;
+
+                        // Remove file_name_to_remove file name (in a folder called rooms)
+                        let path = Path::new("rooms").join(&file_name_to_remove);
+
+                        if let Err(err) = fs::remove_file(&path) {
+                            eprintln!("Failed to remove room file '{}': {}", path.display(), err);
+                        }
+                    }
+
+                    if ui.add(egui::Button::new("New room")).clicked() {
+                        let new_room = Room::new_boxed(0, 0, 5, 5);
+                        new_room.save_json(Room::next_available_file_name());
+                        self.all_rooms = Room::load_rooms_from_folder();
+                        self.current_editor_room_index = self.all_rooms.len() as u32 - 1;
+                        self.state.map = self.all_rooms[self.all_rooms.len() - 1].1.clone();
+                        self.state.player.bb.x = self.state.map.get_center().0;
+                        self.state.player.bb.y = self.state.map.get_center().1;
                     }
                 });
             });
@@ -326,7 +453,7 @@ impl EventHandler for Stage {
         self.egui_mq.mouse_motion_event(x, y);
 
         if self.egui_mq.egui_ctx().wants_pointer_input() {
-            return
+            return;
         }
 
         if self.mouse_pressed {
@@ -340,7 +467,7 @@ impl EventHandler for Stage {
         self.egui_mq.mouse_button_down_event(mb, x, y);
 
         if self.egui_mq.egui_ctx().wants_pointer_input() {
-            return
+            return;
         }
 
         let coords =
@@ -353,7 +480,7 @@ impl EventHandler for Stage {
             EditorSelection::PlayerPos => {
                 self.state.player.bb.x = coords.0 as f32;
                 self.state.player.bb.y = coords.1 as f32;
-            },
+            }
             _ => {}
         }
     }

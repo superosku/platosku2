@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fs::DirEntry;
 use std::{fs, io, path::Path};
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
@@ -34,7 +35,7 @@ pub trait MapLike {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Room {
     base: Vec<BaseTile>,
     overlay: Vec<OverlayTile>,
@@ -45,7 +46,7 @@ pub struct Room {
 }
 
 impl Room {
-    pub fn new_empty( x: i32, y: i32, w: u32, h: u32 ) -> Room {
+    pub fn new_empty(x: i32, y: i32, w: u32, h: u32) -> Room {
         // Create new base and overlay that has x * y size and is initialized to Empty and None
         let base = vec![BaseTile::Empty; (h * w) as usize];
         let overlay = vec![OverlayTile::None; (h * w) as usize];
@@ -60,7 +61,14 @@ impl Room {
         }
     }
 
-    pub fn new(x: i32, y: i32, w: u32, h: u32) -> Room {
+    pub fn get_center(&self) -> (f32, f32) {
+        (
+            self.x as f32 + self.w as f32 / 2.0,
+            self.y as f32 + self.h as f32 / 2.0,
+        )
+    }
+
+    pub fn new_boxed(x: i32, y: i32, w: u32, h: u32) -> Room {
         let mut room = Room::new_empty(x, y, w, h);
 
         for xx in 0..w {
@@ -85,6 +93,77 @@ impl Room {
         let room =
             serde_json::from_str(&s).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         Ok(room)
+    }
+
+    fn get_dir_entries() -> Vec<DirEntry> {
+        // Read all json files from the "rooms" directory, sort by filename, load as Room
+        let read_dir = match fs::read_dir("rooms") {
+            Ok(rd) => rd,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut entries: Vec<fs::DirEntry> = read_dir
+            .filter_map(|res| res.ok())
+            .filter(|e| {
+                let path = e.path();
+                path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json")
+            })
+            .collect();
+
+        entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+        entries
+    }
+
+    pub fn next_available_file_name() -> String {
+        let entries = Room::get_dir_entries();
+        let mut max_index: u32 = 0;
+        let mut digit_width: usize = 4; // default to 4 digits like room_0001.json
+
+        for entry in entries {
+            let file_name_os = entry.file_name();
+            let file_name = file_name_os.to_string_lossy();
+
+            // Expect pattern: room_<digits>.json
+            if file_name.starts_with("room_") && file_name.ends_with(".json") {
+                // slice between "room_" (5 chars) and ".json" (5 chars)
+                if file_name.len() > 10 {
+                    let digits_part = &file_name[5..file_name.len() - 5];
+                    // remember observed width for padding
+                    digit_width = digit_width.max(digits_part.len());
+                    if let Ok(num) = digits_part.parse::<u32>() {
+                        if num > max_index {
+                            max_index = num;
+                        }
+                    }
+                }
+            }
+        }
+
+        let next_index = max_index + 1;
+        // format with zero-padding to observed width
+        format!(
+            "rooms/room_{:0width$}.json",
+            next_index,
+            width = digit_width
+        )
+    }
+
+    pub fn load_rooms_from_folder() -> Vec<(String, Self)> {
+        let entries = Room::get_dir_entries();
+
+        let mut rooms: Vec<(String, Self)> = Vec::new();
+        for entry in entries {
+            let path = entry.path();
+            if let Ok(room) = Self::load_json(&path) {
+                rooms.push((
+                    String::from(path.file_name().unwrap().to_str().unwrap_or("<ERROR>")),
+                    room,
+                ));
+            }
+        }
+
+        rooms
     }
 
     fn abs_to_rel(&self, xy: (i32, i32)) -> Option<(u32, u32)> {
@@ -183,7 +262,7 @@ impl Room {
                 }
             }
             if !still_doing_left && !still_doing_right {
-                break
+                break;
             }
             if still_doing_left {
                 cols_to_remove_left += 1;
@@ -206,12 +285,12 @@ impl Room {
                 match self.get_absolute(xx, self.h - yy - 1) {
                     (BaseTile::Empty, OverlayTile::None) => {}
                     (_, _) => {
-                        still_doing_bottom= false;
+                        still_doing_bottom = false;
                     }
                 }
             }
             if !still_doing_top && !still_doing_bottom {
-                break
+                break;
             }
             if still_doing_top {
                 rows_to_remove_top += 1;
@@ -230,14 +309,10 @@ impl Room {
 
         for xx in 0..new_w {
             for yy in 0..new_h {
-                new_base[(xx + yy * new_w) as usize] = self.base[(
-                    (xx + cols_to_remove_left) +
-                    self.w * (yy + rows_to_remove_top)
-                ) as usize];
-                new_overlay[(xx + yy * new_w) as usize] = self.overlay[(
-                    (xx + cols_to_remove_left) +
-                    self.w * (yy + rows_to_remove_top)
-                ) as usize];
+                new_base[(xx + yy * new_w) as usize] = self.base
+                    [((xx + cols_to_remove_left) + self.w * (yy + rows_to_remove_top)) as usize];
+                new_overlay[(xx + yy * new_w) as usize] = self.overlay
+                    [((xx + cols_to_remove_left) + self.w * (yy + rows_to_remove_top)) as usize];
             }
         }
 
@@ -293,7 +368,7 @@ impl GameMap {
 
         for x in 0..5 {
             for y in 0..5 {
-                rooms.push(Room::new(x * 6 + y - 8, y * 4 - 4, 7, 5))
+                rooms.push(Room::new_boxed(x * 6 + y - 8, y * 4 - 4, 7, 5))
             }
         }
 

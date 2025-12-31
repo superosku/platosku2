@@ -171,9 +171,9 @@ impl Player {
         }
 
         if self.on_ground {
-			self.safe_edge_frames = 4;
-		} else if self.safe_edge_frames > 0 {
-			self.safe_edge_frames -= 1;
+            self.safe_edge_frames = 4;
+        } else if self.safe_edge_frames > 0 {
+            self.safe_edge_frames -= 1;
         }
 
         if input.jump && (self.on_ground || self.safe_edge_frames > 0) {
