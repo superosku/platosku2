@@ -6,7 +6,7 @@ use std::path::Path;
 mod camera;
 mod physics;
 mod state;
-use crate::state::game_map::MapLike;
+use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::{BaseTile, Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
 mod render;
 use crate::render::Renderer;
@@ -29,10 +29,20 @@ enum EnemySelection {
     Slime,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum DoorSelection {
+    Left,
+    Right,
+    Up,
+    Down,
+    Remove,
+}
+
 enum EditorSelection {
     Tiles { selection: TileSelection },
     Enemies { selection: EnemySelection },
     PlayerPos,
+    Doors { selection: DoorSelection },
 }
 
 struct UiConfig {
@@ -168,11 +178,7 @@ impl Stage {
                         .set_overlay(coords.0, coords.1, OverlayTile::None);
                 }
             },
-            EditorSelection::Enemies { selection } => {}
-            EditorSelection::PlayerPos => {
-                self.state.player.bb.x = coords.0 as f32;
-                self.state.player.bb.y = coords.1 as f32;
-            }
+            _ => {}
         }
     }
 }
@@ -274,6 +280,20 @@ impl EventHandler for Stage {
                     {
                         self.ui_config.editor_selection = EditorSelection::PlayerPos;
                     }
+                    if ui
+                        .add(egui::RadioButton::new(
+                            matches!(
+                                self.ui_config.editor_selection,
+                                EditorSelection::Doors { .. }
+                            ),
+                            "Doors",
+                        ))
+                        .clicked()
+                    {
+                        self.ui_config.editor_selection = EditorSelection::Doors {
+                            selection: DoorSelection::Left,
+                        };
+                    }
 
                     let mut new_selection: Option<EditorSelection> = None;
 
@@ -363,6 +383,30 @@ impl EventHandler for Stage {
                         }
                         EditorSelection::PlayerPos => {
                             ui.add(egui::Label::new("Click to set player pos"));
+                        }
+                        EditorSelection::Doors { selection } => {
+                            ui.add(egui::Label::new("Door:"));
+
+                            for door_type in [
+                                DoorSelection::Right,
+                                DoorSelection::Left,
+                                DoorSelection::Up,
+                                DoorSelection::Down,
+                                DoorSelection::Remove,
+                            ] {
+                                if ui
+                                    .add(egui::RadioButton::new(
+                                        *selection == door_type,
+                                        // matches!(selection, door_type),
+                                        format!("{:?}", door_type),
+                                    ))
+                                    .clicked()
+                                {
+                                    new_selection = Some(EditorSelection::Doors {
+                                        selection: door_type,
+                                    });
+                                }
+                            }
                         }
                     }
 
@@ -502,12 +546,34 @@ impl EventHandler for Stage {
                 .screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
         println!("Mouse coords: {:?}", coords);
 
+        self.handle_editor_tile_drawing(x, y);
+
         match &self.ui_config.editor_selection {
             EditorSelection::PlayerPos => {
                 self.state.player.bb.x = coords.0 as f32;
                 self.state.player.bb.y = coords.1 as f32;
             }
-            _ => {}
+            EditorSelection::Enemies { selection } => {}
+            EditorSelection::PlayerPos => {
+                self.state.player.bb.x = coords.0 as f32;
+                self.state.player.bb.y = coords.1 as f32;
+            }
+            EditorSelection::Doors { selection } => {
+                for (sel, direction) in [
+                    (DoorSelection::Up, DoorDir::Up),
+                    (DoorSelection::Down, DoorDir::Down),
+                    (DoorSelection::Right, DoorDir::Right),
+                    (DoorSelection::Left, DoorDir::Left),
+                ] {
+                    if *selection == sel {
+                        self.state.map.set_door(coords.0, coords.1, direction);
+                    }
+                }
+                if *selection == DoorSelection::Remove {
+                    self.state.map.remove_door(coords.0, coords.1);
+                }
+            }
+            EditorSelection::Tiles { .. } => {} // This one is handled in the drawing function
         }
     }
 
