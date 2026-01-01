@@ -39,7 +39,6 @@ enum PlayerAnimationState {
     JumpingDown,
     Laddering,
     Hanging,
-    GotHit,
     Immunity,
 }
 
@@ -52,8 +51,7 @@ impl AnimationConfig for PlayerAnimationState {
             PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
             PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 10),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
-            PlayerAnimationState::GotHit => AnimationConfigResult::new(17, 17, 8),
-            PlayerAnimationState::Immunity => AnimationConfigResult::new(18, 19, 8),
+            PlayerAnimationState::Immunity => AnimationConfigResult::new(17, 18, 8),
         }
     }
 }
@@ -88,12 +86,11 @@ impl Player {
         if damage > 0 {
             if damage > self.health {
 				self.health = 0;
+                self.immunity_frames = 60;
                 self.state = PlayerState::Dead;
 			} else {
 			    self.health -= damage;
         	    self.immunity_frames = 60;
-		        self.animation_handler
-				    .set_state(PlayerAnimationState::GotHit);
             }
         }
     }
@@ -238,7 +235,7 @@ impl Player {
         self.bb = new_bb;
         self.on_ground = on_ground;
 
-        if self.immunity_frames > 0 && self.immunity_frames < 53 {
+        if self.immunity_frames > 0 {
 			self.animation_handler
 				.set_state(PlayerAnimationState::Immunity);
         } else if self.on_ground {
