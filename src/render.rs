@@ -1,6 +1,6 @@
 use crate::state::GameState;
 use crate::state::OverlayTile;
-use crate::state::game_map::MapLike;
+use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::{BaseTile, Dir};
 use image::GenericImageView;
 use miniquad::*;
@@ -293,6 +293,9 @@ impl Renderer {
         // Draw overlay tiles
         self.draw_overlay(state);
 
+        // Draw doors
+        self.draw_doors(state);
+
         // draw coins
         for coin in &state.coins {
             self.draw_rect(
@@ -573,6 +576,32 @@ impl Renderer {
 
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
         self.ctx.draw(0, 6, 1);
+    }
+
+    fn draw_doors(&mut self, state: &GameState) {
+        let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
+        let tex_w = tilemap.w;
+        let tex_h = tilemap.h;
+        let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
+
+        for door in state.map.get_doors() {
+            let px = (state.map.x as f32 + door.x as f32) * TILE_SIZE;
+            let py = (state.map.y as f32 + door.y as f32) * TILE_SIZE;
+
+            let uv_base_px = [
+                match door.dir {
+                    DoorDir::Up => 0,
+                    DoorDir::Right => 1,
+                    DoorDir::Down => 2,
+                    DoorDir::Left => 3,
+                } as f32
+                    * TILE_SIZE,
+                5.0_f32 * TILE_SIZE,
+            ];
+            let uv_base = [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h];
+
+            self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
+        }
     }
 
     fn draw_overlay(&mut self, state: &GameState) {

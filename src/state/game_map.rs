@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::DirEntry;
 use std::{fs, io, path::Path};
 
@@ -38,13 +39,29 @@ pub trait MapLike {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub enum DoorDir {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RoomDoor {
+    pub x: u32,
+    pub y: u32,
+    pub dir: DoorDir,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Room {
     base: Vec<BaseTile>,
     overlay: Vec<OverlayTile>,
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
     h: u32,
     w: u32,
+    doors: Vec<RoomDoor>,
 }
 
 impl Room {
@@ -60,7 +77,12 @@ impl Room {
             w,
             base,
             overlay,
+            doors: Vec::new(),
         }
+    }
+
+    pub fn get_doors(&self) -> &Vec<RoomDoor> {
+        &self.doors
     }
 
     pub fn get_center(&self) -> (f32, f32) {
@@ -324,6 +346,28 @@ impl Room {
         self.w = new_w;
         self.overlay = new_overlay;
         self.base = new_base;
+    }
+
+    pub fn set_door(&mut self, x: i32, y: i32, dir: DoorDir) {
+        println!("Set door");
+        if let Some(rel_pos) = self.abs_to_rel((x, y)) {
+            println!("Set doorrrr");
+            self.remove_door(x, y);
+            self.doors.push(RoomDoor {
+                x: rel_pos.0,
+                y: rel_pos.1,
+                dir,
+            });
+        }
+    }
+
+    pub fn remove_door(&mut self, x: i32, y: i32) {
+        println!("Remove door");
+        if let Some(rel_pos) = self.abs_to_rel((x, y)) {
+            println!("Remove doorrrr");
+            self.doors
+                .retain(|door| !(door.x == rel_pos.0 && door.y == rel_pos.1))
+        }
     }
 }
 
