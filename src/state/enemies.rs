@@ -16,6 +16,7 @@ pub trait Enemy {
     fn got_hit(&mut self);
     fn can_be_hit(&self) -> bool;
     fn should_remove(&self) -> bool;
+    fn contanct_damage(&self) -> u32;
 
     fn overlaps(&self, bb: &BoundingBox) -> bool {
         self.bb().overlaps(bb)
@@ -154,6 +155,14 @@ impl Enemy for Slime {
     fn should_remove(&self) -> bool {
         self.is_dead
     }
+
+    fn contanct_damage(&self) -> u32 {
+        if matches!(self.state, SlimeState::Jumping { .. }) {
+            2
+        } else {
+            1
+        }
+	}
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Slime
@@ -325,6 +334,14 @@ impl Enemy for Bat {
 
     fn should_remove(&self) -> bool {
         self.health <= 0
+    }
+
+    fn contanct_damage(&self) -> u32 {
+        if self.can_be_hit() {
+            1
+        } else {
+			0
+		}
     }
 
     fn get_texture_index(&self) -> TextureIndexes {

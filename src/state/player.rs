@@ -20,6 +20,8 @@ pub struct SwingState {
 
 pub struct Player {
     pub bb: BoundingBox,
+    pub health: u32,
+    pub immunity_frames: u32,
     pub on_ground: bool,
     pub safe_edge_frames: u32,
     pub state: PlayerState,
@@ -62,6 +64,8 @@ impl Player {
                 vx: 0.0,
                 vy: 0.0,
             },
+            health: 10,
+            immunity_frames: 0,
             on_ground: false,
             safe_edge_frames: 0,
             state: PlayerState::Normal,
@@ -69,6 +73,18 @@ impl Player {
             dir: Dir::Right,
             animation_handler: AnimationHandler::new(PlayerAnimationState::Standing),
         }
+    }
+
+    pub fn can_be_hit(&self) -> bool {
+		self.immunity_frames == 0
+	}
+
+    pub fn got_hit(&mut self, damage: u32) {
+        if damage > 0 {
+			self.health -= damage;
+			self.immunity_frames = 60;
+		} else {
+		}
     }
 
     pub fn maybe_stomp(&mut self, other_bb: &BoundingBox) -> bool {
@@ -126,6 +142,10 @@ impl Player {
     }
 
     pub fn _handle_normal(&mut self, input: &InputState, map: &dyn MapLike) {
+        if self.immunity_frames > 0 {
+			self.immunity_frames -= 1;
+		}
+        
         let pressing_left = input.left && !input.right;
         let pressing_right = input.right && !input.left;
 
@@ -203,7 +223,10 @@ impl Player {
         self.bb = new_bb;
         self.on_ground = on_ground;
 
-        if self.on_ground {
+        if self.immunity_frames > 0 {
+			self.animation_handler
+				.set_state(PlayerAnimationState::JumpingDown);
+        } else if self.on_ground {
             if pressing_right || pressing_left {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Walking);
