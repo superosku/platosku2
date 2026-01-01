@@ -9,6 +9,7 @@ pub enum PlayerState {
     Swinging { total_frames: u32, frames_left: u32 },
     Hanging { pos: Pos },
     OnLadder,
+    Dead,
 }
 
 pub struct SwingState {
@@ -38,6 +39,8 @@ enum PlayerAnimationState {
     JumpingDown,
     Laddering,
     Hanging,
+    GotHit,
+    Immunity,
 }
 
 impl AnimationConfig for PlayerAnimationState {
@@ -49,6 +52,8 @@ impl AnimationConfig for PlayerAnimationState {
             PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
             PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 10),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
+            PlayerAnimationState::GotHit => AnimationConfigResult::new(17, 17, 8),
+            PlayerAnimationState::Immunity => AnimationConfigResult::new(18, 19, 8),
         }
     }
 }
@@ -81,10 +86,16 @@ impl Player {
 
     pub fn got_hit(&mut self, damage: u32) {
         if damage > 0 {
-			self.health -= damage;
-			self.immunity_frames = 60;
-		} else {
-		}
+            if damage > self.health {
+				self.health = 0;
+                self.state = PlayerState::Dead;
+			} else {
+			    self.health -= damage;
+        	    self.immunity_frames = 60;
+		        self.animation_handler
+				    .set_state(PlayerAnimationState::GotHit);
+            }
+        }
     }
 
     pub fn maybe_stomp(&mut self, other_bb: &BoundingBox) -> bool {
@@ -140,6 +151,10 @@ impl Player {
             _ => None,
         }
     }
+
+    pub fn _handle_dead(&mut self, _input: &InputState, _map: &dyn MapLike) {
+		// Dead players don't do anything
+	}
 
     pub fn _handle_normal(&mut self, input: &InputState, map: &dyn MapLike) {
         if self.immunity_frames > 0 {
@@ -223,9 +238,9 @@ impl Player {
         self.bb = new_bb;
         self.on_ground = on_ground;
 
-        if self.immunity_frames > 0 {
+        if self.immunity_frames > 0 && self.immunity_frames < 53 {
 			self.animation_handler
-				.set_state(PlayerAnimationState::JumpingDown);
+				.set_state(PlayerAnimationState::Immunity);
         } else if self.on_ground {
             if pressing_right || pressing_left {
                 self.animation_handler
@@ -282,6 +297,9 @@ impl Player {
                 }
 
                 self._handle_normal(input, map);
+            }
+            PlayerState::Dead => {
+                self._handle_dead(input, map);
             }
             PlayerState::Normal => {
                 self._handle_normal(input, map);
