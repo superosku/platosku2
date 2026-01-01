@@ -317,6 +317,7 @@ impl Renderer {
                 bb.y - 1.0 / TILE_SIZE,
                 bb.w + 2.0 / TILE_SIZE,
                 bb.h + 2.0 / TILE_SIZE,
+                1.0,
             );
         }
 
@@ -326,7 +327,13 @@ impl Renderer {
         let pw = state.player.bb.w;
         let ph = state.player.bb.h;
 
-        // self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0]);
+        let alpha = if !state.player.can_be_hit() {
+            ((state.player.immunity_frames / 10) % 2) as f32
+        } else {
+            1.0
+        };
+
+        // self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0], alpha);
         self.draw_from_texture_atlas(
             state,
             TextureIndexes::Player,
@@ -339,6 +346,7 @@ impl Renderer {
             py - 1.0 / TILE_SIZE,
             pw + 2.0 / TILE_SIZE,
             ph + 2.0 / TILE_SIZE,
+            alpha,
         );
 
         if let Some(swing_info) = state.player.get_swing_info() {
@@ -377,6 +385,7 @@ impl Renderer {
         py: f32,
         w: f32,
         h: f32,
+        alpha: f32, 
     ) {
         // ensure tile texture bound
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
@@ -409,7 +418,7 @@ impl Renderer {
 
         let uniforms = Uniforms {
             mvp,
-            color: [1.0, 1.0, 1.0, 1.0],
+            color: [1.0, 1.0, 1.0, alpha],
 
             uv_base: [uv_base_x, 0.0, 0.0, 0.0],
             uv_scale: [uv_scale_x, height_ratio, 0.0, 0.0],
@@ -898,7 +907,13 @@ void main() {
     vec2 uv_bg = bg_px / bg_tex_size.xy;
     vec4 bg = texture2D(bg_tex, uv_bg);
     vec4 out_color = mix(texel, bg, is_key);
-    gl_FragColor = out_color * v_color;
+    vec4 final_color = out_color * v_color;
+
+    if (final_color.a <= 0.001) {
+        discard;
+    }
+
+    gl_FragColor = final_color;
 }
 "#;
 

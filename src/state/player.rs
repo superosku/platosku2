@@ -39,7 +39,6 @@ enum PlayerAnimationState {
     JumpingDown,
     Laddering,
     Hanging,
-    Immunity,
 }
 
 impl AnimationConfig for PlayerAnimationState {
@@ -51,7 +50,6 @@ impl AnimationConfig for PlayerAnimationState {
             PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
             PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 10),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
-            PlayerAnimationState::Immunity => AnimationConfigResult::new(17, 18, 8),
         }
     }
 }
@@ -86,7 +84,6 @@ impl Player {
         if damage > 0 {
             if damage > self.health {
 				self.health = 0;
-                self.immunity_frames = 60;
                 self.state = PlayerState::Dead;
 			} else {
 			    self.health -= damage;
@@ -149,15 +146,7 @@ impl Player {
         }
     }
 
-    pub fn _handle_dead(&mut self, _input: &InputState, _map: &dyn MapLike) {
-		// Dead players don't do anything
-	}
-
     pub fn _handle_normal(&mut self, input: &InputState, map: &dyn MapLike) {
-        if self.immunity_frames > 0 {
-			self.immunity_frames -= 1;
-		}
-        
         let pressing_left = input.left && !input.right;
         let pressing_right = input.right && !input.left;
 
@@ -235,10 +224,7 @@ impl Player {
         self.bb = new_bb;
         self.on_ground = on_ground;
 
-        if self.immunity_frames > 0 {
-			self.animation_handler
-				.set_state(PlayerAnimationState::Immunity);
-        } else if self.on_ground {
+        if self.on_ground {
             if pressing_right || pressing_left {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Walking);
@@ -261,6 +247,7 @@ impl Player {
 
     pub fn update(&mut self, input: &InputState, map: &dyn MapLike) {
         let mut increment_frame = true;
+        self.immunity_frames = self.immunity_frames.saturating_sub(1);
 
         match &self.state {
             PlayerState::Hanging { pos, .. } => {
@@ -295,9 +282,8 @@ impl Player {
 
                 self._handle_normal(input, map);
             }
-            PlayerState::Dead => {
-                self._handle_dead(input, map);
-            }
+            PlayerState::Dead => {}
+
             PlayerState::Normal => {
                 self._handle_normal(input, map);
             }
