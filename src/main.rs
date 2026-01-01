@@ -16,6 +16,7 @@ use egui_miniquad as egui_mq;
 
 #[derive(Debug, Eq, PartialEq)]
 enum TileSelection {
+    NotPartOf,
     Clear,
     Stone,
     Wood,
@@ -134,6 +135,14 @@ impl Stage {
 
         match &self.ui_config.editor_selection {
             EditorSelection::Tiles { selection } => match &selection {
+                TileSelection::NotPartOf => {
+                    self.state
+                        .map
+                        .set_base(coords.0, coords.1, BaseTile::NotPartOfRoom);
+                    self.state
+                        .map
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
+                }
                 TileSelection::Clear => {
                     self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
                     self.state
@@ -271,6 +280,17 @@ impl EventHandler for Stage {
                     match &self.ui_config.editor_selection {
                         EditorSelection::Tiles { selection } => {
                             ui.add(egui::Label::new("Tile:"));
+                            if ui
+                                .add(egui::RadioButton::new(
+                                    matches!(selection, TileSelection::NotPartOf),
+                                    "NotPartOf",
+                                ))
+                                .clicked()
+                            {
+                                new_selection = Some(EditorSelection::Tiles {
+                                    selection: TileSelection::NotPartOf,
+                                });
+                            }
                             if ui
                                 .add(egui::RadioButton::new(
                                     matches!(selection, TileSelection::Clear),
