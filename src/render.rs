@@ -286,6 +286,7 @@ impl Renderer {
         self.ctx.apply_bindings(&self.bindings);
 
         // Draw base grid using dual-grid textured tiles
+        self.draw_base_dual_grid(state, BaseTile::NotPartOfRoom, 2);
         self.draw_base_dual_grid(state, BaseTile::Stone, 0);
         self.draw_base_dual_grid(state, BaseTile::Wood, 1);
 

@@ -4,9 +4,10 @@ use std::{fs, io, path::Path};
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
 pub enum BaseTile {
-    Empty = 0,
-    Stone = 1,
-    Wood = 2,
+    NotPartOfRoom = 0,
+    Empty = 1,
+    Stone = 2,
+    Wood = 3,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
@@ -23,6 +24,7 @@ pub trait MapLike {
     fn is_solid_at(&self, tx: i32, ty: i32) -> bool {
         let (base, _overlay) = self.get_at(tx, ty);
         match base {
+            BaseTile::NotPartOfRoom => true,
             BaseTile::Empty => false,
             BaseTile::Stone => true,
             BaseTile::Wood => true,
@@ -215,7 +217,7 @@ impl Room {
         let new_w = self.w + cols_to_add_left as u32 + cols_to_add_right as u32;
         let new_size = new_h * new_w;
 
-        let mut new_base = vec![BaseTile::Empty; new_size as usize];
+        let mut new_base = vec![BaseTile::NotPartOfRoom; new_size as usize];
         let mut new_overlay = vec![OverlayTile::None; new_size as usize];
 
         for xx in 0..self.w {
@@ -249,13 +251,13 @@ impl Room {
         for xx in 0..self.w {
             for yy in 0..self.h {
                 match self.get_absolute(xx, yy) {
-                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (BaseTile::NotPartOfRoom, OverlayTile::None) => {}
                     (_, _) => {
                         still_doing_left = false;
                     }
                 }
                 match self.get_absolute(self.w - xx - 1, yy) {
-                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (BaseTile::NotPartOfRoom, OverlayTile::None) => {}
                     (_, _) => {
                         still_doing_right = false;
                     }
@@ -277,13 +279,13 @@ impl Room {
         for yy in 0..self.h {
             for xx in 0..self.w {
                 match self.get_absolute(xx, yy) {
-                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (BaseTile::NotPartOfRoom, OverlayTile::None) => {}
                     (_, _) => {
                         still_doing_top = false;
                     }
                 }
                 match self.get_absolute(xx, self.h - yy - 1) {
-                    (BaseTile::Empty, OverlayTile::None) => {}
+                    (BaseTile::NotPartOfRoom, OverlayTile::None) => {}
                     (_, _) => {
                         still_doing_bottom = false;
                     }
@@ -328,7 +330,7 @@ impl Room {
 impl MapLike for Room {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         self.get_relative(tx, ty)
-            .unwrap_or((BaseTile::Empty, OverlayTile::None))
+            .unwrap_or((BaseTile::NotPartOfRoom, OverlayTile::None))
     }
 
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
