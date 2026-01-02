@@ -350,6 +350,11 @@ impl Room {
         self.w = new_w;
         self.overlay = new_overlay;
         self.base = new_base;
+
+        for door in &mut self.doors {
+            door.x = (door.x as i32 - cols_to_remove_right as i32).max(0) as u32;
+            door.y = (door.y as i32 - rows_to_remove_top as i32).max(0) as u32;
+        }
     }
 
     pub fn set_door(&mut self, x: i32, y: i32, dir: DoorDir) {
