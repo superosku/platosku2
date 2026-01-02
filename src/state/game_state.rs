@@ -36,10 +36,13 @@ impl GameState {
         for enemy in &mut self.enemies {
             enemy.update(&self.map);
 
-            if enemy.can_be_stomped() && enemy.bb().overlaps(&self.player.bb) {
-                let did_stomp = self.player.maybe_stomp(enemy.bb());
-                if did_stomp {
+            if enemy.bb().overlaps(&self.player.bb) {
+                if enemy.can_be_stomped() && self.player.maybe_stomp(enemy.bb()) {
                     enemy.got_stomped();
+                } else {
+                    if self.player.can_be_hit() {
+					    self.player.got_hit(enemy.contanct_damage());
+				    }
                 }
             }
 

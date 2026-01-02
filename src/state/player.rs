@@ -9,6 +9,7 @@ pub enum PlayerState {
     Swinging { total_frames: u32, frames_left: u32 },
     Hanging { pos: Pos },
     OnLadder,
+    Dead,
 }
 
 pub struct SwingState {
@@ -20,6 +21,8 @@ pub struct SwingState {
 
 pub struct Player {
     pub bb: BoundingBox,
+    pub health: u32,
+    pub immunity_frames: u32,
     pub on_ground: bool,
     pub safe_edge_frames: u32,
     pub state: PlayerState,
@@ -62,12 +65,30 @@ impl Player {
                 vx: 0.0,
                 vy: 0.0,
             },
+            health: 10,
+            immunity_frames: 0,
             on_ground: false,
             safe_edge_frames: 0,
             state: PlayerState::Normal,
             speed: 0.06,
             dir: Dir::Right,
             animation_handler: AnimationHandler::new(PlayerAnimationState::Standing),
+        }
+    }
+
+    pub fn can_be_hit(&self) -> bool {
+		self.immunity_frames == 0
+	}
+
+    pub fn got_hit(&mut self, damage: u32) {
+        if damage > 0 {
+            if damage > self.health {
+				self.health = 0;
+                self.state = PlayerState::Dead;
+			} else {
+			    self.health -= damage;
+        	    self.immunity_frames = 60;
+            }
         }
     }
 
@@ -226,6 +247,7 @@ impl Player {
 
     pub fn update(&mut self, input: &InputState, map: &dyn MapLike) {
         let mut increment_frame = true;
+        self.immunity_frames = self.immunity_frames.saturating_sub(1);
 
         match &self.state {
             PlayerState::Hanging { pos, .. } => {
@@ -260,6 +282,8 @@ impl Player {
 
                 self._handle_normal(input, map);
             }
+            PlayerState::Dead => {}
+
             PlayerState::Normal => {
                 self._handle_normal(input, map);
             }
