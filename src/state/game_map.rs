@@ -259,6 +259,10 @@ impl Room {
         self.w = new_w;
         self.overlay = new_overlay;
         self.base = new_base;
+        for door in &mut self.doors {
+            door.x += cols_to_add_left as u32;
+            door.y += rows_to_add_top as u32;
+        }
     }
 
     pub fn resize_shrink(&mut self) {
