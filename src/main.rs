@@ -353,6 +353,7 @@ impl EventHandler for Stage {
                     ui.add(egui::Label::new("Levels:"));
 
                     let mut remove_current = false;
+                    let mut reload_rooms = false;
                     for (room_index, (file_name, room)) in self.all_rooms.iter().enumerate() {
                         ui.horizontal(|ui| {
                             if ui.add(egui::Link::new(file_name)).clicked() {
@@ -368,6 +369,7 @@ impl EventHandler for Stage {
                                     let path = Path::new("rooms").join(&file_name);
                                     self.state.map.save_json(path);
                                     println!("Button clicked!");
+                                    reload_rooms = true;
                                 }
                                 if ui.add(egui::Button::new("Del")).clicked() {
                                     if self.all_rooms.len() > 2 {
@@ -399,11 +401,15 @@ impl EventHandler for Stage {
                     if ui.add(egui::Button::new("New room")).clicked() {
                         let new_room = Room::new_boxed(0, 0, 5, 5);
                         new_room.save_json(Room::next_available_file_name());
-                        self.all_rooms = Room::load_rooms_from_folder();
                         self.current_editor_room_index = self.all_rooms.len() as u32 - 1;
                         self.state.map = self.all_rooms[self.all_rooms.len() - 1].1.clone();
                         self.state.player.bb.x = self.state.map.get_center().0;
                         self.state.player.bb.y = self.state.map.get_center().1;
+                        reload_rooms = true;
+                    }
+
+                    if reload_rooms {
+                        self.all_rooms = Room::load_rooms_from_folder();
                     }
                 });
             });
