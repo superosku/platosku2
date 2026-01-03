@@ -1,6 +1,8 @@
+use crate::camera::Camera;
 use crate::state::GameState;
 use crate::state::OverlayTile;
-use crate::state::game_map::{DoorDir, MapLike};
+use crate::state::game_map::{DoorDir, MapLike, Room};
+use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, Dir};
 use image::GenericImageView;
 use miniquad::*;
@@ -87,6 +89,70 @@ const DUAL_GRID_UV_TABLE: [(u32, u32); 16] = [
     (3, 1), // E # DONE
     (2, 3), // F # DONE
 ];
+
+pub trait DrawableGameState: GameState {
+    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer);
+}
+
+impl DrawableGameState for Game {
+    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer) {
+        for coin in &self.coins {
+            renderer.draw_rect(
+                camera,
+                coin.bb.x,
+                coin.bb.y,
+                coin.bb.w,
+                coin.bb.h,
+                [1.0, 0.85, 0.2, 1.0],
+            );
+        }
+
+        // draw enemies
+        for enemy in &self.enemies {
+            let bb = enemy.bb();
+            // self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
+            renderer.draw_from_texture_atlas(
+                camera,
+                enemy.get_texture_index(),
+                enemy.get_atlas_index() as f32,
+                !enemy.goes_right(),
+                bb.x - 1.0 / TILE_SIZE,
+                bb.y - 1.0 / TILE_SIZE,
+                bb.w + 2.0 / TILE_SIZE,
+                bb.h + 2.0 / TILE_SIZE,
+                1.0,
+            );
+        }
+    }
+}
+
+impl DrawableGameState for Editor {
+    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer) {
+        let tilemap = renderer.textures.get(&TextureIndexes::Tile).unwrap();
+        let tex_w = tilemap.w;
+        let tex_h = tilemap.h;
+        let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
+
+        for door in self.room.get_doors() {
+            let px = (self.room.x as f32 + door.x as f32) * TILE_SIZE;
+            let py = (self.room.y as f32 + door.y as f32) * TILE_SIZE;
+
+            let uv_base_px = [
+                match door.dir {
+                    DoorDir::Up => 0,
+                    DoorDir::Right => 1,
+                    DoorDir::Down => 2,
+                    DoorDir::Left => 3,
+                } as f32
+                    * TILE_SIZE,
+                5.0_f32 * TILE_SIZE,
+            ];
+            let uv_base = [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h];
+
+            renderer.draw_tile_textured(camera, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
+        }
+    }
+}
 
 impl Renderer {
     pub fn new() -> Renderer {
@@ -275,74 +341,46 @@ impl Renderer {
         // Nothing to do yet
     }
 
-    pub fn draw(&mut self, state: &GameState) {
+    pub fn draw(&mut self, state: &dyn DrawableGameState, camera: &Camera) {
         let clear = PassAction::Clear {
             color: Some((0.08, 0.09, 0.10, 1.0)),
             depth: Some(1.0),
             stencil: Some(0),
         };
+
         self.ctx.begin_default_pass(clear);
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
 
         // Draw base grid using dual-grid textured tiles
-        self.draw_base_dual_grid(state, BaseTile::NotPartOfRoom, 2);
-        self.draw_base_dual_grid(state, BaseTile::Stone, 0);
-        self.draw_base_dual_grid(state, BaseTile::Wood, 1);
+        self.draw_base_dual_grid(state.map(), camera, BaseTile::NotPartOfRoom, 2);
+        self.draw_base_dual_grid(state.map(), camera, BaseTile::Stone, 0);
+        self.draw_base_dual_grid(state.map(), camera, BaseTile::Wood, 1);
 
         // Draw overlay tiles
-        self.draw_overlay(state);
+        self.draw_overlay(state.map(), camera);
 
-        // Draw doors
-        self.draw_doors(state);
-
-        // draw coins
-        for coin in &state.coins {
-            self.draw_rect(
-                state,
-                coin.bb.x,
-                coin.bb.y,
-                coin.bb.w,
-                coin.bb.h,
-                [1.0, 0.85, 0.2, 1.0],
-            );
-        }
-
-        // draw enemies
-        for enemy in &state.enemies {
-            let bb = enemy.bb();
-            // self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
-            self.draw_from_texture_atlas(
-                state,
-                enemy.get_texture_index(),
-                enemy.get_atlas_index() as f32,
-                !enemy.goes_right(),
-                bb.x - 1.0 / TILE_SIZE,
-                bb.y - 1.0 / TILE_SIZE,
-                bb.w + 2.0 / TILE_SIZE,
-                bb.h + 2.0 / TILE_SIZE,
-                1.0,
-            );
-        }
+        // draw (coins and enemies) OR (doors)
+        state.draw_extra(camera, self);
 
         // draw player on top
-        let px = state.player.bb.x;
-        let py = state.player.bb.y;
-        let pw = state.player.bb.w;
-        let ph = state.player.bb.h;
+        let px = state.player().bb.x;
+        let py = state.player().bb.y;
+        let pw = state.player().bb.w;
+        let ph = state.player().bb.h;
 
-        let alpha = if !state.player.can_be_hit() {
-            ((state.player.immunity_frames / 10) % 2) as f32
+        let alpha = if !state.player().can_be_hit() {
+            ((state.player().immunity_frames / 10) % 2) as f32
         } else {
             1.0
         };
 
         // self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0], alpha);
         self.draw_from_texture_atlas(
-            state,
+            camera,
             TextureIndexes::Player,
-            state.player.get_atlas_index() as f32,
-            match state.player.dir {
+            state.player().get_atlas_index() as f32,
+            match state.player().dir {
                 Dir::Left => true,
                 Dir::Right => false,
             },
@@ -353,9 +391,9 @@ impl Renderer {
             alpha,
         );
 
-        if let Some(swing_info) = state.player.get_swing_info() {
+        if let Some(swing_info) = state.player().get_swing_info() {
             self.draw_rect_rotated(
-                state,
+                camera,
                 swing_info.pivot.x - 0.05,
                 swing_info.pivot.y - 0.15,
                 0.1,
@@ -367,7 +405,7 @@ impl Renderer {
             );
 
             self.draw_rect(
-                state,
+                camera,
                 swing_info.end.x - 0.05,
                 swing_info.end.y - 0.05,
                 0.1,
@@ -381,7 +419,7 @@ impl Renderer {
 
     fn draw_from_texture_atlas(
         &mut self,
-        state: &GameState,
+        camera: &Camera,
         texture_index: TextureIndexes,
         atlas_index: f32,
         flip: bool,
@@ -389,7 +427,7 @@ impl Renderer {
         py: f32,
         w: f32,
         h: f32,
-        alpha: f32, 
+        alpha: f32,
     ) {
         // ensure tile texture bound
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
@@ -400,8 +438,8 @@ impl Renderer {
 
         self.ctx.apply_bindings(&self.bindings);
 
-        let view = Self::camera_view(state);
-        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let view = Self::camera_view(camera);
+        let proj = Self::ortho_mvp(camera);
         let model = Self::mat4_mul(
             Self::mat4_translation(px * TILE_SIZE, py * TILE_SIZE),
             Self::mat4_scale(w * TILE_SIZE, h * TILE_SIZE),
@@ -442,7 +480,7 @@ impl Renderer {
 
     fn draw_tile_textured(
         &mut self,
-        state: &GameState,
+        camera: &Camera,
         px: f32,
         py: f32,
         color: [f32; 4],
@@ -457,8 +495,8 @@ impl Renderer {
         self.bindings.images[1] = background.texture;
         self.ctx.apply_bindings(&self.bindings);
 
-        let view = Self::camera_view(state);
-        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let view = Self::camera_view(camera);
+        let proj = Self::ortho_mvp(camera);
         let model = Self::mat4_mul(
             Self::mat4_translation(px, py),
             Self::mat4_scale(TILE_SIZE, TILE_SIZE),
@@ -482,7 +520,7 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
-    fn draw_rect(&mut self, state: &GameState, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
+    fn draw_rect(&mut self, camera: &Camera, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
         // bind white texture and use full-quad UVs
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
         let white = self.textures.get(&TextureIndexes::White1x1).unwrap();
@@ -492,8 +530,8 @@ impl Renderer {
 
         self.ctx.apply_bindings(&self.bindings);
 
-        let view = Self::camera_view(state);
-        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let view = Self::camera_view(camera);
+        let proj = Self::ortho_mvp(camera);
         let model = Self::mat4_mul(
             Self::mat4_translation(px * TILE_SIZE, py * TILE_SIZE),
             Self::mat4_scale(w * TILE_SIZE, h * TILE_SIZE),
@@ -519,7 +557,7 @@ impl Renderer {
 
     fn draw_rect_rotated(
         &mut self,
-        state: &GameState,
+        camera: &Camera,
         px: f32,
         py: f32,
         w: f32,
@@ -536,8 +574,8 @@ impl Renderer {
         self.bindings.images[1] = background.texture;
         self.ctx.apply_bindings(&self.bindings);
 
-        let view = Self::camera_view(state);
-        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let view = Self::camera_view(camera);
+        let proj = Self::ortho_mvp(camera);
 
         // --- build model matrix with pivot rotation ---
         let pxw = px * TILE_SIZE;
@@ -578,33 +616,7 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
-    fn draw_doors(&mut self, state: &GameState) {
-        let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
-        let tex_w = tilemap.w;
-        let tex_h = tilemap.h;
-        let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
-
-        for door in state.map.get_doors() {
-            let px = (state.map.x as f32 + door.x as f32) * TILE_SIZE;
-            let py = (state.map.y as f32 + door.y as f32) * TILE_SIZE;
-
-            let uv_base_px = [
-                match door.dir {
-                    DoorDir::Up => 0,
-                    DoorDir::Right => 1,
-                    DoorDir::Down => 2,
-                    DoorDir::Left => 3,
-                } as f32
-                    * TILE_SIZE,
-                5.0_f32 * TILE_SIZE,
-            ];
-            let uv_base = [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h];
-
-            self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
-        }
-    }
-
-    fn draw_overlay(&mut self, state: &GameState) {
+    fn draw_overlay(&mut self, map: &dyn MapLike, camera: &Camera) {
         // let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         // let height = state.map.base.len();
         // if width == 0 || height == 0 {
@@ -620,13 +632,13 @@ impl Renderer {
         let offset_y = 0.0;
 
         // Compute visible world bounds from camera (expand slightly to avoid edge gaps)
-        let zoom = state.camera.zoom;
-        let half_w_world = state.screen_w * 0.5 / zoom;
-        let half_h_world = state.screen_h * 0.5 / zoom;
-        let world_min_x = state.camera.x * TILE_SIZE - half_w_world - TILE_SIZE;
-        let world_min_y = state.camera.y * TILE_SIZE - half_h_world - TILE_SIZE;
-        let world_max_x = state.camera.x * TILE_SIZE + half_w_world + TILE_SIZE;
-        let world_max_y = state.camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
+        let zoom = camera.zoom;
+        let half_w_world = camera.screen_w * 0.5 / zoom;
+        let half_h_world = camera.screen_h * 0.5 / zoom;
+        let world_min_x = camera.x * TILE_SIZE - half_w_world - TILE_SIZE;
+        let world_min_y = camera.y * TILE_SIZE - half_h_world - TILE_SIZE;
+        let world_max_x = camera.x * TILE_SIZE + half_w_world + TILE_SIZE;
+        let world_max_y = camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
 
         // Convert world bounds to dual-grid tile indices
         let start_x = ((world_min_x - offset_x) / TILE_SIZE).floor() as i32;
@@ -641,13 +653,12 @@ impl Renderer {
                 let px = x as f32 * TILE_SIZE;
                 let py = y as f32 * TILE_SIZE;
 
-                let uv_base = match state.map.get_at(x, y).1 {
+                let uv_base = match map.get_at(x, y).1 {
                     OverlayTile::None => {
                         continue;
                     }
                     OverlayTile::Ladder => {
-                        let uv_base_px = if state.map.is_ladder_at(x, y - 1)
-                            || state.map.is_solid_at(x, y - 1)
+                        let uv_base_px = if map.is_ladder_at(x, y - 1) || map.is_solid_at(x, y - 1)
                         {
                             [0.0_f32 * TILE_SIZE, 4.0_f32 * TILE_SIZE]
                         } else {
@@ -657,12 +668,18 @@ impl Renderer {
                     }
                 };
 
-                self.draw_tile_textured(state, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
+                self.draw_tile_textured(camera, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
             }
         }
     }
 
-    fn draw_base_dual_grid(&mut self, state: &GameState, tile_type: BaseTile, tile_type_index: u8) {
+    fn draw_base_dual_grid(
+        &mut self,
+        map: &dyn MapLike,
+        camera: &Camera,
+        tile_type: BaseTile,
+        tile_type_index: u8,
+    ) {
         // let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
         // let height = state.map.base.len();
         // if width == 0 || height == 0 {
@@ -678,13 +695,13 @@ impl Renderer {
         let offset_y = 0.5 * TILE_SIZE;
 
         // Compute visible world bounds from camera (expand slightly to avoid edge gaps)
-        let zoom = state.camera.zoom;
-        let half_w_world = state.screen_w * 0.5 / zoom;
-        let half_h_world = state.screen_h * 0.5 / zoom;
-        let world_min_x = state.camera.x * TILE_SIZE - half_w_world - TILE_SIZE;
-        let world_min_y = state.camera.y * TILE_SIZE - half_h_world - TILE_SIZE;
-        let world_max_x = state.camera.x * TILE_SIZE + half_w_world + TILE_SIZE;
-        let world_max_y = state.camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
+        let zoom = camera.zoom;
+        let half_w_world = camera.screen_w * 0.5 / zoom;
+        let half_h_world = camera.screen_h * 0.5 / zoom;
+        let world_min_x = camera.x * TILE_SIZE - half_w_world - TILE_SIZE;
+        let world_min_y = camera.y * TILE_SIZE - half_h_world - TILE_SIZE;
+        let world_max_x = camera.x * TILE_SIZE + half_w_world + TILE_SIZE;
+        let world_max_y = camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
 
         // Convert world bounds to dual-grid tile indices
         let start_x = ((world_min_x - offset_x) / TILE_SIZE).floor() as i32;
@@ -699,10 +716,10 @@ impl Renderer {
 
         for y in start_y..end_y {
             for x in start_x..end_x {
-                let (tl, _o1) = state.map.get_at(x, y);
-                let (tr, _o2) = state.map.get_at(x + 1, y);
-                let (bl, _o3) = state.map.get_at(x, y + 1);
-                let (br, _o4) = state.map.get_at(x + 1, y + 1);
+                let (tl, _o1) = map.get_at(x, y);
+                let (tr, _o2) = map.get_at(x + 1, y);
+                let (bl, _o3) = map.get_at(x, y + 1);
+                let (br, _o4) = map.get_at(x + 1, y + 1);
 
                 let mut mask: u32 = 0;
                 if tl == tile_type {
@@ -798,8 +815,8 @@ impl Renderer {
         self.ctx.apply_bindings(&batched_bindings);
 
         // Build VP (no per-tile model matrix since positions are in world pixels)
-        let view = Self::camera_view(state);
-        let proj = Self::ortho_mvp(state.screen_w, state.screen_h);
+        let view = Self::camera_view(camera);
+        let proj = Self::ortho_mvp(camera);
         let vp = Self::mat4_mul(proj, view);
 
         let uniforms = Uniforms {
@@ -822,11 +839,11 @@ impl Renderer {
         self.ctx.apply_bindings(&self.bindings);
     }
 
-    fn ortho_mvp(screen_w: f32, screen_h: f32) -> [f32; 16] {
+    fn ortho_mvp(camera: &Camera) -> [f32; 16] {
         let l = 0.0;
-        let r = screen_w;
+        let r = camera.screen_w;
         let t = 0.0;
-        let b = screen_h;
+        let b = camera.screen_h;
         let n = -1.0;
         let f = 1.0;
         let sx = 2.0 / (r - l);
@@ -840,10 +857,10 @@ impl Renderer {
         ]
     }
 
-    fn camera_view(state: &GameState) -> [f32; 16] {
-        let cx = state.camera.x * TILE_SIZE;
-        let cy = state.camera.y * TILE_SIZE;
-        let zoom = state.camera.zoom;
+    fn camera_view(camera: &Camera) -> [f32; 16] {
+        let cx = camera.x * TILE_SIZE;
+        let cy = camera.y * TILE_SIZE;
+        let zoom = camera.zoom;
 
         // Pixel-snap the camera to avoid subpixel seams at various zoom levels
         let snapped_cx = (cx * zoom).round() / zoom;
@@ -854,7 +871,7 @@ impl Renderer {
         let translate_to_origin = Self::mat4_translation(-snapped_cx, -snapped_cy);
         let scale_zoom = Self::mat4_scale(zoom, zoom);
         let translate_to_screen_center =
-            Self::mat4_translation(state.screen_w * 0.5, state.screen_h * 0.5);
+            Self::mat4_translation(camera.screen_w * 0.5, camera.screen_h * 0.5);
 
         let ts = Self::mat4_mul(scale_zoom, translate_to_origin);
         Self::mat4_mul(translate_to_screen_center, ts)
