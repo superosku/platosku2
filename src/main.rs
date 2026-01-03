@@ -1,6 +1,5 @@
 use miniquad::*;
 use state::OverlayTile;
-use std::path::Path;
 
 mod camera;
 mod physics;
@@ -97,7 +96,7 @@ struct Stage {
 impl Stage {
     fn new(width: i32, height: i32) -> Stage {
         let mut renderer = Renderer::new();
-        let mut state = Box::new(Game::new());
+        let state = Box::new(Game::new());
 
         Stage {
             egui_mq: egui_mq::EguiMq::new(&mut *renderer.ctx),
@@ -122,51 +121,48 @@ impl Stage {
         println!("Mouse coords: {:?}", coords);
 
         // TODO: Move this into debug_menu.rs as well
-        match &self.debug_menu.editor_selection {
-            EditorSelection::Tiles { selection } => match &selection {
-                TileSelection::NotPartOf => {
-                    self.state
-                        .map_mut()
-                        .set_base(coords.0, coords.1, BaseTile::NotPartOfRoom);
-                    self.state
-                        .map_mut()
-                        .set_overlay(coords.0, coords.1, OverlayTile::None);
-                }
-                TileSelection::Clear => {
-                    self.state
-                        .map_mut()
-                        .set_base(coords.0, coords.1, BaseTile::Empty);
-                    self.state
-                        .map_mut()
-                        .set_overlay(coords.0, coords.1, OverlayTile::None);
-                }
-                TileSelection::Ladder => {
-                    self.state
-                        .map_mut()
-                        .set_base(coords.0, coords.1, BaseTile::Empty);
-                    self.state
-                        .map_mut()
-                        .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
-                }
-                TileSelection::Stone => {
-                    self.state
-                        .map_mut()
-                        .set_base(coords.0, coords.1, BaseTile::Stone);
-                    self.state
-                        .map_mut()
-                        .set_overlay(coords.0, coords.1, OverlayTile::None);
-                }
-                TileSelection::Wood => {
-                    self.state
-                        .map_mut()
-                        .set_base(coords.0, coords.1, BaseTile::Wood);
-                    self.state
-                        .map_mut()
-                        .set_overlay(coords.0, coords.1, OverlayTile::None);
-                }
-            },
-            _ => {}
-        }
+        if let EditorSelection::Tiles { selection } = &self.debug_menu.editor_selection { match &selection {
+            TileSelection::NotPartOf => {
+                self.state
+                    .map_mut()
+                    .set_base(coords.0, coords.1, BaseTile::NotPartOfRoom);
+                self.state
+                    .map_mut()
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+            TileSelection::Clear => {
+                self.state
+                    .map_mut()
+                    .set_base(coords.0, coords.1, BaseTile::Empty);
+                self.state
+                    .map_mut()
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+            TileSelection::Ladder => {
+                self.state
+                    .map_mut()
+                    .set_base(coords.0, coords.1, BaseTile::Empty);
+                self.state
+                    .map_mut()
+                    .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
+            }
+            TileSelection::Stone => {
+                self.state
+                    .map_mut()
+                    .set_base(coords.0, coords.1, BaseTile::Stone);
+                self.state
+                    .map_mut()
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+            TileSelection::Wood => {
+                self.state
+                    .map_mut()
+                    .set_base(coords.0, coords.1, BaseTile::Wood);
+                self.state
+                    .map_mut()
+                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+            }
+        } }
     }
 }
 

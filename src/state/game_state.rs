@@ -110,10 +110,8 @@ impl GameState for Game {
             if enemy.bb().overlaps(&self.player.bb) {
                 if enemy.can_be_stomped() && self.player.maybe_stomp(enemy.bb()) {
                     enemy.got_stomped();
-                } else {
-                    if self.player.can_be_hit() {
-                        self.player.got_hit(enemy.contanct_damage());
-                    }
+                } else if self.player.can_be_hit() {
+                    self.player.got_hit(enemy.contanct_damage());
                 }
             }
 

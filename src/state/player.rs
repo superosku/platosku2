@@ -1,5 +1,5 @@
 use super::common::{BoundingBox, Dir, Pos};
-use super::game_map::{GameMap, MapLike};
+use super::game_map::MapLike;
 use super::game_state::InputState;
 use crate::physics::{check_and_snap_hang, integrate_kinematic};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};

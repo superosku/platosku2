@@ -1,9 +1,8 @@
 use crate::state::GameState;
 use crate::state::game_map::{DoorDir, Room};
 use crate::state::game_state::{Editor, Game};
-use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, Stage, TileSelection};
+use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
 use egui::Ui;
-use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
 
@@ -227,15 +226,13 @@ impl GameStateDebugMenu for Editor {
                 if room_index as u32 == stage.current_editor_room_index {
                     if ui.add(egui::Button::new("Save")).clicked() {
                         self.room.resize_shrink();
-                        let path = Path::new("rooms").join(&file_name);
+                        let path = Path::new("rooms").join(file_name);
                         self.room.save_json(path);
                         println!("Button clicked!");
                         reload_rooms = true;
                     }
-                    if ui.add(egui::Button::new("Del")).clicked() {
-                        if stage.all_rooms.len() > 2 {
-                            remove_current = true;
-                        }
+                    if ui.add(egui::Button::new("Del")).clicked() && stage.all_rooms.len() > 2 {
+                        remove_current = true;
                     }
                 }
             });
