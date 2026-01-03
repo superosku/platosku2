@@ -1,5 +1,5 @@
 use rand::Rng;
-use rand::seq::{IndexedMutRandom, IndexedRandom};
+use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
 use std::fs::DirEntry;
 use std::{fs, io, path::Path};
@@ -135,7 +135,7 @@ impl Room {
             })
             .collect();
 
-        entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+        entries.sort_by_key(|a| a.file_name());
 
         entries
     }
@@ -333,8 +333,8 @@ impl Room {
             }
         }
 
-        let new_h = self.h - rows_to_remove_bottom as u32 - rows_to_remove_top as u32;
-        let new_w = self.w - cols_to_remove_left as u32 - cols_to_remove_right as u32;
+        let new_h = self.h - rows_to_remove_bottom as u32 - rows_to_remove_top;
+        let new_w = self.w - cols_to_remove_left - cols_to_remove_right as u32;
         let new_size = new_h * new_w;
 
         let mut new_base = vec![BaseTile::Empty; new_size as usize];
@@ -349,15 +349,15 @@ impl Room {
             }
         }
 
-        self.x = self.x + cols_to_remove_left as i32;
-        self.y = self.y + rows_to_remove_top as i32;
+        self.x += cols_to_remove_left as i32;
+        self.y += rows_to_remove_top as i32;
         self.h = new_h;
         self.w = new_w;
         self.overlay = new_overlay;
         self.base = new_base;
 
         for door in &mut self.doors {
-            door.x = (door.x as i32 - cols_to_remove_right as i32).max(0) as u32;
+            door.x = (door.x as i32 - cols_to_remove_right).max(0) as u32;
             door.y = (door.y as i32 - rows_to_remove_top as i32).max(0) as u32;
         }
     }
@@ -462,7 +462,7 @@ impl GameMap {
                 .cloned()
                 .collect();
 
-            if door_match_candidates.len() == 0 {
+            if door_match_candidates.is_empty() {
                 println!(" ERR: Could not find door match from random room");
                 continue;
             }

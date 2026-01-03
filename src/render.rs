@@ -1,7 +1,7 @@
 use crate::camera::Camera;
 use crate::state::GameState;
 use crate::state::OverlayTile;
-use crate::state::game_map::{DoorDir, MapLike, Room};
+use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, Dir};
 use image::GenericImageView;
