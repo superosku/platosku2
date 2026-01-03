@@ -1,5 +1,5 @@
 use super::common::{BoundingBox, Dir, Pos};
-use super::game_map::{GameMap, MapLike};
+use super::game_map::MapLike;
 use super::game_state::InputState;
 use crate::physics::{check_and_snap_hang, integrate_kinematic};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
@@ -77,17 +77,17 @@ impl Player {
     }
 
     pub fn can_be_hit(&self) -> bool {
-		self.immunity_frames == 0
-	}
+        self.immunity_frames == 0
+    }
 
     pub fn got_hit(&mut self, damage: u32) {
         if damage > 0 {
             if damage > self.health {
-				self.health = 0;
+                self.health = 0;
                 self.state = PlayerState::Dead;
-			} else {
-			    self.health -= damage;
-        	    self.immunity_frames = 60;
+            } else {
+                self.health -= damage;
+                self.immunity_frames = 60;
             }
         }
     }

@@ -1,6 +1,5 @@
 use crate::state::BoundingBox;
 use crate::state::Dir;
-use crate::state::GameMap;
 use crate::state::Pos;
 use crate::state::game_map::MapLike;
 

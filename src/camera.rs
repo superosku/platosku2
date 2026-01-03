@@ -4,17 +4,26 @@ pub struct Camera {
     pub zoom: f32,
     pub min_zoom: f32,
     pub max_zoom: f32,
+    pub screen_w: f32,
+    pub screen_h: f32,
 }
 
 impl Camera {
-    pub fn new(x: f32, y: f32, zoom: f32) -> Self {
+    pub fn new(x: f32, y: f32, zoom: f32, width: f32, height: f32) -> Self {
         Camera {
             x,
             y,
             zoom,
             min_zoom: 1.0,
             max_zoom: 16.0,
+            screen_w: width,
+            screen_h: height,
         }
+    }
+
+    pub fn on_resize(&mut self, w: f32, h: f32) {
+        self.screen_w = w;
+        self.screen_h = h;
     }
 
     pub fn follow(&mut self, target_x: f32, target_y: f32) {
@@ -32,13 +41,7 @@ impl Camera {
         self.set_zoom(new_zoom);
     }
 
-    pub fn screen_to_tile(
-        &self,
-        mouse_x: f32,
-        mouse_y: f32,
-        screen_w: f32,
-        screen_h: f32,
-    ) -> (i32, i32) {
+    pub fn screen_to_tile(&self, mouse_x: f32, mouse_y: f32) -> (i32, i32) {
         // Keep this in sync with TILE_SIZE used in rendering.
         const TILE_SIZE: f32 = 16.0;
 
@@ -51,8 +54,8 @@ impl Camera {
         // Invert the View transform used in rendering:
         // screen = (world - snapped_center) * zoom + screen_center
         // => world = (screen - screen_center) / zoom + snapped_center
-        let world_x_px = (mouse_x - screen_w * 0.5) / self.zoom + snapped_cx;
-        let world_y_px = (mouse_y - screen_h * 0.5) / self.zoom + snapped_cy;
+        let world_x_px = (mouse_x - self.screen_w * 0.5) / self.zoom + snapped_cx;
+        let world_y_px = (mouse_y - self.screen_h * 0.5) / self.zoom + snapped_cy;
 
         // Convert world pixels to tile indices on the base grid
         let tx = (world_x_px / TILE_SIZE).floor() as i32;

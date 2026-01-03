@@ -1,5 +1,5 @@
 use super::common::BoundingBox;
-use super::game_map::{GameMap, MapLike};
+use super::game_map::MapLike;
 use crate::physics::integrate_kinematic;
 
 pub struct Coin {

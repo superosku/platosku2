@@ -1,5 +1,5 @@
 use super::common::BoundingBox;
-use super::game_map::{GameMap, MapLike};
+use super::game_map::MapLike;
 use crate::physics::integrate_kinematic;
 use crate::render::TextureIndexes;
 use crate::state::Dir;
@@ -162,7 +162,7 @@ impl Enemy for Slime {
         } else {
             1
         }
-	}
+    }
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Slime
@@ -337,11 +337,7 @@ impl Enemy for Bat {
     }
 
     fn contanct_damage(&self) -> u32 {
-        if self.can_be_hit() {
-            1
-        } else {
-			0
-		}
+        if self.can_be_hit() { 1 } else { 0 }
     }
 
     fn get_texture_index(&self) -> TextureIndexes {
