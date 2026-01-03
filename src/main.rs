@@ -1,17 +1,20 @@
 use miniquad::*;
 use state::OverlayTile;
-use std::fs;
 use std::path::Path;
 
 mod camera;
 mod physics;
 mod state;
-use crate::state::game_map::{DoorDir, MapLike};
-use crate::state::{BaseTile, Bat, Coin, Enemy, GameMap, GameState, InputState, Player};
+use crate::state::game_map::MapLike;
+use crate::state::{BaseTile, Enemy, GameState, InputState};
+mod debug_menu;
 mod render;
-use crate::render::Renderer;
-use crate::state::enemies::Slime;
+
+use crate::camera::Camera;
+use crate::debug_menu::GameStateDebugMenu;
+use crate::render::{DrawableGameState, Renderer};
 use crate::state::game_map::Room;
+use crate::state::game_state::{Editor, Game};
 use egui_miniquad as egui_mq;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -45,25 +48,38 @@ enum EditorSelection {
     Doors { selection: DoorSelection },
 }
 
-struct UiConfig {
+struct DebugMenu {
     editor_selection: EditorSelection,
+    all_rooms: Vec<(String, Room)>,
+    current_editor_room_index: u32,
+    is_game: bool,
 }
 
-impl UiConfig {
-    pub fn new() -> UiConfig {
-        UiConfig {
+impl DebugMenu {
+    pub fn new() -> DebugMenu {
+        let all_rooms = Room::load_rooms_from_folder();
+
+        DebugMenu {
             editor_selection: EditorSelection::Tiles {
                 selection: TileSelection::Clear,
             },
+            all_rooms,
+            current_editor_room_index: 0,
+            is_game: true,
         }
     }
 }
 
+trait FullGameState: GameState + DrawableGameState + GameStateDebugMenu {}
+impl<T: GameState + DrawableGameState + GameStateDebugMenu> FullGameState for T {}
+
 struct Stage {
     egui_mq: egui_mq::EguiMq,
 
-    state: GameState,
+    input: InputState,
+    state: Box<dyn FullGameState>,
     renderer: Renderer,
+    camera: Camera,
 
     last_time: f64,
     last_time_ups: f64,
@@ -73,50 +89,15 @@ struct Stage {
     time_spent_drawing: f64,
     time_spent_updating: f64,
 
-    ui_config: UiConfig,
-
     mouse_pressed: bool,
-    all_rooms: Vec<(String, Room)>,
-    current_editor_room_index: u32,
+
+    debug_menu: DebugMenu,
 }
 
 impl Stage {
     fn new(width: i32, height: i32) -> Stage {
-        // Simple unit quad at origin (0..1, 0..1)
         let mut renderer = Renderer::new();
-
-        let all_rooms = Room::load_rooms_from_folder();
-        let map = all_rooms[0].1.clone();
-
-        // Start player near the top-left open area
-        let player = Player::new(2.0, 2.0);
-
-        let mut state = GameState {
-            screen_w: width as f32,
-            screen_h: height as f32,
-            player,
-            map,
-            input: InputState::default(),
-            coins: vec![
-                Coin::new(4.0, 1.0),
-                Coin::new(6.0, 1.5),
-                Coin::new(10.0, 1.0),
-            ],
-            enemies: vec![
-                Box::new(Bat::new(8.0, 2.0)) as Box<dyn Enemy>,
-                Box::new(Bat::new(12.0, 2.0)) as Box<dyn Enemy>,
-                Box::new(Bat::new(4.0, 2.5)) as Box<dyn Enemy>,
-                Box::new(Slime::new(5.0, 5.5)) as Box<dyn Enemy>,
-                Box::new(Slime::new(9.0, 4.0)) as Box<dyn Enemy>,
-                Box::new(Slime::new(10.0, 4.0)) as Box<dyn Enemy>,
-            ],
-            camera: camera::Camera::new(0.0, 0.0, 2.0),
-        };
-
-        // Initialize camera to player center
-        let pcx = state.player.bb.x + state.player.bb.w * 0.5;
-        let pcy = state.player.bb.y + state.player.bb.h * 0.5;
-        state.camera.follow(pcx, pcy);
+        let mut state = Box::new(Game::new());
 
         Stage {
             egui_mq: egui_mq::EguiMq::new(&mut *renderer.ctx),
@@ -129,52 +110,58 @@ impl Stage {
             last_time_ups: date::now(),
             time_spent_drawing: 0.0,
             time_spent_updating: 0.0,
-            ui_config: UiConfig::new(),
             mouse_pressed: false,
-            all_rooms,
-            current_editor_room_index: 0,
+            debug_menu: DebugMenu::new(),
+            input: InputState::default(),
+            camera: Camera::new(0.0, 0.0, 2.0, width as f32, height as f32),
         }
     }
 
     fn handle_editor_tile_drawing(&mut self, x: f32, y: f32) {
-        let coords =
-            self.state
-                .camera
-                .screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
+        let coords = self.camera.screen_to_tile(x, y);
         println!("Mouse coords: {:?}", coords);
 
-        match &self.ui_config.editor_selection {
+        // TODO: Move this into debug_menu.rs as well
+        match &self.debug_menu.editor_selection {
             EditorSelection::Tiles { selection } => match &selection {
                 TileSelection::NotPartOf => {
                     self.state
-                        .map
+                        .map_mut()
                         .set_base(coords.0, coords.1, BaseTile::NotPartOfRoom);
                     self.state
-                        .map
+                        .map_mut()
                         .set_overlay(coords.0, coords.1, OverlayTile::None);
                 }
                 TileSelection::Clear => {
-                    self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
                     self.state
-                        .map
+                        .map_mut()
+                        .set_base(coords.0, coords.1, BaseTile::Empty);
+                    self.state
+                        .map_mut()
                         .set_overlay(coords.0, coords.1, OverlayTile::None);
                 }
                 TileSelection::Ladder => {
-                    self.state.map.set_base(coords.0, coords.1, BaseTile::Empty);
                     self.state
-                        .map
+                        .map_mut()
+                        .set_base(coords.0, coords.1, BaseTile::Empty);
+                    self.state
+                        .map_mut()
                         .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
                 }
                 TileSelection::Stone => {
-                    self.state.map.set_base(coords.0, coords.1, BaseTile::Stone);
                     self.state
-                        .map
+                        .map_mut()
+                        .set_base(coords.0, coords.1, BaseTile::Stone);
+                    self.state
+                        .map_mut()
                         .set_overlay(coords.0, coords.1, OverlayTile::None);
                 }
                 TileSelection::Wood => {
-                    self.state.map.set_base(coords.0, coords.1, BaseTile::Wood);
                     self.state
-                        .map
+                        .map_mut()
+                        .set_base(coords.0, coords.1, BaseTile::Wood);
+                    self.state
+                        .map_mut()
                         .set_overlay(coords.0, coords.1, OverlayTile::None);
                 }
             },
@@ -198,8 +185,8 @@ impl EventHandler for Stage {
         let dt = 1.0 / 60.0;
 
         while self.accumulator >= dt {
-            self.state.update(); // HERE is the actual game call
-            self.state.input.jump = false;
+            self.state.update(&mut self.camera, &self.input); // HERE is the actual game call
+            self.input.jump = false;
             self.updates += 1;
             self.accumulator -= dt;
         }
@@ -229,7 +216,7 @@ impl EventHandler for Stage {
         // Game
         let draw_start = date::now();
 
-        self.renderer.draw(&self.state);
+        self.renderer.draw(self.state.as_ref(), &self.camera);
         self.frames += 1;
         let draw_total = date::now() - draw_start;
         self.time_spent_drawing += draw_total;
@@ -241,240 +228,32 @@ impl EventHandler for Stage {
                     // egui::widgets::global_theme_preference_buttons(ui);
                     // ui.checkbox(&mut true, "Show egui demo windows");
 
-                    ui.add(egui::Label::new("Tool:"));
-
-                    if ui
-                        .add(egui::RadioButton::new(
-                            matches!(
-                                self.ui_config.editor_selection,
-                                EditorSelection::Tiles { .. }
-                            ),
-                            "Tiles",
-                        ))
-                        .clicked()
-                    {
-                        self.ui_config.editor_selection = EditorSelection::Tiles {
-                            selection: TileSelection::Clear,
-                        };
-                    }
-                    if ui
-                        .add(egui::RadioButton::new(
-                            matches!(
-                                self.ui_config.editor_selection,
-                                EditorSelection::Enemies { .. }
-                            ),
-                            "Enemies",
-                        ))
-                        .clicked()
-                    {
-                        self.ui_config.editor_selection = EditorSelection::Enemies {
-                            selection: EnemySelection::Bat,
-                        };
-                    }
-                    if ui
-                        .add(egui::RadioButton::new(
-                            matches!(self.ui_config.editor_selection, EditorSelection::PlayerPos),
-                            "Player position",
-                        ))
-                        .clicked()
-                    {
-                        self.ui_config.editor_selection = EditorSelection::PlayerPos;
-                    }
-                    if ui
-                        .add(egui::RadioButton::new(
-                            matches!(
-                                self.ui_config.editor_selection,
-                                EditorSelection::Doors { .. }
-                            ),
-                            "Doors",
-                        ))
-                        .clicked()
-                    {
-                        self.ui_config.editor_selection = EditorSelection::Doors {
-                            selection: DoorSelection::Left,
-                        };
-                    }
-
-                    let mut new_selection: Option<EditorSelection> = None;
-
-                    match &self.ui_config.editor_selection {
-                        EditorSelection::Tiles { selection } => {
-                            ui.add(egui::Label::new("Tile:"));
-                            if ui
-                                .add(egui::RadioButton::new(
-                                    matches!(selection, TileSelection::NotPartOf),
-                                    "NotPartOf",
-                                ))
-                                .clicked()
-                            {
-                                new_selection = Some(EditorSelection::Tiles {
-                                    selection: TileSelection::NotPartOf,
-                                });
-                            }
-                            if ui
-                                .add(egui::RadioButton::new(
-                                    matches!(selection, TileSelection::Clear),
-                                    "Clear",
-                                ))
-                                .clicked()
-                            {
-                                new_selection = Some(EditorSelection::Tiles {
-                                    selection: TileSelection::Clear,
-                                });
-                            }
-                            if ui
-                                .add(egui::RadioButton::new(
-                                    matches!(selection, TileSelection::Wood),
-                                    "Wood",
-                                ))
-                                .clicked()
-                            {
-                                new_selection = Some(EditorSelection::Tiles {
-                                    selection: TileSelection::Wood,
-                                });
-                            }
-                            if ui
-                                .add(egui::RadioButton::new(
-                                    matches!(selection, TileSelection::Ladder),
-                                    "Ladder",
-                                ))
-                                .clicked()
-                            {
-                                new_selection = Some(EditorSelection::Tiles {
-                                    selection: TileSelection::Ladder,
-                                });
-                            }
-                            if ui
-                                .add(egui::RadioButton::new(
-                                    matches!(selection, TileSelection::Stone),
-                                    "Stone",
-                                ))
-                                .clicked()
-                            {
-                                new_selection = Some(EditorSelection::Tiles {
-                                    selection: TileSelection::Stone,
-                                });
-                            }
-                        }
-                        EditorSelection::Enemies { selection } => {
-                            ui.add(egui::Label::new("Enemy:"));
-                            if ui
-                                .add(egui::RadioButton::new(
-                                    matches!(selection, EnemySelection::Bat),
-                                    "Bat",
-                                ))
-                                .clicked()
-                            {
-                                new_selection = Some(EditorSelection::Enemies {
-                                    selection: EnemySelection::Bat,
-                                });
-                            }
-                            if ui
-                                .add(egui::RadioButton::new(
-                                    matches!(selection, EnemySelection::Slime),
-                                    "Slime",
-                                ))
-                                .clicked()
-                            {
-                                new_selection = Some(EditorSelection::Enemies {
-                                    selection: EnemySelection::Slime,
-                                });
-                            }
-                        }
-                        EditorSelection::PlayerPos => {
-                            ui.add(egui::Label::new("Click to set player pos"));
-                        }
-                        EditorSelection::Doors { selection } => {
-                            ui.add(egui::Label::new("Door:"));
-
-                            for door_type in [
-                                DoorSelection::Right,
-                                DoorSelection::Left,
-                                DoorSelection::Up,
-                                DoorSelection::Down,
-                                DoorSelection::Remove,
-                            ] {
-                                if ui
-                                    .add(egui::RadioButton::new(
-                                        *selection == door_type,
-                                        // matches!(selection, door_type),
-                                        format!("{:?}", door_type),
-                                    ))
-                                    .clicked()
-                                {
-                                    new_selection = Some(EditorSelection::Doors {
-                                        selection: door_type,
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                    if let Some(selection) = new_selection {
-                        self.ui_config.editor_selection = selection;
-                    }
-
-                    ui.add(egui::Label::new("Levels:"));
-
-                    let mut remove_current = false;
-                    let mut reload_rooms = false;
-                    for (room_index, (file_name, room)) in self.all_rooms.iter().enumerate() {
-                        ui.horizontal(|ui| {
-                            if ui.add(egui::Link::new(file_name)).clicked() {
-                                println!("Clicked a link");
-                                self.state.map = room.clone();
-                                self.current_editor_room_index = room_index as u32;
-                                self.state.player.bb.x = self.state.map.get_center().0;
-                                self.state.player.bb.y = self.state.map.get_center().1;
-                            }
-                            if room_index as u32 == self.current_editor_room_index {
-                                if ui.add(egui::Button::new("Save")).clicked() {
-                                    self.state.map.resize_shrink();
-                                    let path = Path::new("rooms").join(&file_name);
-                                    self.state.map.save_json(path);
-                                    println!("Button clicked!");
-                                    reload_rooms = true;
-                                }
-                                if ui.add(egui::Button::new("Del")).clicked() {
-                                    if self.all_rooms.len() > 2 {
-                                        remove_current = true;
-                                    }
-                                }
-                            }
+                    let previous_selection = self.debug_menu.is_game;
+                    egui::ComboBox::from_id_salt("Select one!")
+                        .selected_text(if self.debug_menu.is_game {
+                            "Game"
+                        } else {
+                            "Editor"
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.debug_menu.is_game, false, "Editor");
+                            ui.selectable_value(&mut self.debug_menu.is_game, true, "Game");
                         });
-                    }
-                    if remove_current {
-                        let file_name_to_remove = self.all_rooms
-                            [self.current_editor_room_index as usize]
-                            .0
-                            .clone();
-
-                        self.all_rooms
-                            .remove(self.current_editor_room_index as usize);
-                        self.state.map = self.all_rooms[0].1.clone();
-                        self.current_editor_room_index = 0;
-
-                        // Remove file_name_to_remove file name (in a folder called rooms)
-                        let path = Path::new("rooms").join(&file_name_to_remove);
-
-                        if let Err(err) = fs::remove_file(&path) {
-                            eprintln!("Failed to remove room file '{}': {}", path.display(), err);
+                    if previous_selection != self.debug_menu.is_game {
+                        if self.debug_menu.is_game {
+                            self.state = Box::new(Game::new());
+                        } else {
+                            let mut editor = Editor::new();
+                            editor.room = self.debug_menu.all_rooms[0].1.clone();
+                            self.state = Box::new(editor);
+                            self.debug_menu.current_editor_room_index = 0;
+                            self.debug_menu.editor_selection = EditorSelection::Tiles {
+                                selection: TileSelection::Stone,
+                            }
                         }
                     }
 
-                    if ui.add(egui::Button::new("New room")).clicked() {
-                        let new_room = Room::new_boxed(0, 0, 5, 5);
-                        new_room.save_json(Room::next_available_file_name());
-                        self.current_editor_room_index = self.all_rooms.len() as u32 - 1;
-                        self.state.map = self.all_rooms[self.all_rooms.len() - 1].1.clone();
-                        self.state.player.bb.x = self.state.map.get_center().0;
-                        self.state.player.bb.y = self.state.map.get_center().1;
-                        reload_rooms = true;
-                    }
-
-                    if reload_rooms {
-                        self.all_rooms = Room::load_rooms_from_folder();
-                    }
+                    self.state.render_ui(ui, &mut self.debug_menu)
                 });
             });
 
@@ -484,18 +263,18 @@ impl EventHandler for Stage {
     }
 
     fn resize_event(&mut self, width: f32, height: f32) {
-        self.state.on_resize(width, height);
+        self.camera.on_resize(width, height);
         self.renderer.resize(width, height);
     }
 
     fn key_down_event(&mut self, keycode: KeyCode, keymods: KeyMods, _repeat: bool) {
         match keycode {
-            KeyCode::Left => self.state.input.left = true,
-            KeyCode::Right => self.state.input.right = true,
-            KeyCode::Up => self.state.input.up = true,
-            KeyCode::X => self.state.input.swing = true,
-            KeyCode::Z => self.state.input.jump = true,
-            KeyCode::Down => self.state.input.down = true,
+            KeyCode::Left => self.input.left = true,
+            KeyCode::Right => self.input.right = true,
+            KeyCode::Up => self.input.up = true,
+            KeyCode::X => self.input.swing = true,
+            KeyCode::Z => self.input.jump = true,
+            KeyCode::Down => self.input.down = true,
             _ => {}
         }
         self.egui_mq.key_down_event(keycode, keymods);
@@ -503,19 +282,19 @@ impl EventHandler for Stage {
 
     fn key_up_event(&mut self, keycode: KeyCode, keymods: KeyMods) {
         match keycode {
-            KeyCode::Left => self.state.input.left = false,
-            KeyCode::Right => self.state.input.right = false,
-            KeyCode::Up => self.state.input.up = false,
-            KeyCode::X => self.state.input.swing = false,
-            KeyCode::Z => self.state.input.jump = false,
-            KeyCode::Down => self.state.input.down = false,
+            KeyCode::Left => self.input.left = false,
+            KeyCode::Right => self.input.right = false,
+            KeyCode::Up => self.input.up = false,
+            KeyCode::X => self.input.swing = false,
+            KeyCode::Z => self.input.jump = false,
+            KeyCode::Down => self.input.down = false,
             _ => {}
         }
         self.egui_mq.key_up_event(keycode, keymods);
     }
 
     fn mouse_wheel_event(&mut self, dx: f32, dy: f32) {
-        self.state.camera.zoom_scroll(dy);
+        self.camera.zoom_scroll(dy);
         self.egui_mq.mouse_wheel_event(dx, dy);
     }
 
@@ -540,41 +319,12 @@ impl EventHandler for Stage {
             return;
         }
 
-        let coords =
-            self.state
-                .camera
-                .screen_to_tile(x, y, self.state.screen_w, self.state.screen_h);
+        let coords = self.camera.screen_to_tile(x, y);
         println!("Mouse coords: {:?}", coords);
 
         self.handle_editor_tile_drawing(x, y);
 
-        match &self.ui_config.editor_selection {
-            EditorSelection::PlayerPos => {
-                self.state.player.bb.x = coords.0 as f32;
-                self.state.player.bb.y = coords.1 as f32;
-            }
-            EditorSelection::Enemies { selection } => {}
-            EditorSelection::PlayerPos => {
-                self.state.player.bb.x = coords.0 as f32;
-                self.state.player.bb.y = coords.1 as f32;
-            }
-            EditorSelection::Doors { selection } => {
-                for (sel, direction) in [
-                    (DoorSelection::Up, DoorDir::Up),
-                    (DoorSelection::Down, DoorDir::Down),
-                    (DoorSelection::Right, DoorDir::Right),
-                    (DoorSelection::Left, DoorDir::Left),
-                ] {
-                    if *selection == sel {
-                        self.state.map.set_door(coords.0, coords.1, direction);
-                    }
-                }
-                if *selection == DoorSelection::Remove {
-                    self.state.map.remove_door(coords.0, coords.1);
-                }
-            }
-            EditorSelection::Tiles { .. } => {} // This one is handled in the drawing function
-        }
+        self.state.mouse_button_event(coords, &mut self.debug_menu)
     }
 
     fn mouse_button_up_event(&mut self, mb: MouseButton, x: f32, y: f32) {

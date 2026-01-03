@@ -1,5 +1,6 @@
+use rand::Rng;
+use rand::seq::{IndexedMutRandom, IndexedRandom};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs::DirEntry;
 use std::{fs, io, path::Path};
 
@@ -38,7 +39,7 @@ pub trait MapLike {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum DoorDir {
     Left,
     Right,
@@ -188,6 +189,10 @@ impl Room {
         }
 
         rooms
+    }
+
+    fn rel_to_abs(&self, xy: (u32, u32)) -> (i32, i32) {
+        (self.x + xy.0 as i32, self.y + xy.1 as i32)
     }
 
     fn abs_to_rel(&self, xy: (i32, i32)) -> Option<(u32, u32)> {
@@ -419,23 +424,139 @@ pub struct GameMap {
 
 impl GameMap {
     pub fn new_random() -> GameMap {
+        let room_candidates = Room::load_rooms_from_folder();
+        let mut rng = rand::rng();
+        let first_room = room_candidates.choose(&mut rng).unwrap().1.clone();
         let mut rooms = Vec::new();
 
-        for x in 0..5 {
-            for y in 0..5 {
-                rooms.push(Room::new_boxed(x * 6 + y - 8, y * 4 - 4, 7, 5))
+        rooms.push(first_room);
+
+        let mut game_map = GameMap { rooms };
+
+        // Iterate this
+
+        let mut room_count = 1;
+        'room_loop: for i in 0..100 {
+            println!("Iterating for adding a room {}", i);
+            println!(" a) Choosing a random room to try to connect a room to");
+            let random_existing_room_index = rng.random_range(0..game_map.rooms.len());
+            // let random_existing_room = game_map.rooms.choose(&mut rng).unwrap();
+            let random_existing_room = &game_map.rooms[random_existing_room_index];
+            let random_door = random_existing_room.doors.choose(&mut rng).unwrap();
+            let random_door_x = random_door.x;
+            let random_door_y = random_door.y;
+            let door_world_pos = random_existing_room.rel_to_abs((random_door.x, random_door.y));
+
+            println!(" b) Choosing a random room to add");
+            let mut random_new_room = room_candidates.choose(&mut rng).unwrap().1.clone();
+            println!(" c) Choosing a random door");
+            let door_match_candidates: Vec<RoomDoor> = random_new_room
+                .doors
+                .iter()
+                .filter(|door| match door.dir {
+                    DoorDir::Down => random_door.dir == DoorDir::Up,
+                    DoorDir::Up => random_door.dir == DoorDir::Down,
+                    DoorDir::Left => random_door.dir == DoorDir::Right,
+                    DoorDir::Right => random_door.dir == DoorDir::Left,
+                })
+                .cloned()
+                .collect();
+
+            if door_match_candidates.len() == 0 {
+                println!(" ERR: Could not find door match from random room");
+                continue;
+            }
+
+            println!(" d) Checking if room overlaps with any other ones");
+            let random_door_where_trying_to_connect =
+                door_match_candidates.choose(&mut rng).unwrap();
+            let new_door_world_pos = random_new_room.rel_to_abs((
+                random_door_where_trying_to_connect.x,
+                random_door_where_trying_to_connect.y,
+            ));
+            random_new_room.x += -new_door_world_pos.0 + door_world_pos.0;
+            random_new_room.y += -new_door_world_pos.1 + door_world_pos.1;
+
+            if random_new_room.x == random_existing_room.x
+                && random_new_room.y == random_existing_room.y
+            {
+                println!(" ERR: Room is a direct copy overlapping maybe");
+                continue;
+            }
+
+            for x in 0..random_new_room.w {
+                for y in 0..random_new_room.h {
+                    let new_room_tile = random_new_room.get_absolute(x, y).0;
+
+                    for room in &game_map.rooms {
+                        let existing_tile = room
+                            .get_at(random_new_room.x + x as i32, random_new_room.y + y as i32)
+                            .0;
+
+                        match (new_room_tile, existing_tile) {
+                            (BaseTile::NotPartOfRoom, _) => {}
+                            (_, BaseTile::NotPartOfRoom) => {}
+                            // (BaseTile::Empty, _) => {},
+                            // (_, BaseTile::Empty) => {},
+                            (tile1, tile2) => {
+                                if tile1 != tile2 {
+                                    println!(
+                                        " ERR: Room overlaps with other one {:?} {:?} ({} {})",
+                                        tile1, tile2, x, y
+                                    );
+                                    continue 'room_loop;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            println!(" e) Adding room and clearing doors");
+            random_new_room.set_base_absolute(
+                random_door_where_trying_to_connect.x,
+                random_door_where_trying_to_connect.y,
+                BaseTile::Empty,
+            );
+
+            game_map.rooms[random_existing_room_index].set_base_absolute(
+                random_door_x,
+                random_door_y,
+                BaseTile::Empty,
+            );
+
+            game_map.rooms.push(random_new_room);
+
+            room_count += 1;
+
+            if room_count >= 5 {
+                break;
             }
         }
 
-        GameMap { rooms }
+        // for x in 0..5 {
+        //     for y in 0..5 {
+        //         let mut room = room_candidates.choose(
+        //             // &mut rand::rng()
+        //             &mut rng
+        //         ).unwrap().1.clone();
+        //         room.x = x * 15;
+        //         room.y = y * 15;
+        //         rooms.push(room)
+        //     }
+        // }
+
+        game_map
     }
 }
 
 impl MapLike for GameMap {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         for room in &self.rooms {
-            if let Some(result) = room.get_relative(tx, ty) {
-                return result;
+            match room.get_relative(tx, ty) {
+                None => {}
+                Some((BaseTile::NotPartOfRoom, _)) => {}
+                Some(res) => return res,
             }
         }
 
