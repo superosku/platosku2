@@ -123,6 +123,27 @@ impl DrawableGameState for Game {
                 1.0,
             );
         }
+
+        renderer.draw_base_dual_grid(
+            &|x, y| {
+                // TODO: Refactor this player center thing (copypasted in 2 places) into player
+                if let Some(room) = self.map.get_room_at(
+                    (self.player.bb.x + self.player.bb.w * 0.5),
+                    (self.player.bb.y + self.player.bb.h * 0.5),
+                ) {
+                    if let Some((base, overlay)) = room.get_relative(x, y) {
+                        if base == BaseTile::NotPartOfRoom {
+                            return true;
+                        }
+                        return false;
+                    }
+                    return true;
+                }
+                true
+            },
+            camera,
+            3,
+        );
     }
 }
 
@@ -353,9 +374,21 @@ impl Renderer {
         self.ctx.apply_bindings(&self.bindings);
 
         // Draw base grid using dual-grid textured tiles
-        self.draw_base_dual_grid(state.map(), camera, BaseTile::NotPartOfRoom, 2);
-        self.draw_base_dual_grid(state.map(), camera, BaseTile::Stone, 0);
-        self.draw_base_dual_grid(state.map(), camera, BaseTile::Wood, 1);
+        self.draw_base_dual_grid(
+            &|x, y| matches!(state.map().get_at(x, y).0, BaseTile::NotPartOfRoom),
+            camera,
+            2,
+        );
+        self.draw_base_dual_grid(
+            &|x, y| matches!(state.map().get_at(x, y).0, BaseTile::Stone),
+            camera,
+            0,
+        );
+        self.draw_base_dual_grid(
+            &|x, y| matches!(state.map().get_at(x, y).0, BaseTile::Wood),
+            camera,
+            1,
+        );
 
         // Draw overlay tiles
         self.draw_overlay(state.map(), camera);
@@ -675,9 +708,8 @@ impl Renderer {
 
     fn draw_base_dual_grid(
         &mut self,
-        map: &dyn MapLike,
+        checker_fn: impl Fn(i32, i32) -> bool,
         camera: &Camera,
-        tile_type: BaseTile,
         tile_type_index: u8,
     ) {
         // let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
@@ -716,22 +748,22 @@ impl Renderer {
 
         for y in start_y..end_y {
             for x in start_x..end_x {
-                let (tl, _o1) = map.get_at(x, y);
-                let (tr, _o2) = map.get_at(x + 1, y);
-                let (bl, _o3) = map.get_at(x, y + 1);
-                let (br, _o4) = map.get_at(x + 1, y + 1);
+                let tl = checker_fn(x, y);
+                let tr = checker_fn(x + 1, y);
+                let bl = checker_fn(x, y + 1);
+                let br = checker_fn(x + 1, y + 1);
 
                 let mut mask: u32 = 0;
-                if tl == tile_type {
+                if tl {
                     mask |= 1;
                 }
-                if tr == tile_type {
+                if tr {
                     mask |= 2;
                 }
-                if bl == tile_type {
+                if bl {
                     mask |= 4;
                 }
-                if br == tile_type {
+                if br {
                     mask |= 8;
                 }
 
