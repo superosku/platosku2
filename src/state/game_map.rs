@@ -60,8 +60,8 @@ pub struct Room {
     overlay: Vec<OverlayTile>,
     pub x: i32,
     pub y: i32,
-    h: u32,
-    w: u32,
+    pub h: u32,
+    pub w: u32,
     doors: Vec<RoomDoor>,
 }
 
@@ -401,6 +401,9 @@ impl MapLike for Room {
                 self.set_base_absolute(rel.0, rel.1, tile);
             }
         }
+        // Maybe shrink afterwards
+        println!("Resize shrinking");
+        self.resize_shrink();
     }
 
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile) {
@@ -413,6 +416,9 @@ impl MapLike for Room {
                 self.set_overlay_absolute(rel.0, rel.1, tile);
             }
         }
+        // Maybe shrink afterwards
+        println!("Resize shrinking");
+        self.resize_shrink();
     }
 }
 
@@ -423,6 +429,54 @@ pub struct GameMap {
 }
 
 impl GameMap {
+    pub fn player_start_pos(&self) -> (f32, f32) {
+        let room = &self.rooms[0];
+        (
+            room.x as f32 + room.w as f32 * 0.5,
+            room.y as f32 + room.h as f32 * 0.5
+        )
+    }
+    
+    pub fn get_bounds(&self) -> (i32, i32, i32, i32) {
+        let mut min_x = 10000;
+        let mut min_y = 10000;
+        let mut max_x = -10000;
+        let mut max_y = -10000;
+
+        for room in &self.rooms {
+            min_x = room.x.min(min_x);
+            min_y = room.y.min(min_y);
+            max_x = (room.x + room.w as i32).max(max_x);
+            max_y = (room.y + room.h as i32).max(max_y);
+        }
+
+        (
+            min_x,
+            min_y,
+            max_x - min_x,
+            max_y - min_y,
+        )
+    }
+
+    pub fn get_room_at(&self, x: f32, y: f32) -> Option<&Room> {
+        for room in &self.rooms {
+            if x < room.x as f32 + 0.5 || y < room.y as f32 + 0.5 {
+                continue
+            }
+            if x > (room.x as f32 + room.w as f32) - 0.5 || y > (room.y as f32 + room.h as f32) - 0.5 {
+                continue
+            }
+
+            if let Some((base, overlay)) = room.get_relative(x as i32, y as i32) {
+                if base != BaseTile::NotPartOfRoom {
+                    return Some(room)
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn new_random() -> GameMap {
         let room_candidates = Room::load_rooms_from_folder();
         let mut rng = rand::rng();
