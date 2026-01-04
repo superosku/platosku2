@@ -1,5 +1,5 @@
 use crate::state::{BaseTile, GameState, OverlayTile};
-use crate::state::game_map::{DoorDir, Room};
+use crate::state::game_map::{DoorDir, GameMap, Room};
 use crate::state::game_state::{Editor, Game};
 use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
 use egui::Ui;
@@ -14,8 +14,38 @@ pub trait GameStateDebugMenu: GameState {
 
 impl GameStateDebugMenu for Game {
     fn mouse_button_event(&mut self, coords: (i32, i32), stage: &mut DebugMenu) {}
-    fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu) {}
     fn mouse_drawing(&mut self, coords: (i32, i32), debug_menu: &DebugMenu) {}
+
+    fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu) {
+        if ui.add(egui::Button::new("Regenerate map")).clicked() {
+            self.map = GameMap::new_random();
+            let player_pos = self.map.player_start_pos();
+            self.player.bb.x =player_pos.0;
+            self.player.bb.y =player_pos.1;
+        }
+
+        if ui
+            .add(egui::RadioButton::new(
+                matches!(stage.zoom_show_full, false),
+                "Zoom to room",
+            ))
+            .clicked()
+        {
+            println!("Setting zoom to room");
+            stage.zoom_show_full = false
+        }
+
+        if ui
+            .add(egui::RadioButton::new(
+                matches!(stage.zoom_show_full, true),
+                "Zoom show all",
+            ))
+            .clicked()
+        {
+            println!("Setting zomo show all");
+            stage.zoom_show_full = true
+        }
+    }
 }
 
 impl GameStateDebugMenu for Editor {

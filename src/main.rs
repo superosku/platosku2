@@ -52,6 +52,7 @@ struct DebugMenu {
     all_rooms: Vec<(String, Room)>,
     current_editor_room_index: u32,
     is_game: bool,
+    zoom_show_full: bool,
 }
 
 impl DebugMenu {
@@ -65,6 +66,7 @@ impl DebugMenu {
             all_rooms,
             current_editor_room_index: 0,
             is_game: true,
+            zoom_show_full: false
         }
     }
 }
@@ -138,7 +140,8 @@ impl EventHandler for Stage {
         let dt = 1.0 / 60.0;
 
         while self.accumulator >= dt {
-            self.state.update(&mut self.camera, &self.input); // HERE is the actual game call
+            self.state.update(&self.input); // HERE is the actual game call
+            self.state.update_camera(&mut self.camera, self.debug_menu.zoom_show_full); // HERE is the actual game call
             self.input.jump = false;
             self.updates += 1;
             self.accumulator -= dt;

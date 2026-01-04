@@ -16,7 +16,8 @@ pub struct InputState {
 }
 
 pub trait GameState {
-    fn update(&mut self, camera: &mut Camera, input: &InputState);
+    fn update(&mut self, input: &InputState);
+    fn update_camera(&mut self, camera: &mut Camera, zoom_show_all: bool);
     fn player(&self) -> &Player;
     fn player_mut(&mut self) -> &mut Player;
     fn map_mut(&mut self) -> &mut dyn MapLike;
@@ -38,13 +39,19 @@ impl Editor {
 }
 
 impl GameState for Editor {
-    fn update(&mut self, camera: &mut Camera, input: &InputState) {
+    fn update(&mut self, input: &InputState) {
         self.player.update(input, &self.room);
+    }
 
-        let pcx = self.player.bb.x + self.player.bb.w * 0.5;
-        let pcy = self.player.bb.y + self.player.bb.h * 0.5;
+    fn update_camera(&mut self, camera: &mut Camera, zoom_show_all: bool) {
+        let camera_x = self.room.x as f32 + self.room.w as f32 * 0.5 - 3.0;
+        let camera_y = self.room.y as f32 + self.room.h as f32 * 0.5;
 
-        camera.follow(pcx, pcy);
+        let camera_zoom = camera.zoom_to_fit_horizontal_tiles(self.room.w + 10).min(
+            camera.zoom_to_fit_vertical_tiles(self.room.h + 4)
+        );
+
+        camera.slowly_follow(camera_x, camera_y, camera_zoom);
     }
 
     fn player(&self) -> &Player {
@@ -65,8 +72,8 @@ impl GameState for Editor {
 }
 
 pub struct Game {
-    player: Player,
-    map: GameMap,
+    pub player: Player,
+    pub map: GameMap,
     pub coins: Vec<Coin>,
     pub enemies: Vec<Box<dyn Enemy>>,
 }
@@ -97,7 +104,7 @@ impl Game {
 }
 
 impl GameState for Game {
-    fn update(&mut self, camera: &mut Camera, input: &InputState) {
+    fn update(&mut self, input: &InputState) {
         self.player.update(input, &self.map);
         for coin in &mut self.coins {
             coin.update(&self.map);
@@ -123,10 +130,35 @@ impl GameState for Game {
         }
         // Filter the enemies that are dead by enemy.is_dead() value
         self.enemies.retain(|e| !e.should_remove());
+    }
 
-        let pcx = self.player.bb.x + self.player.bb.w * 0.5;
-        let pcy = self.player.bb.y + self.player.bb.h * 0.5;
-        camera.follow(pcx, pcy);
+    fn update_camera(&mut self, camera: &mut Camera, zoom_show_all: bool) {
+        if zoom_show_all {
+            let (x, y, w, h) = self.map.get_bounds();
+
+            let camera_x = x as f32 + w as f32 * 0.5;
+            let camera_y = y as f32 + h as f32 * 0.5;
+
+            let camera_zoom = camera.zoom_to_fit_horizontal_tiles(w as u32).min(
+                camera.zoom_to_fit_vertical_tiles(h as u32)
+            );
+
+            camera.slowly_follow(camera_x, camera_y, camera_zoom);
+        } else {
+            if let Some(room) = self.map.get_room_at(
+                (self.player.bb.x + self.player.bb.w * 0.5),
+                (self.player.bb.y + self.player.bb.h * 0.5),
+            ) {
+                let camera_x = room.x as f32 + room.w as f32 * 0.5;
+                let camera_y = room.y as f32 + room.h as f32 * 0.5;
+
+                let camera_zoom = camera.zoom_to_fit_horizontal_tiles(room.w + 0).min(
+                    camera.zoom_to_fit_vertical_tiles(room.h + 0)
+                );
+
+                camera.slowly_follow(camera_x, camera_y, camera_zoom);
+            }
+        }
     }
 
     fn player(&self) -> &Player {
