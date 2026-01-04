@@ -14,7 +14,7 @@ impl Camera {
             x,
             y,
             zoom,
-            min_zoom: 1.0,
+            min_zoom: 1.0 / 16.0,
             max_zoom: 16.0,
             screen_w: width,
             screen_h: height,
@@ -24,6 +24,14 @@ impl Camera {
     pub fn on_resize(&mut self, w: f32, h: f32) {
         self.screen_w = w;
         self.screen_h = h;
+    }
+
+    pub fn slowly_follow(&mut self, x: f32, y: f32, zoom: f32) {
+        let target_zoom = zoom.clamp(self.min_zoom, self.max_zoom);
+
+        self.x += (x - self.x) * 0.10;
+        self.y += (y - self.y) * 0.10;
+        self.zoom += (target_zoom - self.zoom) * 0.10;
     }
 
     pub fn follow(&mut self, target_x: f32, target_y: f32) {
@@ -61,5 +69,25 @@ impl Camera {
         let tx = (world_x_px / TILE_SIZE).floor() as i32;
         let ty = (world_y_px / TILE_SIZE).floor() as i32;
         (tx, ty)
+    }
+
+    pub fn zoom_to_fit_horizontal_tiles(&self, tiles: u32) -> f32 {
+        // Keep this in sync with TILE_SIZE used in rendering.
+        const TILE_SIZE: f32 = 16.0;
+        if tiles == 0 {
+            return self.max_zoom;
+        }
+        let desired = self.screen_w / (tiles as f32 * TILE_SIZE);
+        desired.clamp(self.min_zoom, self.max_zoom)
+    }
+
+    pub fn zoom_to_fit_vertical_tiles(&self, tiles: u32) -> f32 {
+        // Keep this in sync with TILE_SIZE used in rendering.
+        const TILE_SIZE: f32 = 16.0;
+        if tiles == 0 {
+            return self.max_zoom;
+        }
+        let desired = self.screen_h / (tiles as f32 * TILE_SIZE);
+        desired.clamp(self.min_zoom, self.max_zoom)
     }
 }
