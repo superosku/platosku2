@@ -110,13 +110,13 @@ impl Game {
         }
     }
 
-    pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>) {
+    pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>, f32) {
         let cur_room = if let Some(index) = self.cur_room_index {Some(&self.map.rooms[index])} else {None};
         let mut prev_room = if let Some(index) = self.prev_room_index {Some(&self.map.rooms[index])} else {None};
         if self.prev_room_show_frames == 0 {
             prev_room = None
         }
-        (cur_room, prev_room)
+        (cur_room, prev_room, self.prev_room_show_frames as f32 / 30.0)
     }
 }
 
@@ -158,7 +158,7 @@ impl GameState for Game {
             if self.cur_room_index != Some(room_index) {
                 self.prev_room_index = self.cur_room_index;
                 self.cur_room_index = Some(room_index);
-                self.prev_room_show_frames = 60;
+                self.prev_room_show_frames = 30;
             }
         }
         if self.prev_room_show_frames > 0 {
