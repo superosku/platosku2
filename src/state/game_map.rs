@@ -425,7 +425,7 @@ impl MapLike for Room {
 pub struct GameMap {
     // pub base: Vec<Vec<BaseTile>>,
     // pub overlay: Vec<Vec<OverlayTile>>,
-    rooms: Vec<Room>,
+    pub rooms: Vec<Room>,
 }
 
 impl GameMap {
@@ -458,8 +458,10 @@ impl GameMap {
         )
     }
 
-    pub fn get_room_at(&self, x: f32, y: f32) -> Option<&Room> {
-        for room in &self.rooms {
+    pub fn get_room_at(&self, x: f32, y: f32) -> Option<(usize, &Room)> {
+        for room_index in 0..self.rooms.len() {
+            let room = &self.rooms[room_index];
+
             if x < room.x as f32 + 0.5 || y < room.y as f32 + 0.5 {
                 continue
             }
@@ -469,7 +471,7 @@ impl GameMap {
 
             if let Some((base, overlay)) = room.get_relative(x as i32, y as i32) {
                 if base != BaseTile::NotPartOfRoom {
-                    return Some(room)
+                    return Some((room_index, room))
                 }
             }
         }

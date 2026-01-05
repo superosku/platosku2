@@ -76,6 +76,10 @@ pub struct Game {
     pub map: GameMap,
     pub coins: Vec<Coin>,
     pub enemies: Vec<Box<dyn Enemy>>,
+
+    cur_room_index: Option<usize>,
+    prev_room_index: Option<usize>,
+    prev_room_show_frames: u32,
 }
 
 impl Game {
@@ -99,7 +103,20 @@ impl Game {
                 Box::new(Slime::new(9.0, 4.0)) as Box<dyn Enemy>,
                 Box::new(Slime::new(10.0, 4.0)) as Box<dyn Enemy>,
             ],
+
+            cur_room_index: None,
+            prev_room_index: None,
+            prev_room_show_frames: 0,
         }
+    }
+
+    pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>) {
+        let cur_room = if let Some(index) = self.cur_room_index {Some(&self.map.rooms[index])} else {None};
+        let mut prev_room = if let Some(index) = self.prev_room_index {Some(&self.map.rooms[index])} else {None};
+        if self.prev_room_show_frames == 0 {
+            prev_room = None
+        }
+        (cur_room, prev_room)
     }
 }
 
@@ -130,6 +147,28 @@ impl GameState for Game {
         }
         // Filter the enemies that are dead by enemy.is_dead() value
         self.enemies.retain(|e| !e.should_remove());
+
+        // Store the current and previous room as well as how many frames the previous has
+        // been the previous. This is used for centering the camera and displaying the "black"
+        // around the current room (/ rooms).
+        if let Some((room_index, room)) = self.map.get_room_at(
+            (self.player.bb.x + self.player.bb.w * 0.5),
+            (self.player.bb.y + self.player.bb.h * 0.5),
+        ) {
+            println!("WTF {:?} {}", self.cur_room_index, room_index);
+            // if let Some(current_room_index) = self.cur_room_index {
+                if self.cur_room_index != Some(room_index) {
+                    self.prev_room_index = self.cur_room_index;
+                    self.cur_room_index = Some(room_index);
+                    self.prev_room_show_frames = 60;
+                }
+            // } else {
+            //
+            // }
+        }
+        if self.prev_room_show_frames > 0 {
+            self.prev_room_show_frames -= 1;
+        }
     }
 
     fn update_camera(&mut self, camera: &mut Camera, zoom_show_all: bool) {
@@ -145,10 +184,8 @@ impl GameState for Game {
 
             camera.slowly_follow(camera_x, camera_y, camera_zoom);
         } else {
-            if let Some(room) = self.map.get_room_at(
-                (self.player.bb.x + self.player.bb.w * 0.5),
-                (self.player.bb.y + self.player.bb.h * 0.5),
-            ) {
+            let rooms = self.get_rooms_for_display();
+            if let Some(room) = rooms.0 {
                 let camera_x = room.x as f32 + room.w as f32 * 0.5;
                 let camera_y = room.y as f32 + room.h as f32 * 0.5;
 
