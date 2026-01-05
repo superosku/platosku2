@@ -126,18 +126,20 @@ impl DrawableGameState for Game {
 
         renderer.draw_base_dual_grid(
             &|x, y| {
-                // TODO: Refactor this player center thing (copypasted in 2 places) into player
-                if let Some(room) = self.map.get_room_at(
-                    (self.player.bb.x + self.player.bb.w * 0.5),
-                    (self.player.bb.y + self.player.bb.h * 0.5),
-                ) {
+                let rooms = self.get_rooms_for_display();
+                if let Some(room) = rooms.0 {
                     if let Some((base, overlay)) = room.get_relative(x, y) {
-                        if base == BaseTile::NotPartOfRoom {
-                            return true;
+                        if base != BaseTile::NotPartOfRoom {
+                            return false;
                         }
-                        return false;
                     }
-                    return true;
+                }
+                if let Some(room) = rooms.1 {
+                    if let Some((base, overlay)) = room.get_relative(x, y) {
+                        if base != BaseTile::NotPartOfRoom {
+                            return false;
+                        }
+                    }
                 }
                 true
             },
