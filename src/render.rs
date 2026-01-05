@@ -149,7 +149,7 @@ impl DrawableGameState for Game {
             1.0
         );
         // Draw again with opacity to get the fading effect
-        if ratio != 1.0 {
+        if ratio != 1.0 && ratio != 0.0 {
             renderer.draw_base_dual_grid(
                 &|x, y| {
                     if let Some(room) = rooms.1 {
@@ -290,7 +290,7 @@ impl Renderer {
             PipelineParams {
                 color_blend: Some(BlendState::new(
                     Equation::Add,
-                    BlendFactor::One,
+                    BlendFactor::Value(BlendValue::SourceAlpha),
                     BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
                 )),
                 cull_face: CullFace::Nothing,
@@ -336,7 +336,7 @@ impl Renderer {
             PipelineParams {
                 color_blend: Some(BlendState::new(
                     Equation::Add,
-                    BlendFactor::One,
+                    BlendFactor::Value(BlendValue::SourceAlpha),
                     BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
                 )),
                 cull_face: CullFace::Nothing,
@@ -1028,10 +1028,6 @@ void main() {
     vec4 bg = texture2D(bg_tex, uv_bg);
     vec4 out_color = mix(texel, bg, is_key);
     vec4 final_color = out_color * v_color;
-
-    if (final_color.a <= 0.001) {
-        discard;
-    }
 
     gl_FragColor = final_color;
 }
