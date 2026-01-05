@@ -119,50 +119,7 @@ impl Stage {
     fn handle_editor_tile_drawing(&mut self, x: f32, y: f32) {
         let coords = self.camera.screen_to_tile(x, y);
         println!("Mouse coords: {:?}", coords);
-
-        // TODO: Move this into debug_menu.rs as well
-        if let EditorSelection::Tiles { selection } = &self.debug_menu.editor_selection { match &selection {
-            TileSelection::NotPartOf => {
-                self.state
-                    .map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::NotPartOfRoom);
-                self.state
-                    .map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-            TileSelection::Clear => {
-                self.state
-                    .map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Empty);
-                self.state
-                    .map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-            TileSelection::Ladder => {
-                self.state
-                    .map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Empty);
-                self.state
-                    .map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
-            }
-            TileSelection::Stone => {
-                self.state
-                    .map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Stone);
-                self.state
-                    .map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-            TileSelection::Wood => {
-                self.state
-                    .map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Wood);
-                self.state
-                    .map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-        } }
+        self.state.mouse_drawing(coords, &self.debug_menu);
     }
 }
 
