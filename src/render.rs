@@ -855,7 +855,7 @@ impl Renderer {
 
         let uniforms = Uniforms {
             mvp: vp,
-            color: [1.0, 1.0, 1.0, 1.0],
+            color: [1.0, 1.0, 1.0, 0.9],
             uv_base: [0.0, 0.0, 0.0, 0.0],
             uv_scale: [1.0, 1.0, 0.0, 0.0],
             world_base: [0.0, 0.0, 0.0, 0.0],
