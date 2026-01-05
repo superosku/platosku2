@@ -180,10 +180,7 @@ impl EventHandler for Stage {
         // GUI
         self.egui_mq
             .run(&mut *self.renderer.ctx, |_mq_ctx, egui_ctx| {
-                egui::Window::new("Level editor").show(egui_ctx, |ui| {
-                    // egui::widgets::global_theme_preference_buttons(ui);
-                    // ui.checkbox(&mut true, "Show egui demo windows");
-
+                egui::Window::new("Debug").show(egui_ctx, |ui| {
                     let previous_selection = self.debug_menu.is_game;
                     egui::ComboBox::from_id_salt("Select one!")
                         .selected_text(if self.debug_menu.is_game {

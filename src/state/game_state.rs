@@ -155,16 +155,11 @@ impl GameState for Game {
             (self.player.bb.x + self.player.bb.w * 0.5),
             (self.player.bb.y + self.player.bb.h * 0.5),
         ) {
-            println!("WTF {:?} {}", self.cur_room_index, room_index);
-            // if let Some(current_room_index) = self.cur_room_index {
-                if self.cur_room_index != Some(room_index) {
-                    self.prev_room_index = self.cur_room_index;
-                    self.cur_room_index = Some(room_index);
-                    self.prev_room_show_frames = 60;
-                }
-            // } else {
-            //
-            // }
+            if self.cur_room_index != Some(room_index) {
+                self.prev_room_index = self.cur_room_index;
+                self.cur_room_index = Some(room_index);
+                self.prev_room_show_frames = 60;
+            }
         }
         if self.prev_room_show_frames > 0 {
             self.prev_room_show_frames -= 1;
