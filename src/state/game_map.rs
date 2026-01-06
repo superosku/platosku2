@@ -83,21 +83,11 @@ impl ObjectTemplate {
         self.as_object().get_texture_index()
     }
 
-    pub fn _as_object(&self, ox: f32, oy: f32) -> Box<dyn Enemy> {
-        // Takes offset_x and offset_y so this can be used to get objects in both
-        // relative and absolute positions (editor and game)
-        match self.object_type {
-            ObjectTemplateType::Bat => Box::new(Bat::new(self.x + ox, self.y + oy)),
-            ObjectTemplateType::Slime => Box::new(Slime::new(self.x + ox, self.y + oy)),
-        }
-    }
-
     pub fn as_object(&self) -> Box<dyn Enemy> {
-        self._as_object(0.0, 0.0)
-    }
-
-    pub fn as_object_rel(&self, room: &Room) -> Box<dyn Enemy> {
-        self._as_object(room.x as f32, room.y as f32)
+        match self.object_type {
+            ObjectTemplateType::Bat => Box::new(Bat::new(self.x, self.y)),
+            ObjectTemplateType::Slime => Box::new(Slime::new(self.x, self.y)),
+        }
     }
 }
 
@@ -105,8 +95,8 @@ impl ObjectTemplate {
 pub struct Room {
     base: Vec<BaseTile>,
     overlay: Vec<OverlayTile>,
-    pub x: i32,
-    pub y: i32,
+    x: i32,
+    y: i32,
     pub h: u32,
     pub w: u32,
     doors: Vec<RoomDoor>,
@@ -114,6 +104,23 @@ pub struct Room {
 }
 
 impl Room {
+    pub fn get_pos(&self) -> (i32, i32) {
+        (self.x, self.y)
+    }
+
+    pub fn set_pos(&mut self, pos: (i32, i32)) {
+        let diff_x = self.x - pos.0;
+        let diff_y = self.y - pos.1;
+
+        for t in &mut self.object_templates {
+            t.x -= diff_x as f32;
+            t.y -= diff_y as f32;
+        }
+
+        self.x = pos.0;
+        self.y = pos.1;
+    }
+
     pub fn new_empty(x: i32, y: i32, w: u32, h: u32, base: BaseTile, overlay: OverlayTile) -> Room {
         // Create new base and overlay that has x * y size and is initialized to Empty and None
         let base = vec![base; (h * w) as usize];
@@ -134,7 +141,7 @@ impl Room {
     pub fn get_enemies_from_template(&self) -> Vec<Box<dyn Enemy>> {
         self.object_templates
             .iter()
-            .map(|t| t.as_object_rel(self))
+            .map(|t| t.as_object())
             .collect()
     }
 
@@ -599,8 +606,15 @@ impl GameMap {
                 random_door_where_trying_to_connect.x,
                 random_door_where_trying_to_connect.y,
             ));
-            random_new_room.x += -new_door_world_pos.0 + door_world_pos.0;
-            random_new_room.y += -new_door_world_pos.1 + door_world_pos.1;
+
+            // random_new_room.x += -new_door_world_pos.0 + door_world_pos.0;
+            // random_new_room.y += -new_door_world_pos.1 + door_world_pos.1;
+
+            let random_new_room_new_x =
+                random_new_room.x + (-new_door_world_pos.0 + door_world_pos.0);
+            let random_new_room_new_y =
+                random_new_room.y + (-new_door_world_pos.1 + door_world_pos.1);
+            random_new_room.set_pos((random_new_room_new_x, random_new_room_new_y));
 
             if random_new_room.x == random_existing_room.x
                 && random_new_room.y == random_existing_room.y
@@ -621,8 +635,6 @@ impl GameMap {
                         match (new_room_tile, existing_tile) {
                             (BaseTile::NotPartOfRoom, _) => {}
                             (_, BaseTile::NotPartOfRoom) => {}
-                            // (BaseTile::Empty, _) => {},
-                            // (_, BaseTile::Empty) => {},
                             (tile1, tile2) => {
                                 if tile1 != tile2 {
                                     println!(
@@ -658,18 +670,6 @@ impl GameMap {
                 break;
             }
         }
-
-        // for x in 0..5 {
-        //     for y in 0..5 {
-        //         let mut room = room_candidates.choose(
-        //             // &mut rand::rng()
-        //             &mut rng
-        //         ).unwrap().1.clone();
-        //         room.x = x * 15;
-        //         room.y = y * 15;
-        //         rooms.push(room)
-        //     }
-        // }
 
         game_map
     }

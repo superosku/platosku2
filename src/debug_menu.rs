@@ -1,5 +1,5 @@
 use crate::camera::MouseCoords;
-use crate::state::game_map::{DoorDir, GameMap, ObjectTemplateType, Room};
+use crate::state::game_map::{DoorDir, ObjectTemplateType, Room};
 use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, GameState, OverlayTile};
 use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
@@ -19,33 +19,18 @@ impl GameStateDebugMenu for Game {
 
     fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu) {
         if ui.add(egui::Button::new("Regenerate map")).clicked() {
-            self.map = GameMap::new_random();
-            let player_pos = self.map.player_start_pos();
-            self.player.bb.x = player_pos.0;
-            self.player.bb.y = player_pos.1;
+            // TODO: This is hack to regenerate the state. Need to figure out somethign better...
+            let new_state = Game::new();
+            self.map = new_state.map;
+            self.enemies = new_state.enemies;
+            self.player = new_state.player;
         }
 
-        if ui
-            .add(egui::RadioButton::new(
-                !stage.zoom_show_full,
-                "Zoom to room",
-            ))
-            .clicked()
-        {
-            println!("Setting zoom to room");
-            stage.zoom_show_full = false
-        }
-
-        if ui
-            .add(egui::RadioButton::new(
-                stage.zoom_show_full,
-                "Zoom show all",
-            ))
-            .clicked()
-        {
-            println!("Setting zomo show all");
-            stage.zoom_show_full = true
-        }
+        ui.add(egui::Checkbox::new(
+            &mut stage.zoom_show_full,
+            "Zoom to room",
+        ));
+        ui.add(egui::Checkbox::new(&mut stage.show_dark, "Show dark"));
     }
 }
 
@@ -195,7 +180,7 @@ impl GameStateDebugMenu for Editor {
                         .clicked()
                     {
                         new_selection = Some(EditorSelection::Tiles {
-                            selection: TileSelection::NotPartOf,
+                            selection: candidate,
                         });
                     }
                 }
