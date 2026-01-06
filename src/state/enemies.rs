@@ -1,4 +1,4 @@
-use super::common::BoundingBox;
+use super::common::{ BoundingBox, Health };
 use super::game_map::MapLike;
 use crate::physics::integrate_kinematic;
 use crate::render::TextureIndexes;
@@ -16,14 +16,13 @@ pub trait Enemy {
     fn got_hit(&mut self);
     fn can_be_hit(&self) -> bool;
     fn should_remove(&self) -> bool;
-    fn contanct_damage(&self) -> u32;
+    fn contanct_damage(&self) -> f32;
 
     fn overlaps(&self, bb: &BoundingBox) -> bool {
         self.bb().overlaps(bb)
     }
 
-    fn get_current_health(&self) -> i32;
-    fn get_max_health(&self) -> i32;
+    fn get_health(&self) -> Health;
 
     fn get_texture_index(&self) -> TextureIndexes;
     fn get_atlas_index(&self) -> u32;
@@ -57,8 +56,7 @@ pub struct Slime {
     dir: Dir,
     animation_handler: AnimationHandler<SlimeAnimationState>,
     state: SlimeState,
-    max_health: i32,
-    health: i32,
+    health: Health,
 }
 
 impl Slime {
@@ -77,8 +75,7 @@ impl Slime {
             state: Idle {
                 frames_remaining: 100,
             },
-            max_health: 2,
-            health: 2,
+            health: Health { current: 2.0, max: 2.0 }
         }
     }
 }
@@ -156,7 +153,7 @@ impl Enemy for Slime {
 
     fn got_stomped(&mut self) {
         self.state = SlimeState::Immune { frames_remaining: 10 };
-        self.health -= 1;
+        self.health.current -= 1.0;
     }
 
     fn can_be_stomped(&self) -> bool {
@@ -166,7 +163,7 @@ impl Enemy for Slime {
     fn got_hit(&mut self) {
         if !matches!(self.state, SlimeState::Immune { .. }) {
             self.state = SlimeState::Immune { frames_remaining: 10 };
-            self.health -= 1;
+            self.health.current -= 1.0;
         }
     }
 
@@ -175,19 +172,20 @@ impl Enemy for Slime {
     }
 
     fn should_remove(&self) -> bool {
-        self.health <= 0
+        self.health.current <= 0.0
     }
 
-    fn contanct_damage(&self) -> u32 {
+    fn contanct_damage(&self) -> f32 {
         if matches!(self.state, SlimeState::Jumping { .. }) {
-            2
+            2.0
         } else {
-            1
+            1.0
         }
     }
 
-    fn get_current_health(&self) -> i32 {self.health}
-    fn get_max_health(&self) -> i32 {self.max_health}
+    fn get_health(&self) -> Health {
+		self.health
+	}
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Slime
@@ -233,8 +231,7 @@ pub struct Bat {
     bb: BoundingBox,
     state: BatState,
     animation_handler: AnimationHandler<BatAnimationState>,
-    max_health: i32,
-    health: i32,
+    health: Health,
 }
 
 impl Bat {
@@ -254,8 +251,7 @@ impl Bat {
                 dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
             },
             animation_handler: AnimationHandler::new(BatAnimationState::Standing),
-            max_health: 3,
-            health: 3,
+            health: Health { current: 3.0, max: 3.0 },
         }
     }
 }
@@ -342,7 +338,7 @@ impl Enemy for Bat {
                 self.state = BatState::Falling {
                     frames_remaining: 120,
                 };
-                self.health -= 1;
+                self.health.current -= 1.0;
             }
         }
     }
@@ -360,15 +356,16 @@ impl Enemy for Bat {
     }
 
     fn should_remove(&self) -> bool {
-        self.health <= 0
+        self.health.current <= 0.0
     }
 
-    fn contanct_damage(&self) -> u32 {
-        if self.can_be_hit() { 1 } else { 0 }
+    fn contanct_damage(&self) -> f32 {
+        if self.can_be_hit() { 1.0 } else { 0.0 }
     }
 
-    fn get_current_health(&self) -> i32 {self.health}
-    fn get_max_health(&self) -> i32 {self.max_health}
+    fn get_health(&self) -> Health {
+		self.health
+	}
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Bat

@@ -568,12 +568,12 @@ impl Renderer {
     }
 
     pub fn draw_hud(&mut self, state: &dyn GameState, camera: &Camera) {
-        self.draw_health_bar(state, camera);
+        self.draw_player_health_bar(state, camera);
 
         // currently only hp bar. possibility to add other things.
 	}
 
-    fn draw_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {
+    fn draw_player_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {
         let max_width = 200.0;
         let height = 20.0;
         let padding = 10.0;
@@ -581,7 +581,7 @@ impl Renderer {
         let x = camera.screen_w - max_width - padding;
         let y = padding;
 
-        let health_ratio = state.player().health as f32 / state.player().max_health as f32;
+        let health_ratio = state.player().health.current as f32 / state.player().health.max as f32;
         let filled_width = max_width * health_ratio;
 
         self.draw_rect_hud(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
@@ -595,7 +595,7 @@ impl Renderer {
         let x = enemy.bb().x - padding;
         let y = enemy.bb().y - height - padding ;
         
-        let health_ratio = enemy.get_current_health() as f32 / enemy.get_max_health() as f32;
+        let health_ratio = enemy.get_health().current as f32 / enemy.get_health().max as f32;
         let filled_width = max_width * health_ratio;
 
 		self.draw_rect(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
@@ -751,7 +751,6 @@ impl Renderer {
         self.bindings.images[1] = background.texture;
         self.ctx.apply_bindings(&self.bindings);
 
-        // ⭐ NO CAMERA
         let proj = Self::ortho_mvp(camera);
         let model = Self::mat4_mul(
             Self::mat4_translation(x, y),

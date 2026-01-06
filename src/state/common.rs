@@ -5,6 +5,12 @@ pub enum Dir {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct Health {
+    pub current: f32,
+	pub max: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct Pos {
     pub x: f32,
     pub y: f32,
