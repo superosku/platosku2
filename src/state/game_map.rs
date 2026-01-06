@@ -632,9 +632,15 @@ mod tests {
         let mut room = Room::new_empty(-1, -1, 10, 10, BaseTile::NotPartOfRoom, OverlayTile::None);
         room.set_base_absolute(1, 2, BaseTile::Stone);
         room.set_base_absolute(5, 5, BaseTile::Stone);
-        println!("Room before: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
+        println!(
+            "Room before: ({} {}) ({} {})",
+            room.x, room.y, room.w, room.h
+        );
         room.resize_shrink();
-        println!("Room after: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
+        println!(
+            "Room after: ({} {}) ({} {})",
+            room.x, room.y, room.w, room.h
+        );
 
         assert_eq!(room.x, 0);
         assert_eq!(room.y, 1);
@@ -650,9 +656,15 @@ mod tests {
         let mut room = Room::new_empty(-2, -2, 5, 5, BaseTile::NotPartOfRoom, OverlayTile::None);
         room.set_base_absolute(2, 0, BaseTile::Stone);
         room.set_base_absolute(4, 4, BaseTile::Stone);
-        println!("Room before: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
+        println!(
+            "Room before: ({} {}) ({} {})",
+            room.x, room.y, room.w, room.h
+        );
         room.resize_shrink();
-        println!("Room after: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
+        println!(
+            "Room after: ({} {}) ({} {})",
+            room.x, room.y, room.w, room.h
+        );
 
         assert_eq!(room.x, 0);
         assert_eq!(room.y, -2);
