@@ -26,7 +26,7 @@ impl GameStateDebugMenu for Game {
 
         if ui
             .add(egui::RadioButton::new(
-                matches!(stage.zoom_show_full, false),
+                !stage.zoom_show_full,
                 "Zoom to room",
             ))
             .clicked()
@@ -37,7 +37,7 @@ impl GameStateDebugMenu for Game {
 
         if ui
             .add(egui::RadioButton::new(
-                matches!(stage.zoom_show_full, true),
+                stage.zoom_show_full,
                 "Zoom show all",
             ))
             .clicked()

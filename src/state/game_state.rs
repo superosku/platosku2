@@ -111,16 +111,8 @@ impl Game {
     }
 
     pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>, f32) {
-        let cur_room = if let Some(index) = self.cur_room_index {
-            Some(&self.map.rooms[index])
-        } else {
-            None
-        };
-        let mut prev_room = if let Some(index) = self.prev_room_index {
-            Some(&self.map.rooms[index])
-        } else {
-            None
-        };
+        let cur_room = self.cur_room_index.map(|index| &self.map.rooms[index]);
+        let mut prev_room = self.prev_room_index.map(|index| &self.map.rooms[index]);
         if self.prev_room_show_frames == 0 {
             prev_room = None
         }
@@ -164,8 +156,8 @@ impl GameState for Game {
         // been the previous. This is used for centering the camera and displaying the "black"
         // around the current room (/ rooms).
         if let Some((room_index, room)) = self.map.get_room_at(
-            (self.player.bb.x + self.player.bb.w * 0.5),
-            (self.player.bb.y + self.player.bb.h * 0.5),
+            self.player.bb.x + self.player.bb.w * 0.5,
+            self.player.bb.y + self.player.bb.h * 0.5,
         ) {
             if self.cur_room_index != Some(room_index) {
                 self.prev_room_index = self.cur_room_index;
@@ -197,8 +189,8 @@ impl GameState for Game {
                 let camera_y = room.y as f32 + room.h as f32 * 0.5;
 
                 let camera_zoom = camera
-                    .zoom_to_fit_horizontal_tiles(room.w + 0)
-                    .min(camera.zoom_to_fit_vertical_tiles(room.h + 0));
+                    .zoom_to_fit_horizontal_tiles(room.w)
+                    .min(camera.zoom_to_fit_vertical_tiles(room.h));
 
                 camera.slowly_follow(camera_x, camera_y, camera_zoom);
             }
