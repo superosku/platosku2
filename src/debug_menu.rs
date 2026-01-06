@@ -323,12 +323,13 @@ impl GameStateDebugMenu for Editor {
         if ui.add(egui::Button::new("New room")).clicked() {
             let new_room = Room::new_boxed(0, 0, 5, 5);
             new_room.save_json(Room::next_available_file_name());
-            stage.current_editor_room_index = stage.all_rooms.len() as u32 - 1;
 
-            self.room = stage.all_rooms[stage.all_rooms.len() - 1].1.clone();
+            stage.current_editor_room_index = stage.all_rooms.len() as u32;
+            self.room = new_room.clone();
 
             self.player_mut().bb.x = self.room.get_center().0;
             self.player_mut().bb.y = self.room.get_center().1;
+
             reload_rooms = true;
         }
 
