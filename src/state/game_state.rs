@@ -47,9 +47,9 @@ impl GameState for Editor {
         let camera_x = self.room.x as f32 + self.room.w as f32 * 0.5 - 3.0;
         let camera_y = self.room.y as f32 + self.room.h as f32 * 0.5;
 
-        let camera_zoom = camera.zoom_to_fit_horizontal_tiles(self.room.w + 10).min(
-            camera.zoom_to_fit_vertical_tiles(self.room.h + 4)
-        );
+        let camera_zoom = camera
+            .zoom_to_fit_horizontal_tiles(self.room.w + 10)
+            .min(camera.zoom_to_fit_vertical_tiles(self.room.h + 4));
 
         camera.slowly_follow(camera_x, camera_y, camera_zoom);
     }
@@ -111,12 +111,24 @@ impl Game {
     }
 
     pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>, f32) {
-        let cur_room = if let Some(index) = self.cur_room_index {Some(&self.map.rooms[index])} else {None};
-        let mut prev_room = if let Some(index) = self.prev_room_index {Some(&self.map.rooms[index])} else {None};
+        let cur_room = if let Some(index) = self.cur_room_index {
+            Some(&self.map.rooms[index])
+        } else {
+            None
+        };
+        let mut prev_room = if let Some(index) = self.prev_room_index {
+            Some(&self.map.rooms[index])
+        } else {
+            None
+        };
         if self.prev_room_show_frames == 0 {
             prev_room = None
         }
-        (cur_room, prev_room, self.prev_room_show_frames as f32 / 30.0)
+        (
+            cur_room,
+            prev_room,
+            self.prev_room_show_frames as f32 / 30.0,
+        )
     }
 }
 
@@ -173,9 +185,9 @@ impl GameState for Game {
             let camera_x = x as f32 + w as f32 * 0.5;
             let camera_y = y as f32 + h as f32 * 0.5;
 
-            let camera_zoom = camera.zoom_to_fit_horizontal_tiles(w as u32).min(
-                camera.zoom_to_fit_vertical_tiles(h as u32)
-            );
+            let camera_zoom = camera
+                .zoom_to_fit_horizontal_tiles(w as u32)
+                .min(camera.zoom_to_fit_vertical_tiles(h as u32));
 
             camera.slowly_follow(camera_x, camera_y, camera_zoom);
         } else {
@@ -184,9 +196,9 @@ impl GameState for Game {
                 let camera_x = room.x as f32 + room.w as f32 * 0.5;
                 let camera_y = room.y as f32 + room.h as f32 * 0.5;
 
-                let camera_zoom = camera.zoom_to_fit_horizontal_tiles(room.w + 0).min(
-                    camera.zoom_to_fit_vertical_tiles(room.h + 0)
-                );
+                let camera_zoom = camera
+                    .zoom_to_fit_horizontal_tiles(room.w + 0)
+                    .min(camera.zoom_to_fit_vertical_tiles(room.h + 0));
 
                 camera.slowly_follow(camera_x, camera_y, camera_zoom);
             }

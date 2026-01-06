@@ -433,10 +433,10 @@ impl GameMap {
         let room = &self.rooms[0];
         (
             room.x as f32 + room.w as f32 * 0.5,
-            room.y as f32 + room.h as f32 * 0.5
+            room.y as f32 + room.h as f32 * 0.5,
         )
     }
-    
+
     pub fn get_bounds(&self) -> (i32, i32, i32, i32) {
         let mut min_x = 10000;
         let mut min_y = 10000;
@@ -450,12 +450,7 @@ impl GameMap {
             max_y = (room.y + room.h as i32).max(max_y);
         }
 
-        (
-            min_x,
-            min_y,
-            max_x - min_x,
-            max_y - min_y,
-        )
+        (min_x, min_y, max_x - min_x, max_y - min_y)
     }
 
     pub fn get_room_at(&self, x: f32, y: f32) -> Option<(usize, &Room)> {
@@ -463,15 +458,17 @@ impl GameMap {
             let room = &self.rooms[room_index];
 
             if x < room.x as f32 + 0.5 || y < room.y as f32 + 0.5 {
-                continue
+                continue;
             }
-            if x > (room.x as f32 + room.w as f32) - 0.5 || y > (room.y as f32 + room.h as f32) - 0.5 {
-                continue
+            if x > (room.x as f32 + room.w as f32) - 0.5
+                || y > (room.y as f32 + room.h as f32) - 0.5
+            {
+                continue;
             }
 
             if let Some((base, overlay)) = room.get_relative(x as i32, y as i32) {
                 if base != BaseTile::NotPartOfRoom {
-                    return Some((room_index, room))
+                    return Some((room_index, room));
                 }
             }
         }
