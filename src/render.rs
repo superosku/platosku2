@@ -124,6 +124,7 @@ impl DrawableGameState for Game {
             );
         }
 
+        // Draw "the dark" (the overaly)
         let rooms = self.get_rooms_for_display();
         let ratio = rooms.2;
         renderer.draw_base_dual_grid(
