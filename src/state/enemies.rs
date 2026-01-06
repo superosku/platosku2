@@ -18,6 +18,13 @@ pub trait Enemy {
     fn should_remove(&self) -> bool;
     fn contanct_damage(&self) -> u32;
 
+    fn overlaps(&self, bb: &BoundingBox) -> bool {
+        self.bb().overlaps(bb)
+    }
+
+    fn get_current_health(&self) -> i32;
+    fn get_max_health(&self) -> i32;
+
     fn get_texture_index(&self) -> TextureIndexes;
     fn get_atlas_index(&self) -> u32;
     fn goes_right(&self) -> bool;
@@ -71,8 +78,8 @@ impl Slime {
                 frames_remaining: 100,
             },
             is_dead: false,
-            max_health: 1,
-            health: 1,
+            max_health: 2,
+            health: 2,
         }
     }
 }
@@ -138,7 +145,6 @@ impl Enemy for Slime {
 
     fn got_stomped(&mut self) {
         self.health -= 1;
-        self.is_dead = true;
     }
 
     fn can_be_stomped(&self) -> bool {
@@ -147,7 +153,6 @@ impl Enemy for Slime {
 
     fn got_hit(&mut self) {
         self.health -= 1;
-        self.is_dead = true;
     }
 
     fn can_be_hit(&self) -> bool {
@@ -155,7 +160,7 @@ impl Enemy for Slime {
     }
 
     fn should_remove(&self) -> bool {
-        self.is_dead
+        self.health <= 0
     }
 
     fn contanct_damage(&self) -> u32 {
@@ -165,6 +170,9 @@ impl Enemy for Slime {
             1
         }
     }
+
+    fn get_current_health(&self) -> i32 {self.health}
+    fn get_max_health(&self) -> i32 {self.max_health}
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Slime
@@ -343,6 +351,9 @@ impl Enemy for Bat {
     fn contanct_damage(&self) -> u32 {
         if self.can_be_hit() { 1 } else { 0 }
     }
+
+    fn get_current_health(&self) -> i32 {self.health}
+    fn get_max_health(&self) -> i32 {self.max_health}
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Bat

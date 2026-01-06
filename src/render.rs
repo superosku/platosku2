@@ -3,11 +3,12 @@ use crate::state::GameState;
 use crate::state::OverlayTile;
 use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
-use crate::state::{BaseTile, Dir, Enemy};
+use crate::state::{BaseTile, Dir};
 
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
+use crate::state::enemies::Enemy;
 
 #[repr(C)]
 struct Uniforms {
@@ -588,10 +589,17 @@ impl Renderer {
     }
 
     fn draw_enemy_health_bar(&mut self, camera: &Camera, enemy: &Box<dyn Enemy>) {
-        let x = enemy.bb().x;
-        let y = enemy.bb().y;
+        let padding = 0.3;
+        let height = 0.1;
+        let max_width = enemy.bb().w + padding + padding;
+        let x = enemy.bb().x - padding;
+        let y = enemy.bb().y - height - padding ;
+        
+        let health_ratio = enemy.get_current_health() as f32 / enemy.get_max_health() as f32;
+        let filled_width = max_width * health_ratio;
 
-		self.draw_rect(camera, x, y-0.3, 1.0, 0.1, [1.0, 1.0, 0.1, 1.0]);
+		self.draw_rect(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
+        self.draw_rect(camera, x, y, filled_width, height, [0.65, 0.11, 0.11, 1.0]);
     }
 
     #[allow(clippy::too_many_arguments)]
