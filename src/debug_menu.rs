@@ -13,8 +13,8 @@ pub trait GameStateDebugMenu: GameState {
 }
 
 impl GameStateDebugMenu for Game {
-    fn mouse_button_event(&mut self, coords: (i32, i32), stage: &mut DebugMenu) {}
-    fn mouse_drawing(&mut self, coords: (i32, i32), debug_menu: &DebugMenu) {}
+    fn mouse_button_event(&mut self, _coords: (i32, i32), _stage: &mut DebugMenu) {}
+    fn mouse_drawing(&mut self, _coords: (i32, i32), _debug_menu: &DebugMenu) {}
 
     fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu) {
         if ui.add(egui::Button::new("Regenerate map")).clicked() {
@@ -88,7 +88,7 @@ impl GameStateDebugMenu for Editor {
                 self.player_mut().bb.x = coords.0 as f32;
                 self.player_mut().bb.y = coords.1 as f32;
             }
-            EditorSelection::Enemies { selection } => {}
+            EditorSelection::Enemies { .. } => {}
             EditorSelection::Doors { selection } => {
                 for (sel, direction) in [
                     (DoorSelection::Up, DoorDir::Up),

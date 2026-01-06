@@ -466,7 +466,7 @@ impl GameMap {
                 continue;
             }
 
-            if let Some((base, overlay)) = room.get_relative(x as i32, y as i32) {
+            if let Some((base, _overlay)) = room.get_relative(x as i32, y as i32) {
                 if base != BaseTile::NotPartOfRoom {
                     return Some((room_index, room));
                 }
@@ -480,9 +480,7 @@ impl GameMap {
         let room_candidates = Room::load_rooms_from_folder();
         let mut rng = rand::rng();
         let first_room = room_candidates.choose(&mut rng).unwrap().1.clone();
-        let mut rooms = Vec::new();
-
-        rooms.push(first_room);
+        let rooms = vec![first_room];
 
         let mut game_map = GameMap { rooms };
 
@@ -616,11 +614,11 @@ impl MapLike for GameMap {
         (BaseTile::Stone, OverlayTile::None)
     }
 
-    fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
+    fn set_base(&mut self, _x: i32, _y: i32, _tile: BaseTile) {
         todo!()
     }
 
-    fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile) {
+    fn set_overlay(&mut self, _x: i32, _y: i32, _tile: OverlayTile) {
         todo!()
     }
 }

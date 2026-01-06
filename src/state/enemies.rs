@@ -18,10 +18,6 @@ pub trait Enemy {
     fn should_remove(&self) -> bool;
     fn contanct_damage(&self) -> u32;
 
-    fn overlaps(&self, bb: &BoundingBox) -> bool {
-        self.bb().overlaps(bb)
-    }
-
     fn get_texture_index(&self) -> TextureIndexes;
     fn get_atlas_index(&self) -> u32;
     fn goes_right(&self) -> bool;

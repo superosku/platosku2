@@ -43,7 +43,7 @@ impl GameState for Editor {
         self.player.update(input, &self.room);
     }
 
-    fn update_camera(&mut self, camera: &mut Camera, zoom_show_all: bool) {
+    fn update_camera(&mut self, camera: &mut Camera, _zoom_show_all: bool) {
         let camera_x = self.room.x as f32 + self.room.w as f32 * 0.5 - 3.0;
         let camera_y = self.room.y as f32 + self.room.h as f32 * 0.5;
 
@@ -155,7 +155,7 @@ impl GameState for Game {
         // Store the current and previous room as well as how many frames the previous has
         // been the previous. This is used for centering the camera and displaying the "black"
         // around the current room (/ rooms).
-        if let Some((room_index, room)) = self.map.get_room_at(
+        if let Some((room_index, _room)) = self.map.get_room_at(
             self.player.bb.x + self.player.bb.w * 0.5,
             self.player.bb.y + self.player.bb.h * 0.5,
         ) {

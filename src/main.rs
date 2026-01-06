@@ -3,7 +3,7 @@ use miniquad::*;
 mod camera;
 mod physics;
 mod state;
-use crate::state::{Enemy, GameState, InputState};
+use crate::state::{GameState, InputState};
 mod debug_menu;
 mod render;
 

@@ -129,14 +129,14 @@ impl DrawableGameState for Game {
         renderer.draw_base_dual_grid(
             |x, y| {
                 if let Some(room) = rooms.0 {
-                    if let Some((base, overlay)) = room.get_relative(x, y) {
+                    if let Some((base, _overlay)) = room.get_relative(x, y) {
                         if base != BaseTile::NotPartOfRoom {
                             return false;
                         }
                     }
                 }
                 if let Some(room) = rooms.1 {
-                    if let Some((base, overlay)) = room.get_relative(x, y) {
+                    if let Some((base, _overlay)) = room.get_relative(x, y) {
                         if base != BaseTile::NotPartOfRoom {
                             return false;
                         }
@@ -153,7 +153,7 @@ impl DrawableGameState for Game {
             renderer.draw_base_dual_grid(
                 |x, y| {
                     if let Some(room) = rooms.1 {
-                        if let Some((base, overlay)) = room.get_relative(x, y) {
+                        if let Some((base, _overlay)) = room.get_relative(x, y) {
                             if base != BaseTile::NotPartOfRoom {
                                 return false;
                             }
@@ -168,7 +168,7 @@ impl DrawableGameState for Game {
             renderer.draw_base_dual_grid(
                 |x, y| {
                     if let Some(room) = rooms.0 {
-                        if let Some((base, overlay)) = room.get_relative(x, y) {
+                        if let Some((base, _overlay)) = room.get_relative(x, y) {
                             if base != BaseTile::NotPartOfRoom {
                                 return false;
                             }
@@ -490,6 +490,7 @@ impl Renderer {
         self.ctx.end_render_pass();
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw_from_texture_atlas(
         &mut self,
         camera: &Camera,
@@ -551,6 +552,7 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw_tile_textured(
         &mut self,
         camera: &Camera,
@@ -628,6 +630,7 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw_rect_rotated(
         &mut self,
         camera: &Camera,
