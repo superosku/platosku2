@@ -1,4 +1,5 @@
-use crate::state::game_map::{DoorDir, GameMap, Room};
+use crate::camera::MouseCoords;
+use crate::state::game_map::{DoorDir, GameMap, ObjectTemplateType, Room};
 use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, GameState, OverlayTile};
 use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
@@ -7,14 +8,14 @@ use std::fs;
 use std::path::Path;
 
 pub trait GameStateDebugMenu: GameState {
-    fn mouse_button_event(&mut self, coords: (i32, i32), stage: &mut DebugMenu);
+    fn mouse_button_event(&mut self, coords: MouseCoords, stage: &mut DebugMenu);
     fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu);
-    fn mouse_drawing(&mut self, coords: (i32, i32), debug_menu: &DebugMenu);
+    fn mouse_drawing(&mut self, coords: MouseCoords, debug_menu: &DebugMenu);
 }
 
 impl GameStateDebugMenu for Game {
-    fn mouse_button_event(&mut self, _coords: (i32, i32), _stage: &mut DebugMenu) {}
-    fn mouse_drawing(&mut self, _coords: (i32, i32), _debug_menu: &DebugMenu) {}
+    fn mouse_button_event(&mut self, _coords: MouseCoords, _stage: &mut DebugMenu) {}
+    fn mouse_drawing(&mut self, _coords: MouseCoords, _debug_menu: &DebugMenu) {}
 
     fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu) {
         if ui.add(egui::Button::new("Regenerate map")).clicked() {
@@ -49,7 +50,8 @@ impl GameStateDebugMenu for Game {
 }
 
 impl GameStateDebugMenu for Editor {
-    fn mouse_drawing(&mut self, coords: (i32, i32), debug_menu: &DebugMenu) {
+    fn mouse_drawing(&mut self, coords: MouseCoords, debug_menu: &DebugMenu) {
+        let coords = coords.as_i();
         if let EditorSelection::Tiles { selection } = &debug_menu.editor_selection {
             match &selection {
                 TileSelection::NotPartOf => {
@@ -82,14 +84,32 @@ impl GameStateDebugMenu for Editor {
         }
     }
 
-    fn mouse_button_event(&mut self, coords: (i32, i32), stage: &mut DebugMenu) {
+    fn mouse_button_event(&mut self, coords: MouseCoords, stage: &mut DebugMenu) {
         match &stage.editor_selection {
             EditorSelection::PlayerPos => {
-                self.player_mut().bb.x = coords.0 as f32;
-                self.player_mut().bb.y = coords.1 as f32;
+                self.player_mut().bb.x = coords.x;
+                self.player_mut().bb.y = coords.y;
             }
-            EditorSelection::Enemies { .. } => {}
+            EditorSelection::Enemies { selection } => {
+                let template_type = match selection {
+                    EnemySelection::Remove => {
+                        self.room.object_templates.retain(|template| {
+                            let bb = template.get_bb();
+                            !(coords.x > bb.x
+                                && coords.x < bb.x + bb.w
+                                && coords.y > bb.y
+                                && coords.y < bb.y + bb.h)
+                        });
+                        return;
+                    }
+                    EnemySelection::Bat => ObjectTemplateType::Bat,
+                    EnemySelection::Slime => ObjectTemplateType::Slime,
+                };
+                self.room
+                    .add_object_template(coords.x, coords.y, template_type);
+            }
             EditorSelection::Doors { selection } => {
+                let coords = coords.as_i();
                 for (sel, direction) in [
                     (DoorSelection::Up, DoorDir::Up),
                     (DoorSelection::Down, DoorDir::Down),
@@ -159,85 +179,46 @@ impl GameStateDebugMenu for Editor {
         match &stage.editor_selection {
             EditorSelection::Tiles { selection } => {
                 ui.add(egui::Label::new("Tile:"));
-                if ui
-                    .add(egui::RadioButton::new(
-                        matches!(selection, TileSelection::NotPartOf),
-                        "NotPartOf",
-                    ))
-                    .clicked()
-                {
-                    new_selection = Some(EditorSelection::Tiles {
-                        selection: TileSelection::NotPartOf,
-                    });
-                }
-                if ui
-                    .add(egui::RadioButton::new(
-                        matches!(selection, TileSelection::Clear),
-                        "Clear",
-                    ))
-                    .clicked()
-                {
-                    new_selection = Some(EditorSelection::Tiles {
-                        selection: TileSelection::Clear,
-                    });
-                }
-                if ui
-                    .add(egui::RadioButton::new(
-                        matches!(selection, TileSelection::Wood),
-                        "Wood",
-                    ))
-                    .clicked()
-                {
-                    new_selection = Some(EditorSelection::Tiles {
-                        selection: TileSelection::Wood,
-                    });
-                }
-                if ui
-                    .add(egui::RadioButton::new(
-                        matches!(selection, TileSelection::Ladder),
-                        "Ladder",
-                    ))
-                    .clicked()
-                {
-                    new_selection = Some(EditorSelection::Tiles {
-                        selection: TileSelection::Ladder,
-                    });
-                }
-                if ui
-                    .add(egui::RadioButton::new(
-                        matches!(selection, TileSelection::Stone),
-                        "Stone",
-                    ))
-                    .clicked()
-                {
-                    new_selection = Some(EditorSelection::Tiles {
-                        selection: TileSelection::Stone,
-                    });
+
+                for candidate in [
+                    TileSelection::NotPartOf,
+                    TileSelection::Clear,
+                    TileSelection::Wood,
+                    TileSelection::Ladder,
+                    TileSelection::Stone,
+                ] {
+                    if ui
+                        .add(egui::RadioButton::new(
+                            *selection == candidate,
+                            format!("{:?}", candidate),
+                        ))
+                        .clicked()
+                    {
+                        new_selection = Some(EditorSelection::Tiles {
+                            selection: TileSelection::NotPartOf,
+                        });
+                    }
                 }
             }
             EditorSelection::Enemies { selection } => {
                 ui.add(egui::Label::new("Enemy:"));
-                if ui
-                    .add(egui::RadioButton::new(
-                        matches!(selection, EnemySelection::Bat),
-                        "Bat",
-                    ))
-                    .clicked()
-                {
-                    new_selection = Some(EditorSelection::Enemies {
-                        selection: EnemySelection::Bat,
-                    });
-                }
-                if ui
-                    .add(egui::RadioButton::new(
-                        matches!(selection, EnemySelection::Slime),
-                        "Slime",
-                    ))
-                    .clicked()
-                {
-                    new_selection = Some(EditorSelection::Enemies {
-                        selection: EnemySelection::Slime,
-                    });
+
+                for candidate in [
+                    EnemySelection::Remove,
+                    EnemySelection::Bat,
+                    EnemySelection::Slime,
+                ] {
+                    if ui
+                        .add(egui::RadioButton::new(
+                            *selection == candidate,
+                            format!("{:?}", candidate),
+                        ))
+                        .clicked()
+                    {
+                        new_selection = Some(EditorSelection::Enemies {
+                            selection: candidate,
+                        });
+                    }
                 }
             }
             EditorSelection::PlayerPos => {

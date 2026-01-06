@@ -209,6 +209,23 @@ impl DrawableGameState for Editor {
 
             renderer.draw_tile_textured(camera, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
         }
+
+        // draw enemy templates
+        for template in &self.room.object_templates {
+            let bb = template.get_bb();
+            let texture_index = template.get_texture_index();
+            renderer.draw_from_texture_atlas(
+                camera,
+                texture_index,
+                0.0,
+                false,
+                bb.x - 1.0 / TILE_SIZE,
+                bb.y - 1.0 / TILE_SIZE,
+                bb.w + 2.0 / TILE_SIZE,
+                bb.h + 2.0 / TILE_SIZE,
+                1.0,
+            );
+        }
     }
 }
 
