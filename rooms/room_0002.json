@@ -1,5 +1,4 @@
 {
-  "object_templates": [],
   "base": [
     "Stone",
     "Stone",
@@ -454,6 +453,33 @@
       "x": 8,
       "y": 12,
       "dir": "Down"
+    }
+  ],
+  "object_templates": [
+    {
+      "x": 2.694454,
+      "y": -2.913448,
+      "object_type": "Slime"
+    },
+    {
+      "x": 1.8829694,
+      "y": -5.8530483,
+      "object_type": "Slime"
+    },
+    {
+      "x": 11.2954035,
+      "y": 1.1528616,
+      "object_type": "Slime"
+    },
+    {
+      "x": 9.664056,
+      "y": 0.98972684,
+      "object_type": "Slime"
+    },
+    {
+      "x": 7.234553,
+      "y": 1.1795218,
+      "object_type": "Slime"
     }
   ]
 }
