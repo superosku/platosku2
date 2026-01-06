@@ -118,7 +118,6 @@ impl Stage {
 
     fn handle_editor_tile_drawing(&mut self, x: f32, y: f32) {
         let coords = self.camera.screen_to_tile(x, y);
-        println!("Mouse coords: {:?}", coords);
         self.state.mouse_drawing(coords, &self.debug_menu);
     }
 }
@@ -272,7 +271,6 @@ impl EventHandler for Stage {
         }
 
         let coords = self.camera.screen_to_tile(x, y);
-        println!("Mouse coords: {:?}", coords);
 
         self.handle_editor_tile_drawing(x, y);
 

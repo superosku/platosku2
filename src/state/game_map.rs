@@ -39,7 +39,7 @@ pub trait MapLike {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub enum DoorDir {
     Left,
     Right,
@@ -47,7 +47,7 @@ pub enum DoorDir {
     Down,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct RoomDoor {
     pub x: u32,
     pub y: u32,
@@ -357,8 +357,12 @@ impl Room {
         self.base = new_base;
 
         for door in &mut self.doors {
-            door.x = (door.x as i32 - cols_to_remove_right).max(0) as u32;
-            door.y = (door.y as i32 - rows_to_remove_top as i32).max(0) as u32;
+            door.x = (door.x as i32 - cols_to_remove_left as i32)
+                .max(0)
+                .min(self.w as i32 - 1) as u32;
+            door.y = (door.y as i32 - rows_to_remove_top as i32)
+                .max(0)
+                .min(self.h as i32 - 1) as u32;
         }
     }
 
@@ -402,7 +406,6 @@ impl MapLike for Room {
             }
         }
         // Maybe shrink afterwards
-        println!("Resize shrinking");
         self.resize_shrink();
     }
 
@@ -417,7 +420,6 @@ impl MapLike for Room {
             }
         }
         // Maybe shrink afterwards
-        println!("Resize shrinking");
         self.resize_shrink();
     }
 }
@@ -689,5 +691,26 @@ mod tests {
 
         assert_eq!(room.get_absolute(0, 0).0, BaseTile::Stone);
         assert_eq!(room.get_absolute(4, 4).0, BaseTile::Stone);
+    }
+
+    #[test]
+    fn test_shrink_from_left_with_doors() {
+        let mut room = Room::new_boxed(0, 0, 5, 5);
+        // Set on left to expand the room and set the door
+        room.set_base(-1, 1, BaseTile::Stone);
+        room.set_door(-1, 1, DoorDir::Left);
+        // Unset on left and shrink
+        room.set_base(-1, 1, BaseTile::NotPartOfRoom);
+        room.resize_shrink();
+
+        println!("Doors: {:?}", room.doors);
+        assert_eq!(
+            room.doors[0],
+            RoomDoor {
+                x: 0,
+                y: 1,
+                dir: DoorDir::Left
+            }
+        );
     }
 }
