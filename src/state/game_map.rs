@@ -83,11 +83,21 @@ impl ObjectTemplate {
         self.as_object().get_texture_index()
     }
 
-    pub fn as_object(&self) -> Box<dyn Enemy> {
+    pub fn _as_object(&self, ox: f32, oy: f32) -> Box<dyn Enemy> {
+        // Takes offset_x and offset_y so this can be used to get objects in both
+        // relative and absolute positions (editor and game)
         match self.object_type {
-            ObjectTemplateType::Bat => Box::new(Bat::new(self.x, self.y)),
-            ObjectTemplateType::Slime => Box::new(Slime::new(self.x, self.y)),
+            ObjectTemplateType::Bat => Box::new(Bat::new(self.x + ox, self.y + oy)),
+            ObjectTemplateType::Slime => Box::new(Slime::new(self.x + ox, self.y + oy)),
         }
+    }
+
+    pub fn as_object(&self) -> Box<dyn Enemy> {
+        self._as_object(0.0, 0.0)
+    }
+
+    pub fn as_object_rel(&self, room: &Room) -> Box<dyn Enemy> {
+        self._as_object(room.x as f32, room.y as f32)
     }
 }
 
@@ -119,6 +129,13 @@ impl Room {
             doors: Vec::new(),
             object_templates: Vec::new(),
         }
+    }
+
+    pub fn get_enemies_from_template(&self) -> Vec<Box<dyn Enemy>> {
+        self.object_templates
+            .iter()
+            .map(|t| t.as_object_rel(self))
+            .collect()
     }
 
     pub fn add_object_template(&mut self, x: f32, y: f32, template: ObjectTemplateType) {
@@ -520,6 +537,17 @@ impl GameMap {
         }
 
         None
+    }
+
+    pub fn get_enemies_from_templates(&self) -> Vec<Box<dyn Enemy>> {
+        let mut enemies = Vec::new();
+
+        for room in &self.rooms {
+            let mut room_enemies = room.get_enemies_from_template();
+            enemies.append(&mut room_enemies)
+        }
+
+        enemies
     }
 
     pub fn new_random() -> GameMap {

@@ -7,6 +7,7 @@ pub struct Coin {
 }
 
 impl Coin {
+    #[allow(dead_code)]
     pub fn new(x: f32, y: f32) -> Self {
         Coin {
             bb: BoundingBox {

@@ -1,9 +1,8 @@
 use super::coin::Coin;
-use super::enemies::{Enemy, Slime};
+use super::enemies::Enemy;
 use super::game_map::{GameMap, MapLike, Room};
 use super::player::Player;
 use crate::camera::Camera;
-use crate::state::Bat;
 
 #[derive(Default)]
 pub struct InputState {
@@ -86,24 +85,13 @@ impl Game {
     pub fn new() -> Game {
         let map = GameMap::new_random();
         let player = Player::new(2.0, 2.0);
+        let enemies = map.get_enemies_from_templates();
 
         Game {
             player,
             map,
-            coins: vec![
-                Coin::new(4.0, 1.0),
-                Coin::new(6.0, 1.5),
-                Coin::new(10.0, 1.0),
-            ],
-            enemies: vec![
-                Box::new(Bat::new(8.0, 2.0)) as Box<dyn Enemy>,
-                Box::new(Bat::new(12.0, 2.0)) as Box<dyn Enemy>,
-                Box::new(Bat::new(4.0, 2.5)) as Box<dyn Enemy>,
-                Box::new(Slime::new(5.0, 5.5)) as Box<dyn Enemy>,
-                Box::new(Slime::new(9.0, 4.0)) as Box<dyn Enemy>,
-                Box::new(Slime::new(10.0, 4.0)) as Box<dyn Enemy>,
-            ],
-
+            coins: vec![],
+            enemies,
             cur_room_index: None,
             prev_room_index: None,
             prev_room_show_frames: 0,
