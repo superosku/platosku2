@@ -49,6 +49,7 @@ impl AnimationConfig for SlimeAnimationState {
 enum SlimeState {
     Idle { frames_remaining: u32 },
     Jumping { frames_remaining: u32 },
+    Immune { frames_remaining: u32 },
 }
 
 pub struct Slime {
@@ -56,7 +57,6 @@ pub struct Slime {
     dir: Dir,
     animation_handler: AnimationHandler<SlimeAnimationState>,
     state: SlimeState,
-    is_dead: bool,
     max_health: i32,
     health: i32,
 }
@@ -77,7 +77,6 @@ impl Slime {
             state: Idle {
                 frames_remaining: 100,
             },
-            is_dead: false,
             max_health: 2,
             health: 2,
         }
@@ -138,25 +137,41 @@ impl Enemy for Slime {
                     }
                 }
             }
+            SlimeState::Immune { frames_remaining } => {
+				self.animation_handler.set_state(SlimeAnimationState::Idle);
+				if frames_remaining == 0 {
+					self.state = SlimeState::Idle {
+						frames_remaining: idling_frames,
+					}
+				} else {
+					self.state = SlimeState::Immune {
+						frames_remaining: frames_remaining - 1,
+					}
+                }
+            }
         }
 
         self.animation_handler.increment_frame();
     }
 
     fn got_stomped(&mut self) {
+        self.state = SlimeState::Immune { frames_remaining: 10 };
         self.health -= 1;
     }
 
     fn can_be_stomped(&self) -> bool {
-        true
+        !matches!(self.state, SlimeState::Immune { .. })
     }
 
     fn got_hit(&mut self) {
-        self.health -= 1;
+        if !matches!(self.state, SlimeState::Immune { .. }) {
+            self.state = SlimeState::Immune { frames_remaining: 10 };
+            self.health -= 1;
+        }
     }
 
     fn can_be_hit(&self) -> bool {
-        true
+        !matches!(self.state, SlimeState::Immune { .. })
     }
 
     fn should_remove(&self) -> bool {
