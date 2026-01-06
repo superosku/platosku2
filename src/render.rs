@@ -127,7 +127,7 @@ impl DrawableGameState for Game {
         let rooms = self.get_rooms_for_display();
         let ratio = rooms.2;
         renderer.draw_base_dual_grid(
-            &|x, y| {
+            |x, y| {
                 if let Some(room) = rooms.0 {
                     if let Some((base, overlay)) = room.get_relative(x, y) {
                         if base != BaseTile::NotPartOfRoom {
@@ -151,7 +151,7 @@ impl DrawableGameState for Game {
         // Draw again with opacity to get the fading effect
         if ratio != 1.0 && ratio != 0.0 {
             renderer.draw_base_dual_grid(
-                &|x, y| {
+                |x, y| {
                     if let Some(room) = rooms.1 {
                         if let Some((base, overlay)) = room.get_relative(x, y) {
                             if base != BaseTile::NotPartOfRoom {
@@ -166,7 +166,7 @@ impl DrawableGameState for Game {
                 ratio,
             );
             renderer.draw_base_dual_grid(
-                &|x, y| {
+                |x, y| {
                     if let Some(room) = rooms.0 {
                         if let Some((base, overlay)) = room.get_relative(x, y) {
                             if base != BaseTile::NotPartOfRoom {
@@ -412,19 +412,19 @@ impl Renderer {
 
         // Draw base grid using dual-grid textured tiles
         self.draw_base_dual_grid(
-            &|x, y| matches!(state.map().get_at(x, y).0, BaseTile::NotPartOfRoom),
+            |x, y| matches!(state.map().get_at(x, y).0, BaseTile::NotPartOfRoom),
             camera,
             2,
             1.0,
         );
         self.draw_base_dual_grid(
-            &|x, y| matches!(state.map().get_at(x, y).0, BaseTile::Stone),
+            |x, y| matches!(state.map().get_at(x, y).0, BaseTile::Stone),
             camera,
             0,
             1.0,
         );
         self.draw_base_dual_grid(
-            &|x, y| matches!(state.map().get_at(x, y).0, BaseTile::Wood),
+            |x, y| matches!(state.map().get_at(x, y).0, BaseTile::Wood),
             camera,
             1,
             1.0,

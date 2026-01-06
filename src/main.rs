@@ -1,11 +1,9 @@
 use miniquad::*;
-use state::OverlayTile;
 
 mod camera;
 mod physics;
 mod state;
-use crate::state::game_map::MapLike;
-use crate::state::{BaseTile, Enemy, GameState, InputState};
+use crate::state::{Enemy, GameState, InputState};
 mod debug_menu;
 mod render;
 
