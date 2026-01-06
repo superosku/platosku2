@@ -34,11 +34,6 @@ impl Camera {
         self.zoom += (target_zoom - self.zoom) * 0.10;
     }
 
-    pub fn follow(&mut self, target_x: f32, target_y: f32) {
-        self.x = target_x;
-        self.y = target_y;
-    }
-
     pub fn set_zoom(&mut self, zoom: f32) {
         self.zoom = zoom.clamp(self.min_zoom, self.max_zoom);
     }
