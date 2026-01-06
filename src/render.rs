@@ -146,7 +146,7 @@ impl DrawableGameState for Game {
             },
             camera,
             3,
-            1.0
+            1.0,
         );
         // Draw again with opacity to get the fading effect
         if ratio != 1.0 && ratio != 0.0 {
@@ -163,7 +163,7 @@ impl DrawableGameState for Game {
                 },
                 camera,
                 3,
-               ratio
+                ratio,
             );
             renderer.draw_base_dual_grid(
                 &|x, y| {
@@ -178,7 +178,7 @@ impl DrawableGameState for Game {
                 },
                 camera,
                 3,
-                1.0 - ratio
+                1.0 - ratio,
             );
         }
     }

@@ -1,6 +1,6 @@
-use crate::state::{BaseTile, GameState, OverlayTile};
 use crate::state::game_map::{DoorDir, GameMap, Room};
 use crate::state::game_state::{Editor, Game};
+use crate::state::{BaseTile, GameState, OverlayTile};
 use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
 use egui::Ui;
 use std::fs;
@@ -20,8 +20,8 @@ impl GameStateDebugMenu for Game {
         if ui.add(egui::Button::new("Regenerate map")).clicked() {
             self.map = GameMap::new_random();
             let player_pos = self.map.player_start_pos();
-            self.player.bb.x =player_pos.0;
-            self.player.bb.y =player_pos.1;
+            self.player.bb.x = player_pos.0;
+            self.player.bb.y = player_pos.1;
         }
 
         if ui
@@ -50,41 +50,38 @@ impl GameStateDebugMenu for Game {
 
 impl GameStateDebugMenu for Editor {
     fn mouse_drawing(&mut self, coords: (i32, i32), debug_menu: &DebugMenu) {
-        if let EditorSelection::Tiles { selection } = &debug_menu.editor_selection { match &selection {
-            TileSelection::NotPartOf => {
-                self.map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::NotPartOfRoom);
-                self.map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
+        if let EditorSelection::Tiles { selection } = &debug_menu.editor_selection {
+            match &selection {
+                TileSelection::NotPartOf => {
+                    self.map_mut()
+                        .set_base(coords.0, coords.1, BaseTile::NotPartOfRoom);
+                    self.map_mut()
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
+                }
+                TileSelection::Clear => {
+                    self.map_mut().set_base(coords.0, coords.1, BaseTile::Empty);
+                    self.map_mut()
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
+                }
+                TileSelection::Ladder => {
+                    self.map_mut().set_base(coords.0, coords.1, BaseTile::Empty);
+                    self.map_mut()
+                        .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
+                }
+                TileSelection::Stone => {
+                    self.map_mut().set_base(coords.0, coords.1, BaseTile::Stone);
+                    self.map_mut()
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
+                }
+                TileSelection::Wood => {
+                    self.map_mut().set_base(coords.0, coords.1, BaseTile::Wood);
+                    self.map_mut()
+                        .set_overlay(coords.0, coords.1, OverlayTile::None);
+                }
             }
-            TileSelection::Clear => {
-                self.map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Empty);
-                self.map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-            TileSelection::Ladder => {
-                self.map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Empty);
-                self.map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
-            }
-            TileSelection::Stone => {
-                self.map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Stone);
-                self.map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-            TileSelection::Wood => {
-                self.map_mut()
-                    .set_base(coords.0, coords.1, BaseTile::Wood);
-                self.map_mut()
-                    .set_overlay(coords.0, coords.1, OverlayTile::None);
-            }
-        } }
-        
+        }
     }
-    
+
     fn mouse_button_event(&mut self, coords: (i32, i32), stage: &mut DebugMenu) {
         match &stage.editor_selection {
             EditorSelection::PlayerPos => {
