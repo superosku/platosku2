@@ -66,10 +66,10 @@ pub struct Room {
 }
 
 impl Room {
-    pub fn new_empty(x: i32, y: i32, w: u32, h: u32) -> Room {
+    pub fn new_empty(x: i32, y: i32, w: u32, h: u32, base: BaseTile, overlay: OverlayTile) -> Room {
         // Create new base and overlay that has x * y size and is initialized to Empty and None
-        let base = vec![BaseTile::Empty; (h * w) as usize];
-        let overlay = vec![OverlayTile::None; (h * w) as usize];
+        let base = vec![base; (h * w) as usize];
+        let overlay = vec![overlay; (h * w) as usize];
 
         Room {
             x,
@@ -94,7 +94,7 @@ impl Room {
     }
 
     pub fn new_boxed(x: i32, y: i32, w: u32, h: u32) -> Room {
-        let mut room = Room::new_empty(x, y, w, h);
+        let mut room = Room::new_empty(x, y, w, h, BaseTile::Empty, OverlayTile::None);
 
         for xx in 0..w {
             room.set_base_absolute(xx, 0, BaseTile::Wood);
@@ -629,10 +629,12 @@ mod tests {
 
     #[test]
     fn test_resize_shrink_all() {
-        let mut room = Room::new_empty(-1, -1, 10, 10);
+        let mut room = Room::new_empty(-1, -1, 10, 10, BaseTile::NotPartOfRoom, OverlayTile::None);
         room.set_base_absolute(1, 2, BaseTile::Stone);
         room.set_base_absolute(5, 5, BaseTile::Stone);
+        println!("Room before: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
         room.resize_shrink();
+        println!("Room after: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
 
         assert_eq!(room.x, 0);
         assert_eq!(room.y, 1);
@@ -645,10 +647,12 @@ mod tests {
 
     #[test]
     fn test_resize_shrink_left() {
-        let mut room = Room::new_empty(-2, -2, 5, 5);
+        let mut room = Room::new_empty(-2, -2, 5, 5, BaseTile::NotPartOfRoom, OverlayTile::None);
         room.set_base_absolute(2, 0, BaseTile::Stone);
         room.set_base_absolute(4, 4, BaseTile::Stone);
+        println!("Room before: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
         room.resize_shrink();
+        println!("Room after: ({} {}) ({} {})", room.x, room.y, room.w, room.h);
 
         assert_eq!(room.x, 0);
         assert_eq!(room.y, -2);
@@ -661,7 +665,7 @@ mod tests {
 
     #[test]
     fn test_resize_shrink_when_shrink_not_needed() {
-        let mut room = Room::new_empty(-2, -2, 5, 5);
+        let mut room = Room::new_empty(-2, -2, 5, 5, BaseTile::NotPartOfRoom, OverlayTile::None);
         room.set_base_absolute(0, 0, BaseTile::Stone);
         room.set_base_absolute(4, 4, BaseTile::Stone);
         room.resize_shrink();
