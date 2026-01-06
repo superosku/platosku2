@@ -3,7 +3,8 @@ use crate::state::GameState;
 use crate::state::OverlayTile;
 use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
-use crate::state::{BaseTile, Dir};
+use crate::state::{BaseTile, Dir, Enemy};
+
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
@@ -32,6 +33,7 @@ pub struct Renderer {
     pub ctx: Box<Context>,
     pipeline: Pipeline,
     pipeline_tiles: Pipeline,
+    pipeline_hud: Pipeline,
     bindings: Bindings,
     textures: HashMap<TextureIndexes, TextureInfo>,
 }
@@ -139,6 +141,7 @@ impl DrawableGameState for Game {
                 bb.h + 2.0 / TILE_SIZE,
                 1.0,
             );
+            renderer.draw_enemy_health_bar(camera, enemy);
         }
 
         // Draw "the dark" (the overaly)
@@ -336,6 +339,26 @@ impl Renderer {
             },
         );
 
+        let pipeline_hud = ctx.new_pipeline(
+            &[BufferLayout::default()],
+            &[
+                VertexAttribute::new("pos", VertexFormat::Float2),
+                VertexAttribute::new("uv", VertexFormat::Float2),
+            ],
+            shader,
+            PipelineParams {
+                depth_write: false,
+                depth_test: Comparison::Always,
+                color_blend: Some(BlendState::new(
+                    Equation::Add,
+                    BlendFactor::One,
+                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                )),
+                cull_face: CullFace::Nothing,
+                ..Default::default()
+            },
+        );
+
         // A second pipeline for batched tilemap rendering (positions in world pixels, UVs precomputed)
         let shader_tiles = ctx
             .new_shader(
@@ -432,6 +455,7 @@ impl Renderer {
             ctx,
             pipeline,
             pipeline_tiles,
+            pipeline_hud,
             bindings,
             textures,
         }
@@ -528,8 +552,46 @@ impl Renderer {
                 [1.0, 0.5, 0.5, 1.0],
             )
         }
+        self.ctx.end_render_pass();
+
+        // Draw hud new HUD pipeline
+        let no_clear = PassAction::Nothing;
+        self.ctx.begin_default_pass(no_clear);
+        self.ctx.apply_pipeline(&self.pipeline_hud);
+        self.ctx.apply_bindings(&self.bindings);
+
+        self.draw_hud(state, camera);
 
         self.ctx.end_render_pass();
+
+    }
+
+    pub fn draw_hud(&mut self, state: &dyn GameState, camera: &Camera) {
+        self.draw_health_bar(state, camera);
+
+        // currently only hp bar. possibility to add other things.
+	}
+
+    fn draw_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {
+        let max_width = 200.0;
+        let height = 20.0;
+        let padding = 10.0;
+
+        let x = camera.screen_w - max_width - padding;
+        let y = padding;
+
+        let health_ratio = state.player().health as f32 / state.player().max_health as f32;
+        let filled_width = max_width * health_ratio;
+
+        self.draw_rect_hud(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
+        self.draw_rect_hud(camera, x, y, filled_width, height, [0.65, 0.11, 0.11, 1.0]);
+    }
+
+    fn draw_enemy_health_bar(&mut self, camera: &Camera, enemy: &Box<dyn Enemy>) {
+        let x = enemy.bb().x;
+        let y = enemy.bb().y;
+
+		self.draw_rect(camera, x, y-0.3, 1.0, 0.1, [1.0, 1.0, 0.1, 1.0]);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -668,6 +730,40 @@ impl Renderer {
             bg_region_origin: [0.0, 0.0, 0.0, 0.0],
             bg_tex_size: [background.w, background.h, 0.0, 0.0],
         };
+        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+        self.ctx.draw(0, 6, 1);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_rect_hud(&mut self, camera: &Camera, x: f32, y: f32, w: f32, h: f32, color: [f32; 4]) {
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+        let white = self.textures.get(&TextureIndexes::White1x1).unwrap();
+
+        self.bindings.images[0] = white.texture;
+        self.bindings.images[1] = background.texture;
+        self.ctx.apply_bindings(&self.bindings);
+
+        // ⭐ NO CAMERA
+        let proj = Self::ortho_mvp(camera);
+        let model = Self::mat4_mul(
+            Self::mat4_translation(x, y),
+            Self::mat4_scale(w, h),
+        );
+        let mvp = Self::mat4_mul(proj, model);
+
+        let uniforms = Uniforms {
+            mvp,
+            color,
+            uv_base: [0.0, 0.0, 0.0, 0.0],
+            uv_scale: [1.0, 1.0, 0.0, 0.0],
+            world_base: [x, y, 0.0, 0.0],
+            world_scale: [w, h, 0.0, 0.0],
+            color_key: [1.0, 0.0, 1.0, 0.01],
+            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
+            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
+        };
+
         self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
         self.ctx.draw(0, 6, 1);
     }

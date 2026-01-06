@@ -50,6 +50,8 @@ pub struct Slime {
     animation_handler: AnimationHandler<SlimeAnimationState>,
     state: SlimeState,
     is_dead: bool,
+    max_health: i32,
+    health: i32,
 }
 
 impl Slime {
@@ -69,6 +71,8 @@ impl Slime {
                 frames_remaining: 100,
             },
             is_dead: false,
+            max_health: 1,
+            health: 1,
         }
     }
 }
@@ -133,6 +137,7 @@ impl Enemy for Slime {
     }
 
     fn got_stomped(&mut self) {
+        self.health -= 1;
         self.is_dead = true;
     }
 
@@ -141,6 +146,7 @@ impl Enemy for Slime {
     }
 
     fn got_hit(&mut self) {
+        self.health -= 1;
         self.is_dead = true;
     }
 
@@ -204,6 +210,7 @@ pub struct Bat {
     bb: BoundingBox,
     state: BatState,
     animation_handler: AnimationHandler<BatAnimationState>,
+    max_health: i32,
     health: i32,
 }
 
@@ -224,6 +231,7 @@ impl Bat {
                 dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
             },
             animation_handler: AnimationHandler::new(BatAnimationState::Standing),
+            max_health: 3,
             health: 3,
         }
     }

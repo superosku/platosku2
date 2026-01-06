@@ -21,6 +21,7 @@ pub struct SwingState {
 
 pub struct Player {
     pub bb: BoundingBox,
+    pub max_health: u32,
     pub health: u32,
     pub immunity_frames: u32,
     pub on_ground: bool,
@@ -65,6 +66,7 @@ impl Player {
                 vx: 0.0,
                 vy: 0.0,
             },
+            max_health: 10,
             health: 10,
             immunity_frames: 0,
             on_ground: false,
