@@ -43,8 +43,9 @@ impl GameState for Editor {
     }
 
     fn update_camera(&mut self, camera: &mut Camera, _zoom_show_all: bool) {
-        let camera_x = self.room.x as f32 + self.room.w as f32 * 0.5 - 3.0;
-        let camera_y = self.room.y as f32 + self.room.h as f32 * 0.5;
+        let room_pos = self.room.get_pos();
+        let camera_x = room_pos.0 as f32 + self.room.w as f32 * 0.5 - 3.0;
+        let camera_y = room_pos.1 as f32 + self.room.h as f32 * 0.5;
 
         let camera_zoom = camera
             .zoom_to_fit_horizontal_tiles(self.room.w + 10)
@@ -84,7 +85,8 @@ pub struct Game {
 impl Game {
     pub fn new() -> Game {
         let map = GameMap::new_random();
-        let player = Player::new(2.0, 2.0);
+        let pos = map.player_start_pos();
+        let player = Player::new(pos.0, pos.1);
         let enemies = map.get_enemies_from_templates();
 
         Game {
@@ -173,8 +175,9 @@ impl GameState for Game {
         } else {
             let rooms = self.get_rooms_for_display();
             if let Some(room) = rooms.0 {
-                let camera_x = room.x as f32 + room.w as f32 * 0.5;
-                let camera_y = room.y as f32 + room.h as f32 * 0.5;
+                let room_pos = room.get_pos();
+                let camera_x = room_pos.0 as f32 + room.w as f32 * 0.5;
+                let camera_y = room_pos.1 as f32 + room.h as f32 * 0.5;
 
                 let camera_zoom = camera
                     .zoom_to_fit_horizontal_tiles(room.w)

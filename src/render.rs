@@ -91,11 +91,11 @@ const DUAL_GRID_UV_TABLE: [(u32, u32); 16] = [
 ];
 
 pub trait DrawableGameState: GameState {
-    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer);
+    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool);
 }
 
 impl DrawableGameState for Game {
-    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer) {
+    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
         for coin in &self.coins {
             renderer.draw_rect(
                 camera,
@@ -125,34 +125,18 @@ impl DrawableGameState for Game {
         }
 
         // Draw "the dark" (the overaly)
-        let rooms = self.get_rooms_for_display();
-        let ratio = rooms.2;
-        renderer.draw_base_dual_grid(
-            |x, y| {
-                if let Some(room) = rooms.0 {
-                    if let Some((base, _overlay)) = room.get_relative(x, y) {
-                        if base != BaseTile::NotPartOfRoom {
-                            return false;
-                        }
-                    }
-                }
-                if let Some(room) = rooms.1 {
-                    if let Some((base, _overlay)) = room.get_relative(x, y) {
-                        if base != BaseTile::NotPartOfRoom {
-                            return false;
-                        }
-                    }
-                }
-                true
-            },
-            camera,
-            3,
-            1.0,
-        );
-        // Draw again with opacity to get the fading effect
-        if ratio != 1.0 && ratio != 0.0 {
+        if show_dark {
+            let rooms = self.get_rooms_for_display();
+            let ratio = rooms.2;
             renderer.draw_base_dual_grid(
                 |x, y| {
+                    if let Some(room) = rooms.0 {
+                        if let Some((base, _overlay)) = room.get_relative(x, y) {
+                            if base != BaseTile::NotPartOfRoom {
+                                return false;
+                            }
+                        }
+                    }
                     if let Some(room) = rooms.1 {
                         if let Some((base, _overlay)) = room.get_relative(x, y) {
                             if base != BaseTile::NotPartOfRoom {
@@ -164,37 +148,56 @@ impl DrawableGameState for Game {
                 },
                 camera,
                 3,
-                ratio,
+                1.0,
             );
-            renderer.draw_base_dual_grid(
-                |x, y| {
-                    if let Some(room) = rooms.0 {
-                        if let Some((base, _overlay)) = room.get_relative(x, y) {
-                            if base != BaseTile::NotPartOfRoom {
-                                return false;
+            // Draw again with opacity to get the fading effect
+            if ratio != 1.0 && ratio != 0.0 {
+                renderer.draw_base_dual_grid(
+                    |x, y| {
+                        if let Some(room) = rooms.1 {
+                            if let Some((base, _overlay)) = room.get_relative(x, y) {
+                                if base != BaseTile::NotPartOfRoom {
+                                    return false;
+                                }
                             }
                         }
-                    }
-                    true
-                },
-                camera,
-                3,
-                1.0 - ratio,
-            );
+                        true
+                    },
+                    camera,
+                    3,
+                    ratio,
+                );
+                renderer.draw_base_dual_grid(
+                    |x, y| {
+                        if let Some(room) = rooms.0 {
+                            if let Some((base, _overlay)) = room.get_relative(x, y) {
+                                if base != BaseTile::NotPartOfRoom {
+                                    return false;
+                                }
+                            }
+                        }
+                        true
+                    },
+                    camera,
+                    3,
+                    1.0 - ratio,
+                );
+            }
         }
     }
 }
 
 impl DrawableGameState for Editor {
-    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer) {
+    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
         let tilemap = renderer.textures.get(&TextureIndexes::Tile).unwrap();
         let tex_w = tilemap.w;
         let tex_h = tilemap.h;
         let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
 
         for door in self.room.get_doors() {
-            let px = (self.room.x as f32 + door.x as f32) * TILE_SIZE;
-            let py = (self.room.y as f32 + door.y as f32) * TILE_SIZE;
+            let room_pos = self.room.get_pos();
+            let px = (room_pos.0 as f32 + door.x as f32) * TILE_SIZE;
+            let py = (room_pos.1 as f32 + door.y as f32) * TILE_SIZE;
 
             let uv_base_px = [
                 match door.dir {
@@ -417,7 +420,7 @@ impl Renderer {
         // Nothing to do yet
     }
 
-    pub fn draw(&mut self, state: &dyn DrawableGameState, camera: &Camera) {
+    pub fn draw(&mut self, state: &dyn DrawableGameState, camera: &Camera, show_dark: bool) {
         let clear = PassAction::Clear {
             color: Some((0.08, 0.09, 0.10, 1.0)),
             depth: Some(1.0),
@@ -452,7 +455,7 @@ impl Renderer {
         self.draw_overlay(state.map(), camera);
 
         // draw (coins and enemies) OR (doors)
-        state.draw_extra(camera, self);
+        state.draw_extra(camera, self, show_dark);
 
         // draw player on top
         let px = state.player().bb.x;
