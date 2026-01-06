@@ -25,6 +25,7 @@ enum TileSelection {
 
 #[derive(Debug, Eq, PartialEq)]
 enum EnemySelection {
+    Remove,
     Bat,
     Slime,
 }

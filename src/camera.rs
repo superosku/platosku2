@@ -8,6 +8,18 @@ pub struct Camera {
     pub screen_h: f32,
 }
 
+#[derive(Debug)]
+pub struct MouseCoords {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl MouseCoords {
+    pub fn as_i(&self) -> (i32, i32) {
+        (self.x.floor() as i32, self.y.floor() as i32)
+    }
+}
+
 impl Camera {
     pub fn new(x: f32, y: f32, zoom: f32, width: f32, height: f32) -> Self {
         Camera {
@@ -44,7 +56,7 @@ impl Camera {
         self.set_zoom(new_zoom);
     }
 
-    pub fn screen_to_tile(&self, mouse_x: f32, mouse_y: f32) -> (i32, i32) {
+    pub fn screen_to_tile(&self, mouse_x: f32, mouse_y: f32) -> MouseCoords {
         // Keep this in sync with TILE_SIZE used in rendering.
         const TILE_SIZE: f32 = 16.0;
 
@@ -61,9 +73,9 @@ impl Camera {
         let world_y_px = (mouse_y - self.screen_h * 0.5) / self.zoom + snapped_cy;
 
         // Convert world pixels to tile indices on the base grid
-        let tx = (world_x_px / TILE_SIZE).floor() as i32;
-        let ty = (world_y_px / TILE_SIZE).floor() as i32;
-        (tx, ty)
+        let tx = world_x_px / TILE_SIZE;
+        let ty = world_y_px / TILE_SIZE;
+        MouseCoords { x: tx, y: ty }
     }
 
     pub fn zoom_to_fit_horizontal_tiles(&self, tiles: u32) -> f32 {

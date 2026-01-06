@@ -1,3 +1,6 @@
+use crate::render::TextureIndexes;
+use crate::state::enemies::{Enemy, Slime};
+use crate::state::{Bat, BoundingBox};
 use rand::Rng;
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
@@ -55,6 +58,40 @@ pub struct RoomDoor {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub enum ObjectTemplateType {
+    Bat = 0,
+    Slime = 1,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ObjectTemplate {
+    x: f32,
+    y: f32,
+    object_type: ObjectTemplateType,
+}
+
+impl ObjectTemplate {
+    fn new(x: f32, y: f32, object_type: ObjectTemplateType) -> ObjectTemplate {
+        ObjectTemplate { x, y, object_type }
+    }
+
+    pub fn get_bb(&self) -> BoundingBox {
+        *self.as_object().bb()
+    }
+
+    pub fn get_texture_index(&self) -> TextureIndexes {
+        self.as_object().get_texture_index()
+    }
+
+    pub fn as_object(&self) -> Box<dyn Enemy> {
+        match self.object_type {
+            ObjectTemplateType::Bat => Box::new(Bat::new(self.x, self.y)),
+            ObjectTemplateType::Slime => Box::new(Slime::new(self.x, self.y)),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Room {
     base: Vec<BaseTile>,
     overlay: Vec<OverlayTile>,
@@ -63,6 +100,7 @@ pub struct Room {
     pub h: u32,
     pub w: u32,
     doors: Vec<RoomDoor>,
+    pub object_templates: Vec<ObjectTemplate>,
 }
 
 impl Room {
@@ -79,7 +117,13 @@ impl Room {
             base,
             overlay,
             doors: Vec::new(),
+            object_templates: Vec::new(),
         }
+    }
+
+    pub fn add_object_template(&mut self, x: f32, y: f32, template: ObjectTemplateType) {
+        self.object_templates
+            .push(ObjectTemplate::new(x, y, template))
     }
 
     pub fn get_doors(&self) -> &Vec<RoomDoor> {
