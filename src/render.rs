@@ -44,6 +44,7 @@ pub enum TextureIndexes {
     Player,
     Bat,
     Slime,
+    Door,
 }
 
 struct TextureInfo {
@@ -96,6 +97,22 @@ pub trait DrawableGameState: GameState {
 
 impl DrawableGameState for Game {
     fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
+        // Draw the doors
+        for door in &self.map.doors {
+            renderer.draw_from_texture_atlas(
+                camera,
+                TextureIndexes::Door,
+                door.get_atlas_index() as f32,
+                false,
+                door.x as f32,
+                door.y as f32,
+                1.0,
+                1.0,
+                1.0,
+            );
+        };
+
+        // Coins
         for coin in &self.coins {
             renderer.draw_rect(
                 camera,
@@ -105,7 +122,7 @@ impl DrawableGameState for Game {
                 coin.bb.h,
                 [1.0, 0.85, 0.2, 1.0],
             );
-        }
+        };
 
         // draw enemies
         for enemy in &self.enemies {
@@ -385,6 +402,10 @@ impl Renderer {
         textures.insert(
             TextureIndexes::Slime,
             load_texture(&mut ctx, "assets/slime.png"),
+        );
+        textures.insert(
+            TextureIndexes::Door,
+            load_texture(&mut ctx, "assets/door.png"),
         );
         textures.insert(
             TextureIndexes::White1x1,

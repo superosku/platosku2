@@ -34,7 +34,7 @@ impl AnimationConfig for SlimeAnimationState {
     fn get_config(&self) -> AnimationConfigResult {
         match self {
             SlimeAnimationState::Idle => AnimationConfigResult::new(0, 1, 40),
-            SlimeAnimationState::Jumping => AnimationConfigResult::new(2, 8, 40),
+            SlimeAnimationState::Jumping => AnimationConfigResult::new_no_loop(2, 5, 40),
         }
     }
 }
