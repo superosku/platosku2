@@ -37,4 +37,11 @@ impl BoundingBox {
     pub fn point_inside(&self, pos: &Pos) -> bool {
         pos.x >= self.x && pos.x <= self.x + self.w && pos.y >= self.y && pos.y <= self.y + self.h
     }
+    
+    pub fn center(&self) -> Pos {
+        Pos {
+            x: self.x + self.w * 0.5,
+            y: self.y + self.h * 0.5,
+        }
+    }
 }

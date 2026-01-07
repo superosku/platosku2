@@ -2,11 +2,16 @@ pub struct AnimationConfigResult {
     start: u32,
     end: u32,
     dur: u32,
+    loops: bool,
 }
 
 impl AnimationConfigResult {
     pub fn new(start: u32, end: u32, dur: u32) -> Self {
-        Self { start, end, dur }
+        Self { start, end, dur, loops: true }
+    }
+
+    pub fn new_no_loop(start: u32, end: u32, dur: u32) -> Self {
+        Self { start, end, dur, loops: false }
     }
 }
 
@@ -40,6 +45,12 @@ impl<T: AnimationConfig + PartialEq> AnimationHandler<T> {
 
     pub fn get_atlas_index(&self) -> u32 {
         let config = self.state.get_config();
-        config.start + (self.current_frame / config.dur) % (config.end - config.start + 1)
+        let frame_index = self.current_frame / config.dur;
+        let total_frames = config.end - config.start + 1;
+        if !config.loops && frame_index >= total_frames {
+            config.start + total_frames - 1
+        } else {
+            config.start + frame_index % total_frames
+        }
     }
 }

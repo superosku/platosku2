@@ -160,7 +160,7 @@ impl EventHandler for Stage {
             self.time_spent_updating = 0.0;
             self.time_spent_drawing = 0.0;
             println!(
-                "FPS: {:.2}, UPS: {:.2}, updat: {:.2} draw: {:.2}",
+                "FPS: {:.2}, UPS: {:.2}, updat: {:.4} draw: {:.4}",
                 fps, ups, ratio_of_time_updating, ratio_of_time_drawing
             );
             self.frames = 0;
