@@ -66,8 +66,8 @@ impl Player {
                 vy: 0.0,
             },
             health: Health {
-                current: 10.0,
-				max: 10.0,
+                current: 10,
+				max: 10,
 			},
             immunity_frames: 0,
             on_ground: false,
@@ -83,10 +83,10 @@ impl Player {
         self.immunity_frames == 0
     }
 
-    pub fn got_hit(&mut self, damage: f32) {
-        if damage > 0.0 {
+    pub fn got_hit(&mut self, damage: u32) {
+        if damage > 0 {
             if damage > self.health.current {
-                self.health.current = 0.0;
+                self.health.current = 0;
                 self.state = PlayerState::Dead;
             } else {
                 self.health.current -= damage;

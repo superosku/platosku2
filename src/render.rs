@@ -581,8 +581,7 @@ impl Renderer {
         let x = camera.screen_w - max_width - padding;
         let y = padding;
 
-        let health_ratio = state.player().health.current as f32 / state.player().health.max as f32;
-        let filled_width = max_width * health_ratio;
+        let filled_width = max_width * state.player().health.ratio();
 
         self.draw_rect_hud(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
         self.draw_rect_hud(camera, x, y, filled_width, height, [0.65, 0.11, 0.11, 1.0]);
@@ -595,8 +594,7 @@ impl Renderer {
         let x = enemy.bb().x - padding;
         let y = enemy.bb().y - height - padding ;
         
-        let health_ratio = enemy.get_health().current as f32 / enemy.get_health().max as f32;
-        let filled_width = max_width * health_ratio;
+        let filled_width = max_width * enemy.get_health().ratio();
 
 		self.draw_rect(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
         self.draw_rect(camera, x, y, filled_width, height, [0.65, 0.11, 0.11, 1.0]);

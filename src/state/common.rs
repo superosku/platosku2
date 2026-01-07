@@ -6,8 +6,14 @@ pub enum Dir {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Health {
-    pub current: f32,
-	pub max: f32,
+    pub current: u32,
+	pub max: u32,
+}
+
+impl Health {
+    pub fn ratio(&self) -> f32 {
+		self.current as f32 / self.max as f32
+	}
 }
 
 #[derive(Clone, Copy, Debug)]
