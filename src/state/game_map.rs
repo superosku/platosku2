@@ -1,4 +1,5 @@
 use crate::render::TextureIndexes;
+use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::enemies::{Enemy, Slime};
 use crate::state::{Bat, BoundingBox};
 use rand::Rng;
@@ -6,7 +7,6 @@ use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
 use std::fs::DirEntry;
 use std::{fs, io, path::Path};
-use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
 pub enum BaseTile {
@@ -505,10 +505,14 @@ enum DoorAnimationState {
 impl AnimationConfig for DoorAnimationState {
     fn get_config(&self) -> AnimationConfigResult {
         match self {
-            DoorAnimationState::OpenSide => AnimationConfigResult::new_no_loop(7 * 0, 7 * 1 - 1, 4),
-            DoorAnimationState::ClosedSide => AnimationConfigResult::new_no_loop(7 * 1, 7 * 2 - 1, 4),
-            DoorAnimationState::ClosedUpDown => AnimationConfigResult::new_no_loop(7 * 2, 7 * 3 - 1, 4),
-            DoorAnimationState::OpenUpDown => AnimationConfigResult::new_no_loop(7 * 3, 7 * 4 - 1, 4),
+            DoorAnimationState::OpenSide => AnimationConfigResult::new_no_loop(0, 7 - 1, 4),
+            DoorAnimationState::ClosedSide => AnimationConfigResult::new_no_loop(7, 7 * 2 - 1, 4),
+            DoorAnimationState::ClosedUpDown => {
+                AnimationConfigResult::new_no_loop(7 * 2, 7 * 3 - 1, 4)
+            }
+            DoorAnimationState::OpenUpDown => {
+                AnimationConfigResult::new_no_loop(7 * 3, 7 * 4 - 1, 4)
+            }
         }
     }
 }
@@ -518,7 +522,7 @@ pub struct MapDoor {
     pub y: i32,
     pub goes_up_down: bool,
     is_open: bool,
-    animation_handler: AnimationHandler<DoorAnimationState>
+    animation_handler: AnimationHandler<DoorAnimationState>,
 }
 
 impl MapDoor {
@@ -528,19 +532,29 @@ impl MapDoor {
             y,
             goes_up_down,
             is_open: false,
-            animation_handler: AnimationHandler::new(
-                if goes_up_down {DoorAnimationState::OpenUpDown} else {DoorAnimationState::OpenSide}
-            )
+            animation_handler: AnimationHandler::new(if goes_up_down {
+                DoorAnimationState::OpenUpDown
+            } else {
+                DoorAnimationState::OpenSide
+            }),
         }
     }
 
     pub fn update(&mut self, is_open: bool) {
         self.is_open = is_open;
         match (self.goes_up_down, is_open) {
-            (true, true) => {self.animation_handler.set_state(DoorAnimationState::OpenUpDown)}
-            (false, true) => {self.animation_handler.set_state(DoorAnimationState::OpenSide)}
-            (true, false) => {self.animation_handler.set_state(DoorAnimationState::ClosedUpDown)}
-            (false, false) => {self.animation_handler.set_state(DoorAnimationState::ClosedSide)}
+            (true, true) => self
+                .animation_handler
+                .set_state(DoorAnimationState::OpenUpDown),
+            (false, true) => self
+                .animation_handler
+                .set_state(DoorAnimationState::OpenSide),
+            (true, false) => self
+                .animation_handler
+                .set_state(DoorAnimationState::ClosedUpDown),
+            (false, false) => self
+                .animation_handler
+                .set_state(DoorAnimationState::ClosedSide),
         }
         self.animation_handler.increment_frame();
     }
@@ -554,7 +568,7 @@ pub struct GameMap {
     // pub base: Vec<Vec<BaseTile>>,
     // pub overlay: Vec<Vec<OverlayTile>>,
     pub rooms: Vec<Room>,
-    pub doors: Vec<MapDoor>
+    pub doors: Vec<MapDoor>,
 }
 
 impl GameMap {
@@ -622,7 +636,10 @@ impl GameMap {
         let first_room = room_candidates.choose(&mut rng).unwrap().1.clone();
         let rooms = vec![first_room];
 
-        let mut game_map = GameMap { rooms, doors: Vec::new() };
+        let mut game_map = GameMap {
+            rooms,
+            doors: Vec::new(),
+        };
 
         // Iterate this
 
@@ -729,9 +746,11 @@ impl GameMap {
             );
 
             game_map.rooms.push(random_new_room);
-            game_map.doors.push(
-                MapDoor::new( door_world_pos.0, door_world_pos.1, door_goes_up_down, ),
-            );
+            game_map.doors.push(MapDoor::new(
+                door_world_pos.0,
+                door_world_pos.1,
+                door_goes_up_down,
+            ));
 
             room_count += 1;
 
