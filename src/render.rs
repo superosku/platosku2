@@ -4,11 +4,11 @@ use crate::state::OverlayTile;
 use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, Dir};
+use super::state::enemies::Enemy;
 
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
-use crate::state::enemies::Enemy;
 
 #[repr(C)]
 struct Uniforms {
@@ -740,7 +740,6 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn draw_rect_hud(&mut self, camera: &Camera, x: f32, y: f32, w: f32, h: f32, color: [f32; 4]) {
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
         let white = self.textures.get(&TextureIndexes::White1x1).unwrap();
