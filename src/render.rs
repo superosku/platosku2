@@ -110,7 +110,7 @@ impl DrawableGameState for Game {
                 1.0,
                 1.0,
             );
-        };
+        }
 
         // Coins
         for coin in &self.coins {
@@ -122,7 +122,7 @@ impl DrawableGameState for Game {
                 coin.bb.h,
                 [1.0, 0.85, 0.2, 1.0],
             );
-        };
+        }
 
         // draw enemies
         for enemy in &self.enemies {

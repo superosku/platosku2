@@ -7,11 +7,21 @@ pub struct AnimationConfigResult {
 
 impl AnimationConfigResult {
     pub fn new(start: u32, end: u32, dur: u32) -> Self {
-        Self { start, end, dur, loops: true }
+        Self {
+            start,
+            end,
+            dur,
+            loops: true,
+        }
     }
 
     pub fn new_no_loop(start: u32, end: u32, dur: u32) -> Self {
-        Self { start, end, dur, loops: false }
+        Self {
+            start,
+            end,
+            dur,
+            loops: false,
+        }
     }
 }
 

@@ -1,4 +1,3 @@
-use image::open;
 use super::coin::Coin;
 use super::enemies::Enemy;
 use super::game_map::{GameMap, MapLike, Room};
@@ -159,22 +158,26 @@ impl GameState for Game {
         if self.prev_room_show_frames > 0 {
             self.prev_room_show_frames -= 1;
         }
-        
+
         // Handle doors
         if let Some(cur_room_index) = self.cur_room_index {
-            let mut list_of_bools: Vec<bool> = self.enemies.iter().map(|enemy| {
-                let center = enemy.bb().center();
-                let enemy_room = self.map.get_room_at(center.x, center.y);
-                if let Some((index, _)) = enemy_room {
-                    if index == cur_room_index {
-                        return true
-                    }
-                };
-                false
-            }).collect();
-       list_of_bools.retain(|b| *b);
-            let room_has_enemies = list_of_bools.len() > 0;
-            
+            let mut list_of_bools: Vec<bool> = self
+                .enemies
+                .iter()
+                .map(|enemy| {
+                    let center = enemy.bb().center();
+                    let enemy_room = self.map.get_room_at(center.x, center.y);
+                    if let Some((index, _)) = enemy_room {
+                        if index == cur_room_index {
+                            return true;
+                        }
+                    };
+                    false
+                })
+                .collect();
+            list_of_bools.retain(|b| *b);
+            let room_has_enemies = !list_of_bools.is_empty();
+
             for door in &mut self.map.doors {
                 door.update(!room_has_enemies);
             }
