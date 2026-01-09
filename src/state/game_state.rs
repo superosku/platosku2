@@ -198,7 +198,9 @@ impl GameState for Game {
             }
 
             if let Some(swing_info) = self.player.get_swing_info() {
-                if enemy.can_be_hit() && enemy.bb().point_inside(&swing_info.end) {
+                if enemy.can_be_hit()
+                    && enemy.bb().overlaps_line(&swing_info.pivot, &swing_info.end)
+                {
                     enemy.got_hit()
                 }
             }

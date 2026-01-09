@@ -39,6 +39,69 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
+    pub fn overlaps_line(&self, a: &Pos, b: &Pos) -> bool {
+        if self.point_inside(a) || self.point_inside(b) {
+            return true;
+        }
+
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let mut t0 = 0.0f32;
+        let mut t1 = 1.0f32;
+
+        fn clip(p: f32, q: f32, t0: &mut f32, t1: &mut f32) -> bool {
+            // p == 0 => line is parallel to this boundary
+            if p.abs() < f32::EPSILON {
+                // If q < 0, it's outside the boundary
+                return q >= 0.0;
+            }
+            let r = q / p;
+            if p < 0.0 {
+                // entering
+                if r > *t1 {
+                    return false;
+                }
+                if r > *t0 {
+                    *t0 = r;
+                }
+            } else {
+                // leaving
+                if r < *t0 {
+                    return false;
+                }
+                if r < *t1 {
+                    *t1 = r;
+                }
+            }
+            true
+        }
+
+        let max_x = self.x + self.w;
+        let min_x = self.x;
+        let max_y = self.y + self.h;
+        let min_y = self.y;
+
+        // Left:   x >= min_x  =>  -dx * t <= a.x - min_x
+        if !clip(-dx, a.x - min_x, &mut t0, &mut t1) {
+            return false;
+        }
+        // Right:  x <= max_x  =>   dx * t <= max_x - a.x
+        if !clip(dx, max_x - a.x, &mut t0, &mut t1) {
+            return false;
+        }
+        // Top:    y >= min_y
+        if !clip(-dy, a.y - min_y, &mut t0, &mut t1) {
+            return false;
+        }
+        // Bottom: y <= max_y
+        if !clip(dy, max_y - a.y, &mut t0, &mut t1) {
+            return false;
+        }
+
+        // If we still have a valid interval, the segment hits the box.
+        t0 <= t1
+    }
+
     pub fn overlaps(&self, other: &BoundingBox) -> bool {
         !(self.x + self.w <= other.x
             || other.x + other.w <= self.x
