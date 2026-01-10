@@ -489,7 +489,10 @@ impl MapLike for Room {
             for y in 0..self.h {
                 match self.get_absolute(x, y) {
                     (_, OverlayTile::Ladder) => {
-                        all_pos.push(Pos::new(x as f32, y as f32));
+                        all_pos.push(Pos::new(
+                            x as f32 + self.x as f32,
+                            y as f32 + self.y as f32
+                        ));
                     }
                     _ => {}
                 }
@@ -860,9 +863,7 @@ impl GameMap {
         }
 
         for room in &game_map.rooms {
-            let mut room_ladders = room.get_ladders().iter().map(|pos| {
-                Pos::new(pos.x + room.x as f32, pos.y + room.y as f32)
-            }).collect();
+            let mut room_ladders = room.get_ladders();
             game_map.ladder_pos.append(&mut room_ladders);
         }
 
