@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::{fs, io};
-use crate::render::TextureIndexes::Atlas;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct FrameJsonItemFrame {
@@ -55,7 +54,7 @@ impl AtlasInfo {
                     y: frame.frame.y as u32,
                     w: frame.frame.w as u32,
                     h: frame.frame.h as u32,
-                }
+                },
             );
         }
 
@@ -71,7 +70,10 @@ impl AtlasInfo {
             println!("Sprite not found {} {}", sprite, frame_i);
             println!("Potential sprites {:?}", self.mapper.keys());
             &AtlasRect {
-                x: 0, y: 0, w: 1, h: 1
+                x: 0,
+                y: 0,
+                w: 1,
+                h: 1,
             }
         }
     }

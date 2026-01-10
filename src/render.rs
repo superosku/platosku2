@@ -2,7 +2,6 @@ use super::state::enemies::Enemy;
 use crate::atlas_info::AtlasInfo;
 use crate::camera::Camera;
 use crate::state::GameState;
-use crate::state::OverlayTile;
 use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, Dir};
@@ -10,7 +9,6 @@ use crate::state::{BaseTile, Dir};
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
-use rand::{rng, Rng};
 
 #[repr(C)]
 struct Uniforms {
@@ -40,9 +38,9 @@ pub struct Renderer {
     bindings: Bindings,
     textures: HashMap<TextureIndexes, TextureInfo>,
     atlas_info: AtlasInfo,
-	// Batched sprite data for atlas-rendered quads (positions in world pixels, precomputed UVs)
-	atlas_batch_vertices: Vec<Vertex>,
-	atlas_batch_indices: Vec<u16>,
+    // Batched sprite data for atlas-rendered quads (positions in world pixels, precomputed UVs)
+    atlas_batch_vertices: Vec<Vertex>,
+    atlas_batch_indices: Vec<u16>,
 
     atlas_vb: BufferId,
     atlas_ib: BufferId,
@@ -235,22 +233,14 @@ impl DrawableGameState for Editor {
             let y = room_pos.1 + door.y as i32;
 
             let tile_index = match door.dir {
-                    DoorDir::Up => 3,
-                    DoorDir::Right => 4,
-                    DoorDir::Down => 5,
-                    DoorDir::Left => 6,
+                DoorDir::Up => 3,
+                DoorDir::Right => 4,
+                DoorDir::Down => 5,
+                DoorDir::Left => 6,
             };
 
             renderer.draw_from_texture_atlas(
-                camera,
-                "tiles",
-                tile_index,
-                false,
-                x as f32,
-                y as f32,
-                1.0,
-                1.0,
-                1.0,
+                camera, "tiles", tile_index, false, x as f32, y as f32, 1.0, 1.0, 1.0,
             );
         }
 
@@ -272,9 +262,7 @@ impl DrawableGameState for Editor {
         }
     }
 
-    fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
-
-    }
+    fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {}
 }
 
 impl Renderer {
@@ -465,8 +453,8 @@ impl Renderer {
 
         let atlas_info = AtlasInfo::load_from_file();
 
-        let atlas_vb_cap = 4 * 4096;  // 4096 sprites => 16384 verts
-        let atlas_ib_cap = 6 * 4096;  // 24576 indices
+        let atlas_vb_cap = 4 * 4096; // 4096 sprites => 16384 verts
+        let atlas_ib_cap = 6 * 4096; // 24576 indices
 
         let atlas_vb = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -480,22 +468,22 @@ impl Renderer {
             BufferSource::empty::<u16>(atlas_ib_cap),
         );
 
-        let dualgrid_vb_cap = 4 * 4096;  // 4096 sprites => 16384 verts
-        let dualgrid_ib_cap = 6 * 4096;  // 24576 indices
+        let dualgrid_vb_cap = 4 * 4096; // 4096 sprites => 16384 verts
+        let dualgrid_ib_cap = 6 * 4096; // 24576 indices
 
         let dualgrid_vb = ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Stream,
-            BufferSource::empty::<Vertex>(dualgrid_vb_cap)
+            BufferSource::empty::<Vertex>(dualgrid_vb_cap),
         );
         let dualgrid_ib = ctx.new_buffer(
             BufferType::IndexBuffer,
             BufferUsage::Stream,
-            BufferSource::empty::<u16>(dualgrid_ib_cap)
+            BufferSource::empty::<u16>(dualgrid_ib_cap),
         );
 
         let dualgrid_vertices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
-        let dualgrid_indices= vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
+        let dualgrid_indices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
 
         Renderer {
             ctx,
@@ -505,8 +493,8 @@ impl Renderer {
             bindings,
             textures,
             atlas_info,
-			atlas_batch_vertices: Vec::new(),
-			atlas_batch_indices: Vec::new(),
+            atlas_batch_vertices: Vec::new(),
+            atlas_batch_indices: Vec::new(),
             atlas_vb,
             atlas_ib,
             atlas_ib_cap,
@@ -516,7 +504,7 @@ impl Renderer {
             dualgrid_ib_cap,
             dualgrid_vb_cap,
             dualgrid_indices,
-            dualgrid_vertices
+            dualgrid_vertices,
         }
     }
 
@@ -535,9 +523,9 @@ impl Renderer {
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
 
-		// Begin new sprite batch for this frame
-		self.atlas_batch_vertices.clear();
-		self.atlas_batch_indices.clear();
+        // Begin new sprite batch for this frame
+        self.atlas_batch_vertices.clear();
+        self.atlas_batch_indices.clear();
 
         // Draw base grid using dual-grid textured tiles
         self.draw_base_dual_grid(
@@ -680,20 +668,20 @@ impl Renderer {
         h: f32,
         alpha: f32,
     ) {
-		// If fully transparent, skip
-		if alpha <= 0.0 {
-			return;
-		}
+        // If fully transparent, skip
+        if alpha <= 0.0 {
+            return;
+        }
 
-		// Lookup atlas location and texture size for UVs
-		let texture = self.textures.get(&TextureIndexes::Atlas).unwrap();
-		let atlas_rect = self.atlas_info.get_rect(texture_index, atlas_index as i32);
+        // Lookup atlas location and texture size for UVs
+        let texture = self.textures.get(&TextureIndexes::Atlas).unwrap();
+        let atlas_rect = self.atlas_info.get_rect(texture_index, atlas_index as i32);
 
         // World pixel quad (destination)
         let pxw = px * TILE_SIZE;
         let pyw = py * TILE_SIZE;
-        let ww  = w  * TILE_SIZE;
-        let hh  = h  * TILE_SIZE;
+        let ww = w * TILE_SIZE;
+        let hh = h * TILE_SIZE;
 
         // UVs from SOURCE rect, not destination size
         let base_u = atlas_rect.x as f32 / texture.w;
@@ -709,32 +697,37 @@ impl Renderer {
         let (u0, u1) = if flip { (u_max, u_min) } else { (u_min, u_max) };
         let (v0, v1) = (v_min, v_max);
 
-		let base_index = self.atlas_batch_vertices.len() as u16;
+        let base_index = self.atlas_batch_vertices.len() as u16;
 
-		// top-left
-		self.atlas_batch_vertices.push(Vertex {
-			pos: [pxw, pyw],
-			uv: [u0, v0],
-		});
-		// top-right
-		self.atlas_batch_vertices.push(Vertex {
-			pos: [pxw + ww, pyw],
-			uv: [u1, v0],
-		});
-		// bottom-right
-		self.atlas_batch_vertices.push(Vertex {
-			pos: [pxw + ww, pyw + hh],
-			uv: [u1, v1],
-		});
-		// bottom-left
-		self.atlas_batch_vertices.push(Vertex {
-			pos: [pxw, pyw + hh],
-			uv: [u0, v1],
-		});
+        // top-left
+        self.atlas_batch_vertices.push(Vertex {
+            pos: [pxw, pyw],
+            uv: [u0, v0],
+        });
+        // top-right
+        self.atlas_batch_vertices.push(Vertex {
+            pos: [pxw + ww, pyw],
+            uv: [u1, v0],
+        });
+        // bottom-right
+        self.atlas_batch_vertices.push(Vertex {
+            pos: [pxw + ww, pyw + hh],
+            uv: [u1, v1],
+        });
+        // bottom-left
+        self.atlas_batch_vertices.push(Vertex {
+            pos: [pxw, pyw + hh],
+            uv: [u0, v1],
+        });
 
-		self
-			.atlas_batch_indices
-			.extend_from_slice(&[base_index, base_index + 1, base_index + 2, base_index, base_index + 2, base_index + 3]);
+        self.atlas_batch_indices.extend_from_slice(&[
+            base_index,
+            base_index + 1,
+            base_index + 2,
+            base_index,
+            base_index + 2,
+            base_index + 3,
+        ]);
     }
 
     fn draw_rect(&mut self, camera: &Camera, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
@@ -866,7 +859,7 @@ impl Renderer {
     fn draw_overlay(&mut self, map: &dyn MapLike, camera: &Camera) {
         for ladder in map.get_ladders() {
             self.draw_from_texture_atlas(
-                camera, "tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0
+                camera, "tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0,
             );
         }
     }
@@ -977,7 +970,6 @@ impl Renderer {
         }
         self.dualgrid_vertices[tile_type_index as usize] = vertices;
         self.dualgrid_indices[tile_type_index as usize] = indices;
-
     }
 
     fn draw_base_dual_grid(
@@ -987,11 +979,7 @@ impl Renderer {
         tile_type_index: u8,
         opacity: f32,
     ) {
-        self.update_dual_grid_indices(
-            camera,
-            checker_fn,
-            tile_type_index
-        );
+        self.update_dual_grid_indices(camera, checker_fn, tile_type_index);
         let vertices = &self.dualgrid_vertices[tile_type_index as usize];
         let indices = &self.dualgrid_indices[tile_type_index as usize];
 
@@ -1003,12 +991,12 @@ impl Renderer {
         let vb = self.ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Immutable,
-            BufferSource::slice(&vertices),
+            BufferSource::slice(vertices),
         );
         let ib = self.ctx.new_buffer(
             BufferType::IndexBuffer,
             BufferUsage::Immutable,
-            BufferSource::slice(&indices),
+            BufferSource::slice(indices),
         );
 
         // Bind textures
@@ -1050,33 +1038,32 @@ impl Renderer {
         self.ctx.apply_bindings(&self.bindings);
     }
 
-	fn flush_atlas_batch(&mut self, camera: &Camera) {
-		if self.atlas_batch_vertices.is_empty() {
-			return;
-		}
+    fn flush_atlas_batch(&mut self, camera: &Camera) {
+        if self.atlas_batch_vertices.is_empty() {
+            return;
+        }
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
         let atlas = self.textures.get(&TextureIndexes::Atlas).unwrap();
 
+        // // VP matrix (no per-sprite model)
+        let view = Self::camera_view(camera);
+        let proj = Self::ortho_mvp(camera);
+        let vp = Self::mat4_mul(proj, view);
 
-		// // VP matrix (no per-sprite model)
-		let view = Self::camera_view(camera);
-		let proj = Self::ortho_mvp(camera);
-		let vp = Self::mat4_mul(proj, view);
-
-		// // Uniforms that are shared across the whole batch
-		let uniforms = Uniforms {
-			mvp: vp,
-			color: [1.0, 1.0, 1.0, 1.0],
-			uv_base: [0.0, 0.0, 0.0, 0.0],
-			uv_scale: [1.0, 1.0, 0.0, 0.0],
-			world_base: [0.0, 0.0, 0.0, 0.0],
-			world_scale: [TILE_SIZE, TILE_SIZE, 0.0, 0.0],
-			color_key: [1.0, 0.0, 1.0, 0.01],
-			bg_tile_size: [background.w, background.h, 0.0, 0.0],
-			bg_region_origin: [0.0, 0.0, 0.0, 0.0],
-			bg_tex_size: [background.w, background.h, 0.0, 0.0],
-		};
-		self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+        // // Uniforms that are shared across the whole batch
+        let uniforms = Uniforms {
+            mvp: vp,
+            color: [1.0, 1.0, 1.0, 1.0],
+            uv_base: [0.0, 0.0, 0.0, 0.0],
+            uv_scale: [1.0, 1.0, 0.0, 0.0],
+            world_base: [0.0, 0.0, 0.0, 0.0],
+            world_scale: [TILE_SIZE, TILE_SIZE, 0.0, 0.0],
+            color_key: [1.0, 0.0, 1.0, 0.01],
+            bg_tile_size: [background.w, background.h, 0.0, 0.0],
+            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
+        };
+        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
 
         if self.atlas_batch_vertices.len() > self.atlas_vb_cap {
             self.atlas_vb_cap = self.atlas_batch_vertices.len().next_power_of_two();
@@ -1096,8 +1083,14 @@ impl Renderer {
             );
         }
 
-        self.ctx.buffer_update(self.atlas_vb, BufferSource::slice(&self.atlas_batch_vertices));
-        self.ctx.buffer_update(self.atlas_ib, BufferSource::slice(&self.atlas_batch_indices));
+        self.ctx.buffer_update(
+            self.atlas_vb,
+            BufferSource::slice(&self.atlas_batch_vertices),
+        );
+        self.ctx.buffer_update(
+            self.atlas_ib,
+            BufferSource::slice(&self.atlas_batch_indices),
+        );
 
         let batched_bindings = Bindings {
             vertex_buffers: vec![self.atlas_vb],

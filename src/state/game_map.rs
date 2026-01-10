@@ -487,14 +487,8 @@ impl MapLike for Room {
 
         for x in 0..self.w {
             for y in 0..self.h {
-                match self.get_absolute(x, y) {
-                    (_, OverlayTile::Ladder) => {
-                        all_pos.push(Pos::new(
-                            x as f32 + self.x as f32,
-                            y as f32 + self.y as f32
-                        ));
-                    }
-                    _ => {}
+                if let (_, OverlayTile::Ladder) = self.get_absolute(x, y) {
+                    all_pos.push(Pos::new(x as f32 + self.x as f32, y as f32 + self.y as f32));
                 }
             }
         }
@@ -928,10 +922,7 @@ impl MapLike for GameMap {
             return (BaseTile::Stone, OverlayTile::None)
         }
         let index = ((tx - self.x) + (ty - self.y) * self.w as i32) as usize;
-        (
-            self.base[index],
-            self.overlay[index],
-        )
+        (self.base[index], self.overlay[index])
     }
 
     fn get_ladders(&self) -> Vec<Pos> {
