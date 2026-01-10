@@ -10,6 +10,7 @@ use crate::state::{BaseTile, Dir};
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
+use rand::{rng, Rng};
 
 #[repr(C)]
 struct Uniforms {
@@ -39,6 +40,22 @@ pub struct Renderer {
     bindings: Bindings,
     textures: HashMap<TextureIndexes, TextureInfo>,
     atlas_info: AtlasInfo,
+	// Batched sprite data for atlas-rendered quads (positions in world pixels, precomputed UVs)
+	atlas_batch_vertices: Vec<Vertex>,
+	atlas_batch_indices: Vec<u16>,
+
+    atlas_vb: BufferId,
+    atlas_ib: BufferId,
+    atlas_vb_cap: usize,
+    atlas_ib_cap: usize,
+
+    dualgrid_vb: BufferId,
+    dualgrid_ib: BufferId,
+    dualgrid_vb_cap: usize,
+    dualgrid_ib_cap: usize,
+
+    dualgrid_vertices: Vec<Vec<Vertex>>,
+    dualgrid_indices: Vec<Vec<u16>>,
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -94,11 +111,12 @@ const DUAL_GRID_UV_TABLE: [(u32, u32); 16] = [
 ];
 
 pub trait DrawableGameState: GameState {
-    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool);
+    fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool);
+    fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool);
 }
 
 impl DrawableGameState for Game {
-    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
+    fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
         // Draw the doors
         for door in &self.map.doors {
             renderer.draw_from_texture_atlas(
@@ -143,7 +161,9 @@ impl DrawableGameState for Game {
             );
             renderer.draw_enemy_health_bar(camera, enemy.as_ref());
         }
+    }
 
+    fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
         // Draw "the dark" (the overaly)
         if show_dark {
             let rooms = self.get_rooms_for_display();
@@ -208,30 +228,30 @@ impl DrawableGameState for Game {
 }
 
 impl DrawableGameState for Editor {
-    fn draw_extra(&self, camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
-        let tilemap = renderer.textures.get(&TextureIndexes::Tile).unwrap();
-        let tex_w = tilemap.w;
-        let tex_h = tilemap.h;
-        let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
-
+    fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
         for door in self.room.get_doors() {
             let room_pos = self.room.get_pos();
-            let px = (room_pos.0 as f32 + door.x as f32) * TILE_SIZE;
-            let py = (room_pos.1 as f32 + door.y as f32) * TILE_SIZE;
+            let x = room_pos.0 + door.x as i32;
+            let y = room_pos.1 + door.y as i32;
 
-            let uv_base_px = [
-                match door.dir {
-                    DoorDir::Up => 0,
-                    DoorDir::Right => 1,
-                    DoorDir::Down => 2,
-                    DoorDir::Left => 3,
-                } as f32
-                    * TILE_SIZE,
-                5.0_f32 * TILE_SIZE,
-            ];
-            let uv_base = [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h];
+            let tile_index = match door.dir {
+                    DoorDir::Up => 3,
+                    DoorDir::Right => 4,
+                    DoorDir::Down => 5,
+                    DoorDir::Left => 6,
+            };
 
-            renderer.draw_tile_textured(camera, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
+            renderer.draw_from_texture_atlas(
+                camera,
+                "tiles",
+                tile_index,
+                false,
+                x as f32,
+                y as f32,
+                1.0,
+                1.0,
+                1.0,
+            );
         }
 
         // draw enemy templates
@@ -250,6 +270,10 @@ impl DrawableGameState for Editor {
                 1.0,
             );
         }
+    }
+
+    fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
+
     }
 }
 
@@ -441,6 +465,38 @@ impl Renderer {
 
         let atlas_info = AtlasInfo::load_from_file();
 
+        let atlas_vb_cap = 4 * 4096;  // 4096 sprites => 16384 verts
+        let atlas_ib_cap = 6 * 4096;  // 24576 indices
+
+        let atlas_vb = ctx.new_buffer(
+            BufferType::VertexBuffer,
+            BufferUsage::Stream,
+            BufferSource::empty::<Vertex>(atlas_vb_cap),
+        );
+
+        let atlas_ib = ctx.new_buffer(
+            BufferType::IndexBuffer,
+            BufferUsage::Stream,
+            BufferSource::empty::<u16>(atlas_ib_cap),
+        );
+
+        let dualgrid_vb_cap = 4 * 4096;  // 4096 sprites => 16384 verts
+        let dualgrid_ib_cap = 6 * 4096;  // 24576 indices
+
+        let dualgrid_vb = ctx.new_buffer(
+            BufferType::VertexBuffer,
+            BufferUsage::Stream,
+            BufferSource::empty::<Vertex>(dualgrid_vb_cap)
+        );
+        let dualgrid_ib = ctx.new_buffer(
+            BufferType::IndexBuffer,
+            BufferUsage::Stream,
+            BufferSource::empty::<u16>(dualgrid_ib_cap)
+        );
+
+        let dualgrid_vertices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
+        let dualgrid_indices= vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
+
         Renderer {
             ctx,
             pipeline,
@@ -449,6 +505,18 @@ impl Renderer {
             bindings,
             textures,
             atlas_info,
+			atlas_batch_vertices: Vec::new(),
+			atlas_batch_indices: Vec::new(),
+            atlas_vb,
+            atlas_ib,
+            atlas_ib_cap,
+            atlas_vb_cap,
+            dualgrid_vb,
+            dualgrid_ib,
+            dualgrid_ib_cap,
+            dualgrid_vb_cap,
+            dualgrid_indices,
+            dualgrid_vertices
         }
     }
 
@@ -466,6 +534,10 @@ impl Renderer {
         self.ctx.begin_default_pass(clear);
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
+
+		// Begin new sprite batch for this frame
+		self.atlas_batch_vertices.clear();
+		self.atlas_batch_indices.clear();
 
         // Draw base grid using dual-grid textured tiles
         self.draw_base_dual_grid(
@@ -491,7 +563,7 @@ impl Renderer {
         self.draw_overlay(state.map(), camera);
 
         // draw (coins and enemies) OR (doors)
-        state.draw_extra(camera, self, show_dark);
+        state.draw_extra_mid(camera, self, show_dark);
 
         // draw player on top
         let px = state.player().bb.x;
@@ -521,6 +593,10 @@ impl Renderer {
             alpha,
         );
 
+        // Flush all queued atlas sprites in one draw call
+        self.flush_atlas_batch(camera);
+
+        // Draw the sword as the last step
         if let Some(swing_info) = state.player().get_swing_info() {
             self.draw_rect_rotated(
                 camera,
@@ -552,6 +628,8 @@ impl Renderer {
         self.ctx.apply_bindings(&self.bindings);
 
         self.draw_hud(state, camera);
+
+        state.draw_extra_last(camera, self, show_dark);
 
         self.ctx.end_render_pass();
     }
@@ -602,99 +680,61 @@ impl Renderer {
         h: f32,
         alpha: f32,
     ) {
-        // ensure tile texture bound
-        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
-        let texture = self.textures.get(&TextureIndexes::Atlas).unwrap();
-        self.bindings.images[0] = texture.texture;
-        self.bindings.images[1] = background.texture;
+		// If fully transparent, skip
+		if alpha <= 0.0 {
+			return;
+		}
 
-        self.ctx.apply_bindings(&self.bindings);
+		// Lookup atlas location and texture size for UVs
+		let texture = self.textures.get(&TextureIndexes::Atlas).unwrap();
+		let atlas_rect = self.atlas_info.get_rect(texture_index, atlas_index as i32);
 
-        let atlas_xy = self.atlas_info.get_xy(texture_index, atlas_index as i32);
+        // World pixel quad (destination)
+        let pxw = px * TILE_SIZE;
+        let pyw = py * TILE_SIZE;
+        let ww  = w  * TILE_SIZE;
+        let hh  = h  * TILE_SIZE;
 
-        let view = Self::camera_view(camera);
-        let proj = Self::ortho_mvp(camera);
-        let model = Self::mat4_mul(
-            Self::mat4_translation(px * TILE_SIZE, py * TILE_SIZE),
-            Self::mat4_scale(w * TILE_SIZE, h * TILE_SIZE),
-        );
-        let vp = Self::mat4_mul(proj, view);
-        let mvp = Self::mat4_mul(vp, model);
+        // UVs from SOURCE rect, not destination size
+        let base_u = atlas_rect.x as f32 / texture.w;
+        let base_v = atlas_rect.y as f32 / texture.h;
+        let du = atlas_rect.w as f32 / texture.w;
+        let dv = atlas_rect.h as f32 / texture.h;
 
-        let width_ratio = w * TILE_SIZE / texture.w;
-        let height_ratio = h * TILE_SIZE / texture.h;
+        let u_min = base_u;
+        let u_max = base_u + du;
+        let v_min = base_v;
+        let v_max = base_v + dv;
 
-        let mut uv_base_x = atlas_xy.0 as f32 / texture.w;
-        let mut uv_scale_x = width_ratio;
-        let uv_base_y = atlas_xy.1 as f32 / texture.h;
-        let uv_scale_y = height_ratio;
+        let (u0, u1) = if flip { (u_max, u_min) } else { (u_min, u_max) };
+        let (v0, v1) = (v_min, v_max);
 
-        if flip {
-            uv_base_x += width_ratio;
-            uv_scale_x = -uv_scale_x;
-        }
+		let base_index = self.atlas_batch_vertices.len() as u16;
 
-        let uniforms = Uniforms {
-            mvp,
-            color: [1.0, 1.0, 1.0, alpha],
+		// top-left
+		self.atlas_batch_vertices.push(Vertex {
+			pos: [pxw, pyw],
+			uv: [u0, v0],
+		});
+		// top-right
+		self.atlas_batch_vertices.push(Vertex {
+			pos: [pxw + ww, pyw],
+			uv: [u1, v0],
+		});
+		// bottom-right
+		self.atlas_batch_vertices.push(Vertex {
+			pos: [pxw + ww, pyw + hh],
+			uv: [u1, v1],
+		});
+		// bottom-left
+		self.atlas_batch_vertices.push(Vertex {
+			pos: [pxw, pyw + hh],
+			uv: [u0, v1],
+		});
 
-            uv_base: [uv_base_x, uv_base_y, 0.0, 0.0],
-            uv_scale: [uv_scale_x, uv_scale_y, 0.0, 0.0],
-
-            world_base: [px * TILE_SIZE, py * TILE_SIZE, 0.0, 0.0],
-            world_scale: [w * TILE_SIZE, h * TILE_SIZE, 0.0, 0.0],
-
-            color_key: [1.0, 0.0, 1.0, 0.01], // bright magenta with small threshold
-
-            bg_tile_size: [background.w, background.h, 0.0, 0.0],
-            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
-            bg_tex_size: [background.w, background.h, 0.0, 0.0],
-        };
-        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
-        self.ctx.draw(0, 6, 1);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn draw_tile_textured(
-        &mut self,
-        camera: &Camera,
-        px: f32,
-        py: f32,
-        color: [f32; 4],
-        uv_base: [f32; 2],
-        uv_scale: [f32; 2],
-        tile_type_index: u8,
-    ) {
-        // ensure tile texture bound
-        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
-        let tile = self.textures.get(&TextureIndexes::Tile).unwrap();
-        self.bindings.images[0] = tile.texture;
-        self.bindings.images[1] = background.texture;
-        self.ctx.apply_bindings(&self.bindings);
-
-        let view = Self::camera_view(camera);
-        let proj = Self::ortho_mvp(camera);
-        let model = Self::mat4_mul(
-            Self::mat4_translation(px, py),
-            Self::mat4_scale(TILE_SIZE, TILE_SIZE),
-        );
-        let vp = Self::mat4_mul(proj, view);
-        let mvp = Self::mat4_mul(vp, model);
-
-        let uniforms = Uniforms {
-            mvp,
-            color,
-            uv_base: [uv_base[0], uv_base[1], 0.0, 0.0],
-            uv_scale: [uv_scale[0], uv_scale[1], 0.0, 0.0],
-            world_base: [px, py, 0.0, 0.0],
-            world_scale: [TILE_SIZE, TILE_SIZE, 0.0, 0.0],
-            color_key: [1.0, 0.0, 1.0, 0.01], // bright magenta with small threshold
-            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
-            bg_region_origin: [64.0 * tile_type_index as f32, 0.0, 0.0, 0.0],
-            bg_tex_size: [background.w, background.h, 0.0, 0.0],
-        };
-        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
-        self.ctx.draw(0, 6, 1);
+		self
+			.atlas_batch_indices
+			.extend_from_slice(&[base_index, base_index + 1, base_index + 2, base_index, base_index + 2, base_index + 3]);
     }
 
     fn draw_rect(&mut self, camera: &Camera, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
@@ -824,75 +864,19 @@ impl Renderer {
     }
 
     fn draw_overlay(&mut self, map: &dyn MapLike, camera: &Camera) {
-        // let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
-        // let height = state.map.base.len();
-        // if width == 0 || height == 0 {
-        //     return;
-        // }
-
-        let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
-        let tex_w = tilemap.w;
-        let tex_h = tilemap.h;
-
-        // Apply half-tile offset: 0.5 left (negative X), 0.5 down (positive Y)
-        let offset_x = 0.0;
-        let offset_y = 0.0;
-
-        // Compute visible world bounds from camera (expand slightly to avoid edge gaps)
-        let zoom = camera.zoom;
-        let half_w_world = camera.screen_w * 0.5 / zoom;
-        let half_h_world = camera.screen_h * 0.5 / zoom;
-        let world_min_x = camera.x * TILE_SIZE - half_w_world - TILE_SIZE;
-        let world_min_y = camera.y * TILE_SIZE - half_h_world - TILE_SIZE;
-        let world_max_x = camera.x * TILE_SIZE + half_w_world + TILE_SIZE;
-        let world_max_y = camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
-
-        // Convert world bounds to dual-grid tile indices
-        let start_x = ((world_min_x - offset_x) / TILE_SIZE).floor() as i32;
-        let end_x = ((world_max_x - offset_x) / TILE_SIZE).ceil() as i32;
-        let start_y = ((world_min_y - offset_y) / TILE_SIZE).floor() as i32;
-        let end_y = ((world_max_y - offset_y) / TILE_SIZE).ceil() as i32;
-
-        for y in start_y..end_y {
-            for x in start_x..end_x {
-                let uv_scale = [(TILE_SIZE) / tex_w, (TILE_SIZE) / tex_h];
-
-                let px = x as f32 * TILE_SIZE;
-                let py = y as f32 * TILE_SIZE;
-
-                let uv_base = match map.get_at(x, y).1 {
-                    OverlayTile::None => {
-                        continue;
-                    }
-                    OverlayTile::Ladder => {
-                        let uv_base_px =
-                            if map.is_ladder_at(x, y - 1) || map.is_solid_at_tile(x, y - 1) {
-                                [0.0_f32 * TILE_SIZE, 4.0_f32 * TILE_SIZE]
-                            } else {
-                                [1.0_f32 * TILE_SIZE, 4.0_f32 * TILE_SIZE]
-                            };
-                        [uv_base_px[0] / tex_w, uv_base_px[1] / tex_h]
-                    }
-                };
-
-                self.draw_tile_textured(camera, px, py, [1.0, 1.0, 1.0, 1.0], uv_base, uv_scale, 0);
-            }
+        for ladder in map.get_ladders() {
+            self.draw_from_texture_atlas(
+                camera, "tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0
+            );
         }
     }
 
-    fn draw_base_dual_grid(
+    fn update_dual_grid_indices(
         &mut self,
-        checker_fn: impl Fn(i32, i32) -> bool,
         camera: &Camera,
+        checker_fn: impl Fn(i32, i32) -> bool,
         tile_type_index: u8,
-        opacity: f32,
     ) {
-        // let width = state.map.base.first().map(|r| r.len()).unwrap_or(0);
-        // let height = state.map.base.len();
-        // if width == 0 || height == 0 {
-        //     return;
-        // }
-
         let tilemap = self.textures.get(&TextureIndexes::Tile).unwrap();
         let tex_w = tilemap.w;
         let tex_h = tilemap.h;
@@ -911,15 +895,16 @@ impl Renderer {
         let world_max_y = camera.y * TILE_SIZE + half_h_world + TILE_SIZE;
 
         // Convert world bounds to dual-grid tile indices
-        let start_x = ((world_min_x - offset_x) / TILE_SIZE).floor() as i32;
-        let end_x = ((world_max_x - offset_x) / TILE_SIZE).ceil() as i32;
-        let start_y = ((world_min_y - offset_y) / TILE_SIZE).floor() as i32;
-        let end_y = ((world_max_y - offset_y) / TILE_SIZE).ceil() as i32;
-
-        // Build a single batched mesh (one quad per visible dual-grid tile) and draw in one call
+        let start_x = ((world_min_x - offset_x) / TILE_SIZE).floor() as i32 - 10;
+        let end_x = ((world_max_x - offset_x) / TILE_SIZE).ceil() as i32 + 10;
+        let start_y = ((world_min_y - offset_y) / TILE_SIZE).floor() as i32 - 10;
+        let end_y = ((world_max_y - offset_y) / TILE_SIZE).ceil() as i32 + 10;
         let mut vertices: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u16> = Vec::new();
         let mut base_index: u16 = 0;
+
+        vertices.reserve(((end_y - start_y) * (end_x - start_x) * 4) as usize);
+        indices.reserve(((end_y - start_y) * (end_x - start_x) * 6) as usize);
 
         for y in start_y..end_y {
             for x in start_x..end_x {
@@ -990,6 +975,25 @@ impl Renderer {
                 base_index = base_index.wrapping_add(4);
             }
         }
+        self.dualgrid_vertices[tile_type_index as usize] = vertices;
+        self.dualgrid_indices[tile_type_index as usize] = indices;
+
+    }
+
+    fn draw_base_dual_grid(
+        &mut self,
+        checker_fn: impl Fn(i32, i32) -> bool,
+        camera: &Camera,
+        tile_type_index: u8,
+        opacity: f32,
+    ) {
+        self.update_dual_grid_indices(
+            camera,
+            checker_fn,
+            tile_type_index
+        );
+        let vertices = &self.dualgrid_vertices[tile_type_index as usize];
+        let indices = &self.dualgrid_indices[tile_type_index as usize];
 
         if vertices.is_empty() {
             return;
@@ -1044,6 +1048,65 @@ impl Renderer {
         // Restore default pipeline and bindings for subsequent draws
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
+    }
+
+	fn flush_atlas_batch(&mut self, camera: &Camera) {
+		if self.atlas_batch_vertices.is_empty() {
+			return;
+		}
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+        let atlas = self.textures.get(&TextureIndexes::Atlas).unwrap();
+
+
+		// // VP matrix (no per-sprite model)
+		let view = Self::camera_view(camera);
+		let proj = Self::ortho_mvp(camera);
+		let vp = Self::mat4_mul(proj, view);
+
+		// // Uniforms that are shared across the whole batch
+		let uniforms = Uniforms {
+			mvp: vp,
+			color: [1.0, 1.0, 1.0, 1.0],
+			uv_base: [0.0, 0.0, 0.0, 0.0],
+			uv_scale: [1.0, 1.0, 0.0, 0.0],
+			world_base: [0.0, 0.0, 0.0, 0.0],
+			world_scale: [TILE_SIZE, TILE_SIZE, 0.0, 0.0],
+			color_key: [1.0, 0.0, 1.0, 0.01],
+			bg_tile_size: [background.w, background.h, 0.0, 0.0],
+			bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+			bg_tex_size: [background.w, background.h, 0.0, 0.0],
+		};
+		self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+
+        if self.atlas_batch_vertices.len() > self.atlas_vb_cap {
+            self.atlas_vb_cap = self.atlas_batch_vertices.len().next_power_of_two();
+            self.atlas_vb = self.ctx.new_buffer(
+                BufferType::VertexBuffer,
+                BufferUsage::Stream,
+                BufferSource::empty::<Vertex>(self.atlas_vb_cap),
+            );
+        }
+
+        if self.atlas_batch_indices.len() > self.atlas_ib_cap {
+            self.atlas_ib_cap = self.atlas_batch_indices.len().next_power_of_two();
+            self.atlas_ib = self.ctx.new_buffer(
+                BufferType::IndexBuffer,
+                BufferUsage::Stream,
+                BufferSource::empty::<u16>(self.atlas_ib_cap),
+            );
+        }
+
+        self.ctx.buffer_update(self.atlas_vb, BufferSource::slice(&self.atlas_batch_vertices));
+        self.ctx.buffer_update(self.atlas_ib, BufferSource::slice(&self.atlas_batch_indices));
+
+        let batched_bindings = Bindings {
+            vertex_buffers: vec![self.atlas_vb],
+            index_buffer: self.atlas_ib,
+            images: vec![atlas.texture, background.texture],
+        };
+
+        self.ctx.apply_bindings(&batched_bindings);
+        self.ctx.draw(0, self.atlas_batch_indices.len() as i32, 1);
     }
 
     fn ortho_mvp(camera: &Camera) -> [f32; 16] {
