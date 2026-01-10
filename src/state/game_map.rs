@@ -918,8 +918,12 @@ impl MapLike for GameMap {
     }
 
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
-        if tx < self.x || ty < self.y || tx >= self.x + self.w as i32 || ty >= self.y + self.h as i32 {
-            return (BaseTile::Stone, OverlayTile::None)
+        if tx < self.x
+            || ty < self.y
+            || tx >= self.x + self.w as i32
+            || ty >= self.y + self.h as i32
+        {
+            return (BaseTile::Stone, OverlayTile::None);
         }
         let index = ((tx - self.x) + (ty - self.y) * self.w as i32) as usize;
         (self.base[index], self.overlay[index])

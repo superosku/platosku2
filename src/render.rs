@@ -114,11 +114,10 @@ pub trait DrawableGameState: GameState {
 }
 
 impl DrawableGameState for Game {
-    fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
+    fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
         // Draw the doors
         for door in &self.map.doors {
             renderer.draw_from_texture_atlas(
-                camera,
                 "door",
                 door.get_atlas_index(),
                 false,
@@ -147,7 +146,6 @@ impl DrawableGameState for Game {
             let bb = enemy.bb();
             // self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
             renderer.draw_from_texture_atlas(
-                camera,
                 enemy.get_texture_index(),
                 enemy.get_atlas_index(),
                 !enemy.goes_right(),
@@ -226,7 +224,7 @@ impl DrawableGameState for Game {
 }
 
 impl DrawableGameState for Editor {
-    fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
+    fn draw_extra_mid(&self, _camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
         for door in self.room.get_doors() {
             let room_pos = self.room.get_pos();
             let x = room_pos.0 + door.x as i32;
@@ -240,7 +238,7 @@ impl DrawableGameState for Editor {
             };
 
             renderer.draw_from_texture_atlas(
-                camera, "tiles", tile_index, false, x as f32, y as f32, 1.0, 1.0, 1.0,
+                "tiles", tile_index, false, x as f32, y as f32, 1.0, 1.0, 1.0,
             );
         }
 
@@ -249,7 +247,6 @@ impl DrawableGameState for Editor {
             let bb = template.get_bb();
             let texture_index = template.get_texture_index();
             renderer.draw_from_texture_atlas(
-                camera,
                 texture_index,
                 0,
                 false,
@@ -262,7 +259,7 @@ impl DrawableGameState for Editor {
         }
     }
 
-    fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {}
+    fn draw_extra_last(&self, _camera: &Camera, _renderer: &mut Renderer, _show_dark: bool) {}
 }
 
 impl Renderer {
@@ -548,7 +545,7 @@ impl Renderer {
         );
 
         // Draw overlay tiles
-        self.draw_overlay(state.map(), camera);
+        self.draw_overlay(state.map());
 
         // draw (coins and enemies) OR (doors)
         state.draw_extra_mid(camera, self, show_dark);
@@ -567,7 +564,6 @@ impl Renderer {
 
         // self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0], alpha);
         self.draw_from_texture_atlas(
-            camera,
             "character",
             state.player().get_atlas_index(),
             match state.player().dir {
@@ -658,7 +654,6 @@ impl Renderer {
     #[allow(clippy::too_many_arguments)]
     fn draw_from_texture_atlas(
         &mut self,
-        camera: &Camera,
         texture_index: &str,
         atlas_index: u32,
         flip: bool,
@@ -856,11 +851,9 @@ impl Renderer {
         self.ctx.draw(0, 6, 1);
     }
 
-    fn draw_overlay(&mut self, map: &dyn MapLike, camera: &Camera) {
+    fn draw_overlay(&mut self, map: &dyn MapLike) {
         for ladder in map.get_ladders() {
-            self.draw_from_texture_atlas(
-                camera, "tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0,
-            );
+            self.draw_from_texture_atlas("tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0);
         }
     }
 
@@ -1006,9 +999,9 @@ impl Renderer {
         }
 
         self.ctx
-            .buffer_update(self.dualgrid_vb, BufferSource::slice(&vertices));
+            .buffer_update(self.dualgrid_vb, BufferSource::slice(vertices));
         self.ctx
-            .buffer_update(self.dualgrid_ib, BufferSource::slice(&indices));
+            .buffer_update(self.dualgrid_ib, BufferSource::slice(indices));
 
         // Bind textures
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
