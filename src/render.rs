@@ -987,25 +987,36 @@ impl Renderer {
             return;
         }
 
-        // Create transient buffers for this frame's batched draw
-        let vb = self.ctx.new_buffer(
-            BufferType::VertexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(vertices),
-        );
-        let ib = self.ctx.new_buffer(
-            BufferType::IndexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(indices),
-        );
+        if vertices.len() > self.dualgrid_vb_cap {
+            self.dualgrid_vb_cap = vertices.len().next_power_of_two();
+            self.dualgrid_vb = self.ctx.new_buffer(
+                BufferType::VertexBuffer,
+                BufferUsage::Stream,
+                BufferSource::empty::<Vertex>(self.dualgrid_vb_cap),
+            );
+        }
+
+        if indices.len() > self.dualgrid_ib_cap {
+            self.dualgrid_ib_cap = indices.len().next_power_of_two();
+            self.dualgrid_ib = self.ctx.new_buffer(
+                BufferType::IndexBuffer,
+                BufferUsage::Stream,
+                BufferSource::empty::<u16>(self.dualgrid_ib_cap),
+            );
+        }
+
+        self.ctx
+            .buffer_update(self.dualgrid_vb, BufferSource::slice(&vertices));
+        self.ctx
+            .buffer_update(self.dualgrid_ib, BufferSource::slice(&indices));
 
         // Bind textures
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
         let tile = self.textures.get(&TextureIndexes::Tile).unwrap();
 
         let batched_bindings = Bindings {
-            vertex_buffers: vec![vb],
-            index_buffer: ib,
+            vertex_buffers: vec![self.dualgrid_vb],
+            index_buffer: self.dualgrid_ib,
             images: vec![tile.texture, background.texture],
         };
 
