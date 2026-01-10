@@ -1,4 +1,5 @@
 use super::state::enemies::Enemy;
+use crate::atlas_info::AtlasInfo;
 use crate::camera::Camera;
 use crate::state::GameState;
 use crate::state::OverlayTile;
@@ -37,6 +38,7 @@ pub struct Renderer {
     pipeline_hud: Pipeline,
     bindings: Bindings,
     textures: HashMap<TextureIndexes, TextureInfo>,
+    atlas_info: AtlasInfo,
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -44,10 +46,7 @@ pub enum TextureIndexes {
     White1x1,
     Tile,
     TileBackground,
-    Player,
-    Bat,
-    Slime,
-    Door,
+    Atlas,
 }
 
 struct TextureInfo {
@@ -104,8 +103,8 @@ impl DrawableGameState for Game {
         for door in &self.map.doors {
             renderer.draw_from_texture_atlas(
                 camera,
-                TextureIndexes::Door,
-                door.get_atlas_index() as f32,
+                "door",
+                door.get_atlas_index(),
                 false,
                 door.x as f32,
                 door.y as f32,
@@ -134,7 +133,7 @@ impl DrawableGameState for Game {
             renderer.draw_from_texture_atlas(
                 camera,
                 enemy.get_texture_index(),
-                enemy.get_atlas_index() as f32,
+                enemy.get_atlas_index(),
                 !enemy.goes_right(),
                 bb.x - 1.0 / TILE_SIZE,
                 bb.y - 1.0 / TILE_SIZE,
@@ -242,7 +241,7 @@ impl DrawableGameState for Editor {
             renderer.draw_from_texture_atlas(
                 camera,
                 texture_index,
-                0.0,
+                0,
                 false,
                 bb.x - 1.0 / TILE_SIZE,
                 bb.y - 1.0 / TILE_SIZE,
@@ -416,20 +415,8 @@ impl Renderer {
             load_texture(&mut ctx, "assets/tile_backgrounds.png"),
         );
         textures.insert(
-            TextureIndexes::Player,
-            load_texture(&mut ctx, "assets/character.png"),
-        );
-        textures.insert(
-            TextureIndexes::Bat,
-            load_texture(&mut ctx, "assets/bat.png"),
-        );
-        textures.insert(
-            TextureIndexes::Slime,
-            load_texture(&mut ctx, "assets/slime.png"),
-        );
-        textures.insert(
-            TextureIndexes::Door,
-            load_texture(&mut ctx, "assets/door.png"),
+            TextureIndexes::Atlas,
+            load_texture(&mut ctx, "assets/atlas.png"),
         );
         textures.insert(
             TextureIndexes::White1x1,
@@ -452,6 +439,8 @@ impl Renderer {
             ],
         };
 
+        let atlas_info = AtlasInfo::load_from_file();
+
         Renderer {
             ctx,
             pipeline,
@@ -459,6 +448,7 @@ impl Renderer {
             pipeline_hud,
             bindings,
             textures,
+            atlas_info,
         }
     }
 
@@ -518,8 +508,8 @@ impl Renderer {
         // self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0], alpha);
         self.draw_from_texture_atlas(
             camera,
-            TextureIndexes::Player,
-            state.player().get_atlas_index() as f32,
+            "character",
+            state.player().get_atlas_index(),
             match state.player().dir {
                 Dir::Left => true,
                 Dir::Right => false,
@@ -603,8 +593,8 @@ impl Renderer {
     fn draw_from_texture_atlas(
         &mut self,
         camera: &Camera,
-        texture_index: TextureIndexes,
-        atlas_index: f32,
+        texture_index: &str,
+        atlas_index: u32,
         flip: bool,
         px: f32,
         py: f32,
@@ -614,12 +604,13 @@ impl Renderer {
     ) {
         // ensure tile texture bound
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
-        let texture = self.textures.get(&texture_index).unwrap();
-
+        let texture = self.textures.get(&TextureIndexes::Atlas).unwrap();
         self.bindings.images[0] = texture.texture;
         self.bindings.images[1] = background.texture;
 
         self.ctx.apply_bindings(&self.bindings);
+
+        let atlas_xy = self.atlas_info.get_xy(texture_index, atlas_index as i32);
 
         let view = Self::camera_view(camera);
         let proj = Self::ortho_mvp(camera);
@@ -633,8 +624,10 @@ impl Renderer {
         let width_ratio = w * TILE_SIZE / texture.w;
         let height_ratio = h * TILE_SIZE / texture.h;
 
-        let mut uv_base_x = atlas_index * width_ratio;
+        let mut uv_base_x = atlas_xy.0 as f32 / texture.w;
         let mut uv_scale_x = width_ratio;
+        let uv_base_y = atlas_xy.1 as f32 / texture.h;
+        let uv_scale_y = height_ratio;
 
         if flip {
             uv_base_x += width_ratio;
@@ -645,8 +638,8 @@ impl Renderer {
             mvp,
             color: [1.0, 1.0, 1.0, alpha],
 
-            uv_base: [uv_base_x, 0.0, 0.0, 0.0],
-            uv_scale: [uv_scale_x, height_ratio, 0.0, 0.0],
+            uv_base: [uv_base_x, uv_base_y, 0.0, 0.0],
+            uv_scale: [uv_scale_x, uv_scale_y, 0.0, 0.0],
 
             world_base: [px * TILE_SIZE, py * TILE_SIZE, 0.0, 0.0],
             world_scale: [w * TILE_SIZE, h * TILE_SIZE, 0.0, 0.0],

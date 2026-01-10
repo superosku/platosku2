@@ -1,7 +1,6 @@
 use super::common::{BoundingBox, Health};
 use super::game_map::MapLike;
 use crate::physics::integrate_kinematic;
-use crate::render::TextureIndexes;
 use crate::state::Dir;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::enemies::SlimeState::Idle;
@@ -18,7 +17,7 @@ pub trait Enemy {
     fn should_remove(&self) -> bool;
     fn contanct_damage(&self) -> u32;
     fn get_health(&self) -> Health;
-    fn get_texture_index(&self) -> TextureIndexes;
+    fn get_texture_index(&self) -> &str;
     fn get_atlas_index(&self) -> u32;
     fn goes_right(&self) -> bool;
 }
@@ -177,8 +176,8 @@ impl Enemy for Slime {
         self.health
     }
 
-    fn get_texture_index(&self) -> TextureIndexes {
-        TextureIndexes::Slime
+    fn get_texture_index(&self) -> &str {
+        "slime"
     }
 
     fn get_atlas_index(&self) -> u32 {
@@ -357,8 +356,8 @@ impl Enemy for Bat {
         self.health
     }
 
-    fn get_texture_index(&self) -> TextureIndexes {
-        TextureIndexes::Bat
+    fn get_texture_index(&self) -> &str {
+        "bat"
     }
 
     fn get_atlas_index(&self) -> u32 {

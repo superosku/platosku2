@@ -1,4 +1,3 @@
-use crate::render::TextureIndexes;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::enemies::{Enemy, Slime};
 use crate::state::{Bat, BoundingBox};
@@ -91,8 +90,11 @@ impl ObjectTemplate {
         *self.as_object().bb()
     }
 
-    pub fn get_texture_index(&self) -> TextureIndexes {
-        self.as_object().get_texture_index()
+    pub fn get_texture_index(&self) -> &str {
+        match self.object_type {
+            ObjectTemplateType::Bat => "bat",
+            ObjectTemplateType::Slime => "slime",
+        }
     }
 
     pub fn as_object(&self) -> Box<dyn Enemy> {
