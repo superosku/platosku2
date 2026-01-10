@@ -39,6 +39,7 @@ enum PlayerAnimationState {
     JumpingDown,
     Laddering,
     Hanging,
+    Dying,
 }
 
 impl AnimationConfig for PlayerAnimationState {
@@ -50,6 +51,7 @@ impl AnimationConfig for PlayerAnimationState {
             PlayerAnimationState::JumpingDown => AnimationConfigResult::new(11, 11, 15),
             PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 10),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
+            PlayerAnimationState::Dying => AnimationConfigResult::new_no_loop(17, 20, 10),
         }
     }
 }
@@ -65,10 +67,7 @@ impl Player {
                 vx: 0.0,
                 vy: 0.0,
             },
-            health: Health {
-                current: 10,
-                max: 10,
-            },
+            health: Health { current: 4, max: 4 },
             immunity_frames: 0,
             on_ground: false,
             safe_edge_frames: 0,
@@ -285,7 +284,14 @@ impl Player {
 
                 self._handle_normal(input, map);
             }
-            PlayerState::Dead => {}
+            PlayerState::Dead => {
+                let res = integrate_kinematic(map, &self.bb, true);
+                self.bb = res.new_bb;
+                self.on_ground = res.on_bottom;
+
+                self.animation_handler
+                    .set_state(PlayerAnimationState::Dying)
+            }
 
             PlayerState::Normal => {
                 self._handle_normal(input, map);
