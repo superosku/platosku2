@@ -28,6 +28,14 @@ This is my platformer game (prototype) written in rust.
    * [ ] All sprites use just one draw call
    * [ ] Less looping over things multiple times
 
+## Linters
+
+Run linters locally with this command
+
+```
+cargo fix --bin platosku2 && cargo check && cargo fmt --all -- --check && cargo clippy --fix && cargo test
+```
+
 ## Regenerate texture atlas:
 
 Run this command to regenrate texture atlas
