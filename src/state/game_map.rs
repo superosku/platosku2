@@ -27,7 +27,13 @@ pub trait MapLike {
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
 
-    fn is_solid_at(&self, tx: i32, ty: i32) -> bool {
+    fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
+        let (_base, overlay) = self.get_at(tx, ty);
+        matches!(overlay, OverlayTile::Ladder)
+    }
+    fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool;
+
+    fn is_solid_at_tile(&self, tx: i32, ty: i32) -> bool {
         let (base, _overlay) = self.get_at(tx, ty);
         match base {
             BaseTile::NotPartOfRoom => true,
@@ -36,10 +42,15 @@ pub trait MapLike {
             BaseTile::Wood => true,
         }
     }
+    fn _overlaps_solid_tile(&self, x: f32, y: f32, w: f32, h: f32) -> bool {
+        self._is_solid_at_f_tile(x, y)
+            || self._is_solid_at_f_tile(x + w, y)
+            || self._is_solid_at_f_tile(x + w, y + h)
+            || self._is_solid_at_f_tile(x, y + h)
+    }
 
-    fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
-        let (_base, overlay) = self.get_at(tx, ty);
-        matches!(overlay, OverlayTile::Ladder)
+    fn _is_solid_at_f_tile(&self, tx: f32, ty: f32) -> bool {
+        self.is_solid_at_tile(tx.floor() as i32, ty.floor() as i32)
     }
 }
 
@@ -459,6 +470,10 @@ impl Room {
 }
 
 impl MapLike for Room {
+    fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool {
+        self._overlaps_solid_tile(x, y, w, h)
+    }
+
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         self.get_relative(tx, ty)
             .unwrap_or((BaseTile::NotPartOfRoom, OverlayTile::None))
@@ -521,17 +536,23 @@ pub struct MapDoor {
     pub x: i32,
     pub y: i32,
     pub goes_up_down: bool,
-    is_open: bool,
+    open: bool,
+    closed_frames: i32, // Extra way to set the door open temporarily for n frames
     animation_handler: AnimationHandler<DoorAnimationState>,
 }
 
 impl MapDoor {
+    pub fn is_open(&self) -> bool {
+        self.open && self.closed_frames == 0
+    }
+
     pub fn new(x: i32, y: i32, goes_up_down: bool) -> MapDoor {
         MapDoor {
             x,
             y,
             goes_up_down,
-            is_open: false,
+            open: false,
+            closed_frames: 0,
             animation_handler: AnimationHandler::new(if goes_up_down {
                 DoorAnimationState::OpenUpDown
             } else {
@@ -541,8 +562,9 @@ impl MapDoor {
     }
 
     pub fn update(&mut self, is_open: bool) {
-        self.is_open = is_open;
-        match (self.goes_up_down, is_open) {
+        self.open = is_open;
+        self.closed_frames = 0.max(self.closed_frames - 1);
+        match (self.goes_up_down, self.is_open()) {
             (true, true) => self
                 .animation_handler
                 .set_state(DoorAnimationState::OpenUpDown),
@@ -557,6 +579,31 @@ impl MapDoor {
                 .set_state(DoorAnimationState::ClosedSide),
         }
         self.animation_handler.increment_frame();
+    }
+
+    pub fn set_closed_for_frames(&mut self, n: u32) {
+        self.closed_frames = n as i32
+    }
+
+    pub fn bb(&self) -> BoundingBox {
+        match self.goes_up_down {
+            true => BoundingBox {
+                x: self.x as f32,
+                y: self.y as f32 + 3.0 / 16.0,
+                w: 1.0,
+                h: 1.0 - 6.0 / 16.0,
+                vy: 0.0,
+                vx: 0.0,
+            },
+            false => BoundingBox {
+                x: self.x as f32 + 3.0 / 16.0,
+                y: self.y as f32,
+                w: 1.0 - 6.0 / 16.0,
+                h: 1.0,
+                vy: 0.0,
+                vx: 0.0,
+            },
+        }
     }
 
     pub fn get_atlas_index(&self) -> u32 {
@@ -600,19 +647,31 @@ impl GameMap {
         for room_index in 0..self.rooms.len() {
             let room = &self.rooms[room_index];
 
-            if x < room.x as f32 + 0.5 || y < room.y as f32 + 0.5 {
-                continue;
-            }
-            if x > (room.x as f32 + room.w as f32) - 0.5
-                || y > (room.y as f32 + room.h as f32) - 0.5
-            {
-                continue;
-            }
+            // Must be room at the center and 0.5 away from the center in every direction
+            // (Since rooms overlap by 1 tile, the in room check must use 0.5 narrower
+            // room than what it acutally is.
+            let cent = room.get_relative(x.floor() as i32, y.floor() as i32);
+            let a = room.get_relative((x - 0.5).floor() as i32, y.floor() as i32);
+            let b = room.get_relative((x + 0.5).floor() as i32, y.floor() as i32);
+            let c = room.get_relative(x.floor() as i32, (y - 0.5).floor() as i32);
+            let d = room.get_relative(x.floor() as i32, (y + 0.5).floor() as i32);
+            let is_in_this_room = match (cent, a, b, c, d) {
+                // If one of these is not part of the room, then it is not in this room...
+                (None, _, _, _, _) => false,
+                (_, None, _, _, _) => false,
+                (_, _, None, _, _) => false,
+                (_, _, _, None, _) => false,
+                (_, _, _, _, None) => false,
+                (Some((BaseTile::NotPartOfRoom, _)), _, _, _, _) => false,
+                (_, Some((BaseTile::NotPartOfRoom, _)), _, _, _) => false,
+                (_, _, Some((BaseTile::NotPartOfRoom, _)), _, _) => false,
+                (_, _, _, Some((BaseTile::NotPartOfRoom, _)), _) => false,
+                (_, _, _, _, Some((BaseTile::NotPartOfRoom, _))) => false,
+                (_, _, _, _, _) => true,
+            };
 
-            if let Some((base, _overlay)) = room.get_relative(x as i32, y as i32) {
-                if base != BaseTile::NotPartOfRoom {
-                    return Some((room_index, room));
-                }
+            if is_in_this_room {
+                return Some((room_index, room));
             }
         }
 
@@ -644,12 +703,15 @@ impl GameMap {
         // Iterate this
 
         let mut room_count = 1;
-        'room_loop: for i in 0..100 {
+        'room_loop: for i in 0..1000 {
             println!("Iterating for adding a room {}", i);
             println!(" a) Choosing a random room to try to connect a room to");
             let random_existing_room_index = rng.random_range(0..game_map.rooms.len());
             // let random_existing_room = game_map.rooms.choose(&mut rng).unwrap();
             let random_existing_room = &game_map.rooms[random_existing_room_index];
+            if random_existing_room.doors.is_empty() {
+                continue;
+            }
             let random_door = random_existing_room.doors.choose(&mut rng).unwrap();
             let random_door_x = random_door.x;
             let random_door_y = random_door.y;
@@ -764,6 +826,27 @@ impl GameMap {
 }
 
 impl MapLike for GameMap {
+    fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool {
+        if self._overlaps_solid_tile(x, y, w, h) {
+            return true;
+        }
+        for door in &self.doors {
+            if !door.is_open()
+                && door.bb().overlaps(&BoundingBox {
+                    x,
+                    y,
+                    w,
+                    h,
+                    vx: 0.0,
+                    vy: 0.0,
+                })
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
         for room in &self.rooms {
             match room.get_relative(tx, ty) {

@@ -314,7 +314,7 @@ impl Player {
                 } else if input.down && !input.up {
                     self.bb.vy = self.speed;
                     let feet_y = self.bb.y + self.bb.h;
-                    if map.is_solid_at(middle_tx, feet_y.floor() as i32)
+                    if map.is_solid_at_tile(middle_tx, feet_y.floor() as i32)
                         || (!ladder_at_head && !ladder_at_below)
                     {
                         self.state = PlayerState::Normal;

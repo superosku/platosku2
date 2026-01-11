@@ -3,6 +3,7 @@ use super::enemies::Enemy;
 use super::game_map::{GameMap, MapLike, Room};
 use super::player::Player;
 use crate::camera::Camera;
+use crate::state::BoundingBox;
 
 #[derive(Default)]
 pub struct InputState {
@@ -79,7 +80,7 @@ pub struct Game {
 
     cur_room_index: Option<usize>,
     prev_room_index: Option<usize>,
-    prev_room_show_frames: u32,
+    prev_room_show_frames: i32,
 }
 
 impl Game {
@@ -109,14 +110,77 @@ impl Game {
         (
             cur_room,
             prev_room,
-            self.prev_room_show_frames as f32 / 30.0,
+            self.prev_room_show_frames as f32 / 60.0,
         )
     }
 }
 
 impl GameState for Game {
     fn update(&mut self, input: &InputState) {
-        self.player.update(input, &self.map);
+        let door_bbs: Vec<BoundingBox> = self
+            .map
+            .doors
+            .iter()
+            .filter(|door| !door.is_open())
+            .map(|door| door.bb())
+            .collect();
+
+        // If player is inside one of the doors, we should move the player frame by frame towards
+        // being out of the door and towards the current room
+        if door_bbs.iter().any(|bb| self.player.bb.overlaps(bb)) {
+            println!("Player overlaps a door");
+            let mut push_dir: Option<(i32, i32)> = None;
+            'outer: for step in 0..20 {
+                for dir in [(0, 1), (0, -1), (1, 0), (-1, 0)] {
+                    let (x, y) = dir;
+                    let mut user_bb = self.player.bb;
+                    user_bb.x += step as f32 * 0.1 * x as f32;
+                    user_bb.y += step as f32 * 0.1 * y as f32;
+
+                    // This is a spot where the user would not overlap anything
+                    if !self
+                        .map
+                        .overlaps_solid(user_bb.x, user_bb.y, user_bb.w, user_bb.h)
+                    {
+                        // This place has a room in it
+                        if let Some((room_index, _)) = self
+                            .map
+                            .get_room_at(user_bb.x + user_bb.w * 0.5, user_bb.y + user_bb.h * 0.5)
+                        {
+                            // The player is at a room
+                            if let Some(cur_room_index) = self.cur_room_index {
+                                // The room is the same where the player is supposedly at
+                                if cur_room_index == room_index {
+                                    if dir.1 == -1 {
+                                        // If going up lets add a little bit of "jump" to the player
+                                        self.player.bb.vy = -0.1;
+                                    }
+
+                                    push_dir = Some(dir);
+                                    break 'outer;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some(push_dir) = push_dir {
+                if push_dir.1 != 0 {
+                    self.player.bb.y += self.player.bb.vy;
+                    println!("Pushing player down form a door")
+                } else {
+                    self.player.bb.x += push_dir.0 as f32 * 0.05;
+                    self.player.bb.y += push_dir.1 as f32 * 0.05;
+                }
+                // self.player.bb.vx = 0.0;
+                // self.player.bb.vy = 0.0;
+            } else {
+                println!("No push dir found");
+            }
+        } else {
+            self.player.update(input, &self.map);
+        }
+
         for coin in &mut self.coins {
             coin.update(&self.map);
         }
@@ -146,18 +210,28 @@ impl GameState for Game {
         // been the previous. This is used for centering the camera and displaying the "black"
         // around the current room (/ rooms).
         if let Some((room_index, _room)) = self.map.get_room_at(
+            // TODO: Use bb.get_center() here
             self.player.bb.x + self.player.bb.w * 0.5,
             self.player.bb.y + self.player.bb.h * 0.5,
         ) {
             if self.cur_room_index != Some(room_index) {
                 self.prev_room_index = self.cur_room_index;
                 self.cur_room_index = Some(room_index);
-                self.prev_room_show_frames = 30;
+                self.prev_room_show_frames = 60;
+
+                // Set the door closed here if the player is moving up and the door
+                // type is up down. This helps in going to a room above
+                for door in &mut self.map.doors {
+                    if door.goes_up_down
+                        && self.player.bb.vy < 0.0
+                        && self.player.bb.overlaps(&door.bb())
+                    {
+                        door.set_closed_for_frames(120)
+                    }
+                }
             }
         }
-        if self.prev_room_show_frames > 0 {
-            self.prev_room_show_frames -= 1;
-        }
+        self.prev_room_show_frames = 0.max(self.prev_room_show_frames - 1);
 
         // Handle doors
         if let Some(cur_room_index) = self.cur_room_index {
