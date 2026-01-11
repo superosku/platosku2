@@ -1,5 +1,5 @@
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
-use crate::state::enemies::{Enemy, Slime};
+use crate::state::enemies::{Enemy, Slime, Worm};
 use crate::state::{Bat, BoundingBox, Pos};
 use rand::Rng;
 use rand::seq::IndexedRandom;
@@ -73,6 +73,7 @@ pub struct RoomDoor {
 pub enum ObjectTemplateType {
     Bat = 0,
     Slime = 1,
+    Worm = 2,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -95,6 +96,7 @@ impl ObjectTemplate {
         match self.object_type {
             ObjectTemplateType::Bat => "bat",
             ObjectTemplateType::Slime => "slime",
+            ObjectTemplateType::Worm => "worm",
         }
     }
 
@@ -102,6 +104,7 @@ impl ObjectTemplate {
         match self.object_type {
             ObjectTemplateType::Bat => Box::new(Bat::new(self.x, self.y)),
             ObjectTemplateType::Slime => Box::new(Slime::new(self.x, self.y)),
+            ObjectTemplateType::Worm => Box::new(Worm::new(self.x, self.y)),
         }
     }
 }
@@ -851,7 +854,7 @@ impl GameMap {
 
             room_count += 1;
 
-            if room_count >= 200 {
+            if room_count >= 10 {
                 break;
             }
         }
