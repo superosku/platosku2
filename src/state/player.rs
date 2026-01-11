@@ -1,4 +1,4 @@
-use super::common::{BoundingBox, Dir, Pos};
+use super::common::{BoundingBox, Dir, Health, Pos};
 use super::game_map::MapLike;
 use super::game_state::InputState;
 use crate::physics::{check_and_snap_hang, integrate_kinematic};
@@ -21,7 +21,7 @@ pub struct SwingState {
 
 pub struct Player {
     pub bb: BoundingBox,
-    pub health: u32,
+    pub health: Health,
     pub immunity_frames: u32,
     pub on_ground: bool,
     pub safe_edge_frames: u32,
@@ -65,7 +65,10 @@ impl Player {
                 vx: 0.0,
                 vy: 0.0,
             },
-            health: 10,
+            health: Health {
+                current: 10,
+                max: 10,
+            },
             immunity_frames: 0,
             on_ground: false,
             safe_edge_frames: 0,
@@ -82,11 +85,11 @@ impl Player {
 
     pub fn got_hit(&mut self, damage: u32) {
         if damage > 0 {
-            if damage > self.health {
-                self.health = 0;
+            if damage > self.health.current {
+                self.health.current = 0;
                 self.state = PlayerState::Dead;
             } else {
-                self.health -= damage;
+                self.health.current -= damage;
                 self.immunity_frames = 60;
             }
         }
