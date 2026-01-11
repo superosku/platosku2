@@ -4,6 +4,7 @@ mod camera;
 mod physics;
 mod state;
 use crate::state::{GameState, InputState};
+mod atlas_info;
 mod debug_menu;
 mod render;
 

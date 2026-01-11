@@ -1,7 +1,6 @@
-use crate::render::TextureIndexes;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::enemies::{Enemy, Slime};
-use crate::state::{Bat, BoundingBox};
+use crate::state::{Bat, BoundingBox, Pos};
 use rand::Rng;
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
@@ -26,6 +25,7 @@ pub trait MapLike {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile);
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
+    fn get_ladders(&self) -> Vec<Pos>;
 
     fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
         let (_base, overlay) = self.get_at(tx, ty);
@@ -91,8 +91,11 @@ impl ObjectTemplate {
         *self.as_object().bb()
     }
 
-    pub fn get_texture_index(&self) -> TextureIndexes {
-        self.as_object().get_texture_index()
+    pub fn get_texture_index(&self) -> &str {
+        match self.object_type {
+            ObjectTemplateType::Bat => "bat",
+            ObjectTemplateType::Slime => "slime",
+        }
     }
 
     pub fn as_object(&self) -> Box<dyn Enemy> {
@@ -479,6 +482,20 @@ impl MapLike for Room {
             .unwrap_or((BaseTile::NotPartOfRoom, OverlayTile::None))
     }
 
+    fn get_ladders(&self) -> Vec<Pos> {
+        let mut all_pos = Vec::new();
+
+        for x in 0..self.w {
+            for y in 0..self.h {
+                if let (_, OverlayTile::Ladder) = self.get_absolute(x, y) {
+                    all_pos.push(Pos::new(x as f32 + self.x as f32, y as f32 + self.y as f32));
+                }
+            }
+        }
+
+        all_pos
+    }
+
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
         if let Some(rel) = self.abs_to_rel((x, y)) {
             self.set_base_absolute(rel.0, rel.1, tile);
@@ -612,10 +629,18 @@ impl MapDoor {
 }
 
 pub struct GameMap {
-    // pub base: Vec<Vec<BaseTile>>,
-    // pub overlay: Vec<Vec<OverlayTile>>,
+    // Rooms contains the room information
     pub rooms: Vec<Room>,
     pub doors: Vec<MapDoor>,
+
+    // These are used for when returning the game data for optimization reasons
+    ladder_pos: Vec<Pos>,
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+    base: Vec<BaseTile>,
+    overlay: Vec<OverlayTile>,
 }
 
 impl GameMap {
@@ -628,10 +653,10 @@ impl GameMap {
     }
 
     pub fn get_bounds(&self) -> (i32, i32, i32, i32) {
-        let mut min_x = 10000;
-        let mut min_y = 10000;
-        let mut max_x = -10000;
-        let mut max_y = -10000;
+        let mut min_x = i32::MAX;
+        let mut min_y = i32::MAX;
+        let mut max_x = i32::MIN;
+        let mut max_y = i32::MIN;
 
         for room in &self.rooms {
             min_x = room.x.min(min_x);
@@ -644,6 +669,8 @@ impl GameMap {
     }
 
     pub fn get_room_at(&self, x: f32, y: f32) -> Option<(usize, &Room)> {
+        // TODO: Do not use this for enemies in every frame. Rather store the room info in the
+        // TODO: enemy on creation
         for room_index in 0..self.rooms.len() {
             let room = &self.rooms[room_index];
 
@@ -698,6 +725,14 @@ impl GameMap {
         let mut game_map = GameMap {
             rooms,
             doors: Vec::new(),
+            ladder_pos: Vec::new(),
+
+            x: 0,
+            y: 0,
+            h: 0,
+            w: 0,
+            overlay: Vec::new(),
+            base: Vec::new(),
         };
 
         // Iterate this
@@ -816,12 +851,47 @@ impl GameMap {
 
             room_count += 1;
 
-            if room_count >= 5 {
+            if room_count >= 200 {
                 break;
             }
         }
 
+        for room in &game_map.rooms {
+            let mut room_ladders = room.get_ladders();
+            game_map.ladder_pos.append(&mut room_ladders);
+        }
+
+        let (x, y, w, h) = game_map.get_bounds();
+
+        game_map.x = x;
+        game_map.y = y;
+        game_map.w = w as u32;
+        game_map.h = h as u32;
+
+        game_map.overlay.resize((w * h) as usize, OverlayTile::None);
+        game_map.base.resize((w * h) as usize, BaseTile::Stone);
+
+        for xx in 0..w {
+            for yy in 0..h {
+                let (base, overlay) = game_map.get_at_from_room(x + xx, y + yy);
+                game_map.overlay[(xx + yy * w) as usize] = overlay;
+                game_map.base[(xx + yy * w) as usize] = base;
+            }
+        }
+
         game_map
+    }
+
+    fn get_at_from_room(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
+        for room in &self.rooms {
+            match room.get_relative(tx, ty) {
+                None => {}
+                Some((BaseTile::NotPartOfRoom, _)) => {}
+                Some(res) => return res,
+            }
+        }
+
+        (BaseTile::Stone, OverlayTile::None)
     }
 }
 
@@ -848,15 +918,19 @@ impl MapLike for GameMap {
     }
 
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {
-        for room in &self.rooms {
-            match room.get_relative(tx, ty) {
-                None => {}
-                Some((BaseTile::NotPartOfRoom, _)) => {}
-                Some(res) => return res,
-            }
+        if tx < self.x
+            || ty < self.y
+            || tx >= self.x + self.w as i32
+            || ty >= self.y + self.h as i32
+        {
+            return (BaseTile::Stone, OverlayTile::None);
         }
+        let index = ((tx - self.x) + (ty - self.y) * self.w as i32) as usize;
+        (self.base[index], self.overlay[index])
+    }
 
-        (BaseTile::Stone, OverlayTile::None)
+    fn get_ladders(&self) -> Vec<Pos> {
+        self.ladder_pos.clone()
     }
 
     fn set_base(&mut self, _x: i32, _y: i32, _tile: BaseTile) {
