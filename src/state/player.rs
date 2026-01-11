@@ -1,4 +1,4 @@
-use super::common::{BoundingBox, Dir, Pos, Health};
+use super::common::{BoundingBox, Dir, Health, Pos};
 use super::game_map::MapLike;
 use super::game_state::InputState;
 use crate::physics::{check_and_snap_hang, integrate_kinematic};
@@ -67,8 +67,8 @@ impl Player {
             },
             health: Health {
                 current: 10,
-				max: 10,
-			},
+                max: 10,
+            },
             immunity_frames: 0,
             on_ground: false,
             safe_edge_frames: 0,

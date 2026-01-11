@@ -1,10 +1,10 @@
+use super::state::enemies::Enemy;
 use crate::camera::Camera;
 use crate::state::GameState;
 use crate::state::OverlayTile;
 use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, Dir};
-use super::state::enemies::Enemy;
 
 use image::GenericImageView;
 use miniquad::*;
@@ -142,7 +142,7 @@ impl DrawableGameState for Game {
                 bb.h + 2.0 / TILE_SIZE,
                 1.0,
             );
-            renderer.draw_enemy_health_bar(camera, enemy);
+            renderer.draw_enemy_health_bar(camera, enemy.as_ref());
         }
 
         // Draw "the dark" (the overaly)
@@ -564,14 +564,13 @@ impl Renderer {
         self.draw_hud(state, camera);
 
         self.ctx.end_render_pass();
-
     }
 
     pub fn draw_hud(&mut self, state: &dyn GameState, camera: &Camera) {
         self.draw_player_health_bar(state, camera);
 
         // currently only hp bar. possibility to add other things.
-	}
+    }
 
     fn draw_player_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {
         let max_width = 200.0;
@@ -587,16 +586,16 @@ impl Renderer {
         self.draw_rect_hud(camera, x, y, filled_width, height, [0.65, 0.11, 0.11, 1.0]);
     }
 
-    fn draw_enemy_health_bar(&mut self, camera: &Camera, enemy: &Box<dyn Enemy>) {
+    fn draw_enemy_health_bar(&mut self, camera: &Camera, enemy: &dyn Enemy) {
         let padding = 0.3;
         let height = 0.1;
         let max_width = enemy.bb().w + padding + padding;
         let x = enemy.bb().x - padding;
-        let y = enemy.bb().y - height - padding ;
-        
+        let y = enemy.bb().y - height - padding;
+
         let filled_width = max_width * enemy.get_health().ratio();
 
-		self.draw_rect(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
+        self.draw_rect(camera, x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
         self.draw_rect(camera, x, y, filled_width, height, [0.65, 0.11, 0.11, 1.0]);
     }
 
@@ -749,10 +748,7 @@ impl Renderer {
         self.ctx.apply_bindings(&self.bindings);
 
         let proj = Self::ortho_mvp(camera);
-        let model = Self::mat4_mul(
-            Self::mat4_translation(x, y),
-            Self::mat4_scale(w, h),
-        );
+        let model = Self::mat4_mul(Self::mat4_translation(x, y), Self::mat4_scale(w, h));
         let mvp = Self::mat4_mul(proj, model);
 
         let uniforms = Uniforms {

@@ -1,4 +1,4 @@
-use super::common::{ BoundingBox, Health };
+use super::common::{BoundingBox, Health};
 use super::game_map::MapLike;
 use crate::physics::integrate_kinematic;
 use crate::render::TextureIndexes;
@@ -137,7 +137,9 @@ impl Enemy for Slime {
 
     fn got_stomped(&mut self) {
         self.immunity_frames = 10;
-        self.state = SlimeState::Idle { frames_remaining: 50 };
+        self.state = SlimeState::Idle {
+            frames_remaining: 50,
+        };
         self.health.current -= 1;
     }
 
@@ -148,7 +150,9 @@ impl Enemy for Slime {
     fn got_hit(&mut self) {
         if self.immunity_frames == 0 {
             self.immunity_frames = 10;
-            self.state = SlimeState::Idle { frames_remaining: 50 };
+            self.state = SlimeState::Idle {
+                frames_remaining: 50,
+            };
             self.health.current -= 1;
         }
     }
@@ -158,7 +162,7 @@ impl Enemy for Slime {
     }
 
     fn should_remove(&self) -> bool {
-        self.health.current <= 0
+        self.health.current == 0
     }
 
     fn contanct_damage(&self) -> u32 {
@@ -170,8 +174,8 @@ impl Enemy for Slime {
     }
 
     fn get_health(&self) -> Health {
-		self.health
-	}
+        self.health
+    }
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Slime
@@ -216,7 +220,6 @@ enum BatState {
 pub struct Bat {
     bb: BoundingBox,
     health: Health,
-    immunity_frames: u32,
     state: BatState,
     animation_handler: AnimationHandler<BatAnimationState>,
 }
@@ -235,7 +238,6 @@ impl Bat {
                 vy: 0.0,
             },
             health: Health { current: 3, max: 3 },
-            immunity_frames: 0,
             state: BatState::Flying {
                 dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
             },
@@ -344,7 +346,7 @@ impl Enemy for Bat {
     }
 
     fn should_remove(&self) -> bool {
-        self.health.current <= 0
+        self.health.current == 0
     }
 
     fn contanct_damage(&self) -> u32 {
@@ -352,8 +354,8 @@ impl Enemy for Bat {
     }
 
     fn get_health(&self) -> Health {
-		self.health
-	}
+        self.health
+    }
 
     fn get_texture_index(&self) -> TextureIndexes {
         TextureIndexes::Bat
