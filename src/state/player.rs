@@ -83,14 +83,15 @@ impl Player {
     }
 
     pub fn got_hit(&mut self, damage: u32) {
+        self.health.current = 0.max(self.health.current as i32 - damage as i32) as u32;
+
+        // If no health set to dead
+        if self.health.current == 0 {
+            self.state = PlayerState::Dead;
+        }
+        // If we took damage set the immunity frmaes
         if damage > 0 {
-            if damage > self.health.current {
-                self.health.current = 0;
-                self.state = PlayerState::Dead;
-            } else {
-                self.health.current -= damage;
-                self.immunity_frames = 60;
-            }
+            self.immunity_frames = 60;
         }
     }
 
