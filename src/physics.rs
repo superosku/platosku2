@@ -58,15 +58,16 @@ pub fn integrate_kinematic(
         vy = 0.0;
     }
 
-    if !(-0.001..=0.001).contains(&vx) {
-        vx = vx - vx * 0.05;
-	} else {
-		vx = 0.0;
-	}
-    vx = vx - vx * 0.1;
+    
 
     // Friction when on ground
-    
+    if on_bottom {
+        if !(-0.002..=0.002).contains(&vx) {
+            vx = vx - vx * 0.2;
+	    } else {
+		    vx = 0.0;
+	    }
+    }
 
     KinematicResult {
         new_bb: BoundingBox {
