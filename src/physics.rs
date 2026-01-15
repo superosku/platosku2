@@ -58,7 +58,7 @@ pub fn integrate_kinematic(
         vy = 0.0;
     }
 
-    if vx > 0.001 || vx < -0.001 {
+    if !(-0.001..=0.001).contains(&vx) {
         vx = vx - vx * 0.05;
 	} else {
 		vx = 0.0;
@@ -66,9 +66,7 @@ pub fn integrate_kinematic(
     vx = vx - vx * 0.1;
 
     // Friction when on ground
-    if on_bottom {
-        
-    }
+    
 
     KinematicResult {
         new_bb: BoundingBox {
