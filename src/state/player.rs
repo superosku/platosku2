@@ -26,7 +26,8 @@ pub struct Player {
     pub on_ground: bool,
     pub safe_edge_frames: u32,
     pub state: PlayerState,
-    pub speed: f32,
+    pub max_speed: f32,
+    pub max_jump_frames: u32,
     pub dir: Dir,
     animation_handler: AnimationHandler<PlayerAnimationState>,
 }
@@ -72,7 +73,8 @@ impl Player {
             on_ground: false,
             safe_edge_frames: 0,
             state: PlayerState::Normal,
-            speed: 0.06,
+            max_speed: 0.06,
+            max_jump_frames: 0,
             dir: Dir::Right,
             animation_handler: AnimationHandler::new(PlayerAnimationState::Standing),
         }
@@ -154,7 +156,9 @@ impl Player {
         let pressing_right = input.right && !input.left;
 
         if pressing_left {
-            self.bb.vx = -self.speed;
+            if self.bb.vx > -self.max_speed {
+                self.bb.vx = self.bb.vx - 0.01;
+            }
             match self.state {
                 PlayerState::Swinging { .. } => {}
                 _ => {
@@ -162,28 +166,34 @@ impl Player {
                 }
             }
         } else if pressing_right {
-            self.bb.vx = self.speed;
+            if self.bb.vx < self.max_speed {
+                self.bb.vx = self.bb.vx + 0.01;
+			}
             match self.state {
                 PlayerState::Swinging { .. } => {}
                 _ => {
                     self.dir = Dir::Right;
                 }
             }
-        } else {
-            self.bb.vx = 0.0;
         }
 
         if self.on_ground {
             self.safe_edge_frames = 4;
+            self.max_jump_frames = 10;
         } else if self.safe_edge_frames > 0 {
             self.safe_edge_frames -= 1;
         }
 
         if input.jump && (self.on_ground || self.safe_edge_frames > 0) {
             self.safe_edge_frames = 0;
-            self.bb.vy = -0.185;
+			self.bb.vy = -0.125;
+        } else if input.jump && self.max_jump_frames > 0 {
+            self.max_jump_frames -= 1;
+            self.bb.vy = -0.125;
+        } else {
+            self.max_jump_frames = 0; // if no input.jump reset to 0
         }
-
+        
         if input.swing {
             if let PlayerState::Normal = self.state {
                 self.state = PlayerState::Swinging {
@@ -205,6 +215,7 @@ impl Player {
             self.state = PlayerState::OnLadder;
             let middle_tx = (new_bb.x + new_bb.w * 0.5).floor() as i32;
             self.bb.x = (middle_tx as f32 + 0.5) - self.bb.w * 0.5;
+            self.bb.vx = 0.0;
 
             return;
         }
@@ -257,6 +268,7 @@ impl Player {
                 self.bb.x = pos.x;
                 self.bb.y = pos.y;
                 self.bb.vy = 0.0;
+                self.bb.vx = 0.0;
                 self.on_ground = false;
 
                 if input.jump {
@@ -313,13 +325,13 @@ impl Player {
 
                 if input.up && !input.down {
                     if ladder_at_head {
-                        self.bb.vy = -self.speed;
+                        self.bb.vy = -self.max_speed;
                     } else {
                         self.bb.vy = 0.0;
                         return;
                     }
                 } else if input.down && !input.up {
-                    self.bb.vy = self.speed;
+                    self.bb.vy = self.max_speed;
                     let feet_y = self.bb.y + self.bb.h;
                     if map.is_solid_at_tile(middle_tx, feet_y.floor() as i32)
                         || (!ladder_at_head && !ladder_at_below)

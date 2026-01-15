@@ -145,7 +145,6 @@ impl EventHandler for Stage {
             self.state.update(&self.input); // HERE is the actual game call
             self.state
                 .update_camera(&mut self.camera, self.debug_menu.zoom_show_full); // HERE is the actual game call
-            self.input.jump = false;
             self.updates += 1;
             self.accumulator -= dt;
         }

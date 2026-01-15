@@ -91,6 +91,7 @@ impl Enemy for Slime {
         match self.state {
             SlimeState::Idle { frames_remaining } => {
                 self.animation_handler.set_state(SlimeAnimationState::Idle);
+                self.bb.vx = 0.0;
                 if frames_remaining == 0 {
                     self.state = SlimeState::Jumping {
                         frames_remaining: jump_total_frames,
