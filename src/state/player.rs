@@ -194,13 +194,14 @@ impl Player {
             self.max_jump_frames = 0; // if no input.jump reset to 0
         }
 
-        if input.swing
-            && let PlayerState::Normal = self.state {
+        if input.swing {
+            if let PlayerState::Normal = self.state {
                 self.state = PlayerState::Swinging {
                     total_frames: 20,
                     frames_left: 20,
                 };
             }
+        }
 
         let res = integrate_kinematic(map, &self.bb, true);
         let new_bb = res.new_bb;
