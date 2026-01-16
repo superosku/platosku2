@@ -58,8 +58,6 @@ pub fn integrate_kinematic(
         vy = 0.0;
     }
 
-    
-
     // Friction when on ground
     if on_bottom {
         if !(-0.002..=0.002).contains(&vx) {
