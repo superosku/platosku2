@@ -70,7 +70,7 @@ impl DebugMenu {
             current_editor_room_index: 0,
             is_game: true,
             zoom_show_full: true,
-            show_dark: false,
+            show_dark: true,
         }
     }
 }
@@ -147,7 +147,7 @@ impl EventHandler for Stage {
         while self.accumulator >= dt {
             self.state.update(&self.input); // HERE is the actual game call
             self.state
-                .update_camera(&mut self.camera, self.debug_menu.zoom_show_full); // HERE is the actual game call
+                .update_camera(&mut self.camera, !self.debug_menu.zoom_show_full); // HERE is the actual game call
             self.updates += 1;
             self.accumulator -= dt;
         }

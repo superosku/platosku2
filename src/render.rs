@@ -166,42 +166,9 @@ impl DrawableGameState for Game {
         if show_dark {
             let rooms = self.get_rooms_for_display();
             let ratio = rooms.2;
-            renderer.draw_base_dual_grid(
-                |x, y| {
-                    if let Some(room) = rooms.0
-                        && let Some((base, _overlay)) = room.get_relative(x, y)
-                        && base != BaseTile::NotPartOfRoom
-                    {
-                        return false;
-                    }
-                    if let Some(room) = rooms.1
-                        && let Some((base, _overlay)) = room.get_relative(x, y)
-                        && base != BaseTile::NotPartOfRoom
-                    {
-                        return false;
-                    }
-                    true
-                },
-                camera,
-                3,
-                1.0,
-            );
-            // Draw again with opacity to get the fading effect
-            if ratio != 1.0 && ratio != 0.0 {
-                renderer.draw_base_dual_grid(
-                    |x, y| {
-                        if let Some(room) = rooms.1
-                            && let Some((base, _overlay)) = room.get_relative(x, y)
-                            && base != BaseTile::NotPartOfRoom
-                        {
-                            return false;
-                        }
-                        true
-                    },
-                    camera,
-                    3,
-                    ratio,
-                );
+            let door_pos = rooms.3;
+
+            if ratio == 1.0 || ratio == 0.0 {
                 renderer.draw_base_dual_grid(
                     |x, y| {
                         if let Some(room) = rooms.0
@@ -214,7 +181,40 @@ impl DrawableGameState for Game {
                     },
                     camera,
                     3,
-                    1.0 - ratio,
+                    1.0,
+                );
+            } else if let (Some(room1), Some(room2)) = (rooms.0, rooms.1) {
+                renderer.draw_base_dual_grid(
+                    |x, y| {
+                        let dist_to_door = ((x - door_pos.0) * (x - door_pos.0)
+                            + (y - door_pos.1) * (y - door_pos.1))
+                            .isqrt();
+
+                        let room_max_dist = room1.h.max(room1.w);
+
+                        let distance_ratio = dist_to_door as f32 / room_max_dist as f32;
+
+                        if let Some((base, _overlay)) = room1.get_relative(x, y) {
+                            if (1.0 - distance_ratio) < ratio {
+                                return true;
+                            }
+                            if base != BaseTile::NotPartOfRoom {
+                                return false;
+                            }
+                        }
+                        if let Some((base, _overlay)) = room2.get_relative(x, y) {
+                            if distance_ratio / 2.0 + 0.5 > ratio {
+                                return true;
+                            }
+                            if base != BaseTile::NotPartOfRoom {
+                                return false;
+                            }
+                        }
+                        true
+                    },
+                    camera,
+                    3,
+                    1.0,
                 );
             }
         }
