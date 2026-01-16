@@ -155,7 +155,9 @@ impl DrawableGameState for Game {
                 bb.h + 2.0 / TILE_SIZE,
                 1.0,
             );
-            renderer.draw_enemy_health_bar(camera, enemy.as_ref());
+            if enemy.get_health().ratio() < 1.0 {
+                renderer.draw_enemy_health_bar(camera, enemy.as_ref());
+            }
         }
     }
 
