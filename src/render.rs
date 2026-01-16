@@ -851,6 +851,9 @@ impl Renderer {
         for ladder in map.get_ladders() {
             self.draw_from_texture_atlas("tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0);
         }
+        for platform in map.get_platforms() {
+            self.draw_from_texture_atlas("tiles", 2, false, platform.x, platform.y, 1.0, 1.0, 1.0);
+        }
     }
 
     fn update_dual_grid_indices(

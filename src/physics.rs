@@ -151,6 +151,29 @@ fn sweep_axis(
     (final_pos, true)
 }
 
+pub fn check_and_snap_platforms(
+    old_bb: &BoundingBox,
+    new_bb: &mut BoundingBox,
+    map: &dyn MapLike,
+) -> bool {
+    if (new_bb.y + new_bb.h).floor() > (old_bb.y + old_bb.h).floor()
+        && (map.is_platform_at(
+            new_bb.x.floor() as i32,
+            (new_bb.y + new_bb.h).floor() as i32,
+        ) || map.is_platform_at(
+            (new_bb.x + new_bb.w).floor() as i32,
+            (new_bb.y + new_bb.h).floor() as i32,
+        ))
+    {
+        new_bb.vy = 0.0;
+        let new_y = (old_bb.y + old_bb.h).floor() - old_bb.h - EPS * 8.0 + 1.0;
+        new_bb.y = new_y;
+        true
+    } else {
+        false
+    }
+}
+
 pub fn check_and_snap_hang(
     old_bb: &BoundingBox,
     new_bb: &BoundingBox,

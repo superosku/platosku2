@@ -33,7 +33,7 @@ This is my platformer game (prototype) written in rust.
 Run linters locally with this command
 
 ```
-cargo fix --bin platosku2 && cargo check && cargo fmt --all -- --check && cargo clippy --fix && cargo test
+cargo fix --bin platosku2 && cargo check && cargo fmt --all -- && cargo clippy --fix && cargo test
 ```
 
 ## Regenerate texture atlas:

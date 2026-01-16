@@ -5,7 +5,7 @@ use super::player::Player;
 use crate::camera::Camera;
 use crate::state::BoundingBox;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct InputState {
     pub left: bool,
     pub right: bool,

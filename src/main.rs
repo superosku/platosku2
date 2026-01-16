@@ -22,6 +22,7 @@ enum TileSelection {
     Stone,
     Wood,
     Ladder,
+    Platform,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -100,6 +101,8 @@ struct Stage {
 
 impl Stage {
     fn new(width: i32, height: i32) -> Stage {
+        println!("Stage new");
+
         let mut renderer = Renderer::new();
         let state = Box::new(Game::new());
 
