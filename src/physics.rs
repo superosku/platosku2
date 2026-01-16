@@ -62,9 +62,9 @@ pub fn integrate_kinematic(
     if on_bottom {
         if !(-0.002..=0.002).contains(&vx) {
             vx = vx - vx * 0.2;
-	    } else {
-		    vx = 0.0;
-	    }
+        } else {
+            vx = 0.0;
+        }
     }
 
     KinematicResult {
@@ -73,7 +73,7 @@ pub fn integrate_kinematic(
             y: out_y,
             w: bb.w,
             h: bb.h,
-            vx, 
+            vx,
             vy,
         },
         on_bottom,

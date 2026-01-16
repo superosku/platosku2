@@ -168,7 +168,7 @@ impl Player {
         } else if pressing_right {
             if self.bb.vx < self.max_speed {
                 self.bb.vx = self.bb.vx + 0.01;
-			}
+            }
             match self.state {
                 PlayerState::Swinging { .. } => {}
                 _ => {
@@ -186,14 +186,14 @@ impl Player {
 
         if input.jump && (self.on_ground || self.safe_edge_frames > 0) {
             self.safe_edge_frames = 0;
-			self.bb.vy = -0.125;
+            self.bb.vy = -0.125;
         } else if input.jump && self.max_jump_frames > 0 {
             self.max_jump_frames -= 1;
             self.bb.vy = -0.125;
         } else {
             self.max_jump_frames = 0; // if no input.jump reset to 0
         }
-        
+
         if input.swing {
             if let PlayerState::Normal = self.state {
                 self.state = PlayerState::Swinging {
