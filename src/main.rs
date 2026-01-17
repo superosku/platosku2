@@ -30,6 +30,7 @@ enum EnemySelection {
     Bat,
     Slime,
     Worm,
+    Mage,
 }
 
 #[derive(Debug, Eq, PartialEq)]
