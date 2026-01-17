@@ -62,7 +62,7 @@ pub fn integrate_kinematic(
             y: out_y,
             w: bb.w,
             h: bb.h,
-            vx: 0.0, // keep your original behavior: consume vx each frame
+            vx: bb.vx,
             vy,
         },
         on_bottom,
