@@ -197,12 +197,11 @@ impl GameState for Game {
                 }
             }
 
-            if let Some(swing_info) = self.player.get_swing_info() {
-                if enemy.can_be_hit()
-                    && enemy.bb().overlaps_line(&swing_info.pivot, &swing_info.end)
-                {
-                    enemy.got_hit()
-                }
+            if let Some(swing_info) = self.player.get_swing_info()
+                && enemy.can_be_hit()
+                && enemy.bb().overlaps_line(&swing_info.pivot, &swing_info.end)
+            {
+                enemy.got_hit()
             }
         }
         // Filter the enemies that are dead by enemy.is_dead() value
@@ -215,21 +214,20 @@ impl GameState for Game {
             // TODO: Use bb.get_center() here
             self.player.bb.x + self.player.bb.w * 0.5,
             self.player.bb.y + self.player.bb.h * 0.5,
-        ) {
-            if self.cur_room_index != Some(room_index) {
-                self.prev_room_index = self.cur_room_index;
-                self.cur_room_index = Some(room_index);
-                self.prev_room_show_frames = 60;
+        ) && self.cur_room_index != Some(room_index)
+        {
+            self.prev_room_index = self.cur_room_index;
+            self.cur_room_index = Some(room_index);
+            self.prev_room_show_frames = 60;
 
-                // Set the door closed here if the player is moving up and the door
-                // type is up down. This helps in going to a room above
-                for door in &mut self.map.doors {
-                    if door.goes_up_down
-                        && self.player.bb.vy < 0.0
-                        && self.player.bb.overlaps(&door.bb())
-                    {
-                        door.set_closed_for_frames(120)
-                    }
+            // Set the door closed here if the player is moving up and the door
+            // type is up down. This helps in going to a room above
+            for door in &mut self.map.doors {
+                if door.goes_up_down
+                    && self.player.bb.vy < 0.0
+                    && self.player.bb.overlaps(&door.bb())
+                {
+                    door.set_closed_for_frames(120)
                 }
             }
         }
@@ -243,10 +241,10 @@ impl GameState for Game {
                 .map(|enemy| {
                     let center = enemy.bb().center();
                     let enemy_room = self.map.get_room_at(center.x, center.y);
-                    if let Some((index, _)) = enemy_room {
-                        if index == cur_room_index {
-                            return true;
-                        }
+                    if let Some((index, _)) = enemy_room
+                        && index == cur_room_index
+                    {
+                        return true;
                     };
                     false
                 })
