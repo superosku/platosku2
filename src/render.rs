@@ -477,8 +477,9 @@ impl Renderer {
             BufferSource::empty::<u16>(dualgrid_ib_cap),
         );
 
-        let dualgrid_vertices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
-        let dualgrid_indices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
+        // TODO: Why 5 vectors? What if we just used one for all dual-grid tiles?
+        let dualgrid_vertices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        let dualgrid_indices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         Renderer {
             ctx,
@@ -523,6 +524,7 @@ impl Renderer {
         self.atlas_batch_indices.clear();
 
         // Draw base grid using dual-grid textured tiles
+        self.draw_base_dual_grid(|_x, _y| true, camera, 4, 1.0);
         self.draw_base_dual_grid(
             |x, y| matches!(state.map().get_at(x, y).0, BaseTile::NotPartOfRoom),
             camera,
