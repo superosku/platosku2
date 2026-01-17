@@ -220,14 +220,15 @@ impl GameState for Game {
         let player_center_x = self.player.bb.x + self.player.bb.w * 0.5;
         let player_center_y = self.player.bb.y + self.player.bb.h * 0.5;
         if let Some((room_index, _room)) = self.map.get_room_at(player_center_x, player_center_y)
-            && self.cur_room_index != Some(room_index) {
-                self.prev_room_index = self.cur_room_index;
-                self.cur_room_index = Some(room_index);
-                self.prev_room_show_frames = ROOM_TRANSITION_FRAMES;
-                self.room_change_position = (
-                    player_center_x.floor() as i32,
-                    player_center_y.floor() as i32,
-                );
+            && self.cur_room_index != Some(room_index)
+        {
+            self.prev_room_index = self.cur_room_index;
+            self.cur_room_index = Some(room_index);
+            self.prev_room_show_frames = ROOM_TRANSITION_FRAMES;
+            self.room_change_position = (
+                player_center_x.floor() as i32,
+                player_center_y.floor() as i32,
+            );
 
             // Set the door closed here if the player is moving up and the door
             // type is up down. This helps in going to a room above
