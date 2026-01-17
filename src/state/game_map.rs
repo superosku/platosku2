@@ -242,10 +242,10 @@ impl Room {
                     let digits_part = &file_name[5..file_name.len() - 5];
                     // remember observed width for padding
                     digit_width = digit_width.max(digits_part.len());
-                    if let Ok(num) = digits_part.parse::<u32>() {
-                        if num > max_index {
-                            max_index = num;
-                        }
+                    if let Ok(num) = digits_part.parse::<u32>()
+                        && num > max_index
+                    {
+                        max_index = num;
                     }
                 }
             }

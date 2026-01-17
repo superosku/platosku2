@@ -166,19 +166,17 @@ impl DrawableGameState for Game {
             let ratio = rooms.2;
             renderer.draw_base_dual_grid(
                 |x, y| {
-                    if let Some(room) = rooms.0 {
-                        if let Some((base, _overlay)) = room.get_relative(x, y) {
-                            if base != BaseTile::NotPartOfRoom {
-                                return false;
-                            }
-                        }
+                    if let Some(room) = rooms.0
+                        && let Some((base, _overlay)) = room.get_relative(x, y)
+                        && base != BaseTile::NotPartOfRoom
+                    {
+                        return false;
                     }
-                    if let Some(room) = rooms.1 {
-                        if let Some((base, _overlay)) = room.get_relative(x, y) {
-                            if base != BaseTile::NotPartOfRoom {
-                                return false;
-                            }
-                        }
+                    if let Some(room) = rooms.1
+                        && let Some((base, _overlay)) = room.get_relative(x, y)
+                        && base != BaseTile::NotPartOfRoom
+                    {
+                        return false;
                     }
                     true
                 },
@@ -190,12 +188,11 @@ impl DrawableGameState for Game {
             if ratio != 1.0 && ratio != 0.0 {
                 renderer.draw_base_dual_grid(
                     |x, y| {
-                        if let Some(room) = rooms.1 {
-                            if let Some((base, _overlay)) = room.get_relative(x, y) {
-                                if base != BaseTile::NotPartOfRoom {
-                                    return false;
-                                }
-                            }
+                        if let Some(room) = rooms.1
+                            && let Some((base, _overlay)) = room.get_relative(x, y)
+                            && base != BaseTile::NotPartOfRoom
+                        {
+                            return false;
                         }
                         true
                     },
@@ -205,12 +202,11 @@ impl DrawableGameState for Game {
                 );
                 renderer.draw_base_dual_grid(
                     |x, y| {
-                        if let Some(room) = rooms.0 {
-                            if let Some((base, _overlay)) = room.get_relative(x, y) {
-                                if base != BaseTile::NotPartOfRoom {
-                                    return false;
-                                }
-                            }
+                        if let Some(room) = rooms.0
+                            && let Some((base, _overlay)) = room.get_relative(x, y)
+                            && base != BaseTile::NotPartOfRoom
+                        {
+                            return false;
                         }
                         true
                     },
