@@ -175,8 +175,14 @@ impl Player {
                     self.dir = Dir::Right;
                 }
             }
+        } else {  // Ground and air friction
+            if !(-0.002..=0.002).contains(&self.bb.vx) {
+                self.bb.vx = self.bb.vx - self.bb.vx * 0.2;
+            } else {
+                self.bb.vx = 0.0;
+            }
         }
-
+        
         if self.on_ground {
             self.safe_edge_frames = 4;
             self.max_jump_frames = 10;
@@ -312,9 +318,10 @@ impl Player {
             PlayerState::OnLadder => {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Laddering);
-                if input.jump {
+                if input.jump && !input.up {
                     self.state = PlayerState::Normal;
-                    self.bb.vy = -0.15;
+                    self.bb.vy = -0.125;
+                    self.bb.y = self.bb.y + 0.05;
                     return;
                 }
 

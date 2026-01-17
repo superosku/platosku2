@@ -43,8 +43,6 @@ pub fn integrate_kinematic(
         bb.vy
     };
 
-    let mut vx = bb.vx;
-
     // Vertical sweep
     let (out_y, hit_y) = sweep_axis(world, out_x, bb.y, bb.w, bb.h, vy, Axis::Y);
 
@@ -58,22 +56,13 @@ pub fn integrate_kinematic(
         vy = 0.0;
     }
 
-    // Friction when on ground
-    if on_bottom {
-        if !(-0.002..=0.002).contains(&vx) {
-            vx = vx - vx * 0.2;
-        } else {
-            vx = 0.0;
-        }
-    }
-
     KinematicResult {
         new_bb: BoundingBox {
             x: out_x,
             y: out_y,
             w: bb.w,
             h: bb.h,
-            vx,
+            vx: bb.vx,
             vy,
         },
         on_bottom,
