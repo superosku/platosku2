@@ -195,7 +195,7 @@ impl Player {
         if input.jump && !input.down && (self.on_ground || self.safe_edge_frames > 0) {
             self.safe_edge_frames = 0;
             self.bb.vy = -0.125;
-        } else if input.jump && self.max_jump_frames > 0 {
+        } else if input.jump && !input.down && self.max_jump_frames > 0 {
             self.max_jump_frames -= 1;
             self.bb.vy = -0.125;
         } else {

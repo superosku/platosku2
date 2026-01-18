@@ -155,13 +155,16 @@ impl DrawableGameState for Game {
                 bb.h + 2.0 / TILE_SIZE,
                 1.0,
             );
-            if enemy.get_health().ratio() < 1.0 {
-                renderer.draw_enemy_health_bar(camera, enemy.as_ref());
-            }
         }
     }
 
     fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
+        for enemy in &self.enemies {
+            if enemy.get_health().ratio() < 1.0 {
+                renderer.draw_enemy_health_bar(camera, enemy.as_ref());
+            }
+        }
+
         // Draw "the dark" (the overaly)
         if show_dark {
             let rooms = self.get_rooms_for_display();
@@ -611,9 +614,9 @@ impl Renderer {
         self.ctx.apply_pipeline(&self.pipeline_hud);
         self.ctx.apply_bindings(&self.bindings);
 
-        self.draw_hud(state, camera);
-
         state.draw_extra_last(camera, self, show_dark);
+
+        self.draw_hud(state, camera);
 
         self.ctx.end_render_pass();
     }
