@@ -155,51 +155,23 @@ impl DrawableGameState for Game {
                 bb.h + 2.0 / TILE_SIZE,
                 1.0,
             );
-            renderer.draw_enemy_health_bar(camera, enemy.as_ref());
         }
     }
 
     fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
+        for enemy in &self.enemies {
+            if enemy.get_health().ratio() < 1.0 {
+                renderer.draw_enemy_health_bar(camera, enemy.as_ref());
+            }
+        }
+
         // Draw "the dark" (the overaly)
         if show_dark {
             let rooms = self.get_rooms_for_display();
             let ratio = rooms.2;
-            renderer.draw_base_dual_grid(
-                |x, y| {
-                    if let Some(room) = rooms.0
-                        && let Some((base, _overlay)) = room.get_relative(x, y)
-                        && base != BaseTile::NotPartOfRoom
-                    {
-                        return false;
-                    }
-                    if let Some(room) = rooms.1
-                        && let Some((base, _overlay)) = room.get_relative(x, y)
-                        && base != BaseTile::NotPartOfRoom
-                    {
-                        return false;
-                    }
-                    true
-                },
-                camera,
-                3,
-                1.0,
-            );
-            // Draw again with opacity to get the fading effect
-            if ratio != 1.0 && ratio != 0.0 {
-                renderer.draw_base_dual_grid(
-                    |x, y| {
-                        if let Some(room) = rooms.1
-                            && let Some((base, _overlay)) = room.get_relative(x, y)
-                            && base != BaseTile::NotPartOfRoom
-                        {
-                            return false;
-                        }
-                        true
-                    },
-                    camera,
-                    3,
-                    ratio,
-                );
+            let door_pos = rooms.3;
+
+            if ratio == 1.0 || ratio == 0.0 {
                 renderer.draw_base_dual_grid(
                     |x, y| {
                         if let Some(room) = rooms.0
@@ -212,7 +184,40 @@ impl DrawableGameState for Game {
                     },
                     camera,
                     3,
-                    1.0 - ratio,
+                    1.0,
+                );
+            } else if let (Some(room1), Some(room2)) = (rooms.0, rooms.1) {
+                renderer.draw_base_dual_grid(
+                    |x, y| {
+                        let dist_to_door = ((x - door_pos.0) * (x - door_pos.0)
+                            + (y - door_pos.1) * (y - door_pos.1))
+                            .isqrt();
+
+                        let room_max_dist = room1.h.max(room1.w);
+
+                        let distance_ratio = dist_to_door as f32 / room_max_dist as f32;
+
+                        if let Some((base, _overlay)) = room1.get_relative(x, y) {
+                            if (1.0 - distance_ratio) < ratio {
+                                return true;
+                            }
+                            if base != BaseTile::NotPartOfRoom {
+                                return false;
+                            }
+                        }
+                        if let Some((base, _overlay)) = room2.get_relative(x, y) {
+                            if distance_ratio / 2.0 + 0.5 > ratio {
+                                return true;
+                            }
+                            if base != BaseTile::NotPartOfRoom {
+                                return false;
+                            }
+                        }
+                        true
+                    },
+                    camera,
+                    3,
+                    1.0,
                 );
             }
         }
@@ -475,8 +480,9 @@ impl Renderer {
             BufferSource::empty::<u16>(dualgrid_ib_cap),
         );
 
-        let dualgrid_vertices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
-        let dualgrid_indices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()]; //: Vec<Vec<Vertex>>,
+        // TODO: Why 5 vectors? What if we just used one for all dual-grid tiles?
+        let dualgrid_vertices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        let dualgrid_indices = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         Renderer {
             ctx,
@@ -521,6 +527,7 @@ impl Renderer {
         self.atlas_batch_indices.clear();
 
         // Draw base grid using dual-grid textured tiles
+        self.draw_base_dual_grid(|_x, _y| true, camera, 4, 1.0);
         self.draw_base_dual_grid(
             |x, y| matches!(state.map().get_at(x, y).0, BaseTile::NotPartOfRoom),
             camera,
@@ -607,9 +614,9 @@ impl Renderer {
         self.ctx.apply_pipeline(&self.pipeline_hud);
         self.ctx.apply_bindings(&self.bindings);
 
-        self.draw_hud(state, camera);
-
         state.draw_extra_last(camera, self, show_dark);
+
+        self.draw_hud(state, camera);
 
         self.ctx.end_render_pass();
     }
@@ -850,6 +857,9 @@ impl Renderer {
     fn draw_overlay(&mut self, map: &dyn MapLike) {
         for ladder in map.get_ladders() {
             self.draw_from_texture_atlas("tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0);
+        }
+        for platform in map.get_platforms() {
+            self.draw_from_texture_atlas("tiles", 2, false, platform.x, platform.y, 1.0, 1.0, 1.0);
         }
     }
 

@@ -428,11 +428,9 @@ impl Enemy for Worm {
         self.bb = res.new_bb;
 
         if res.on_right {
-            println!("We are on right");
             self.dir = Dir::Left
         };
         if res.on_left {
-            println!("We are on left");
             self.dir = Dir::Right
         };
 

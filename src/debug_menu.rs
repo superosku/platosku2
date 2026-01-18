@@ -52,8 +52,23 @@ impl GameStateDebugMenu for Editor {
                 }
                 TileSelection::Ladder => {
                     self.map_mut().set_base(coords.0, coords.1, BaseTile::Empty);
-                    self.map_mut()
-                        .set_overlay(coords.0, coords.1, OverlayTile::Ladder);
+
+                    let tile_to_set = match self.map().get_at(coords.0, coords.1) {
+                        (_, OverlayTile::Platform) => OverlayTile::LadderPlatform,
+                        _ => OverlayTile::Ladder,
+                    };
+
+                    self.map_mut().set_overlay(coords.0, coords.1, tile_to_set);
+                }
+                TileSelection::Platform => {
+                    self.map_mut().set_base(coords.0, coords.1, BaseTile::Empty);
+
+                    let tile_to_set = match self.map().get_at(coords.0, coords.1) {
+                        (_, OverlayTile::Ladder) => OverlayTile::LadderPlatform,
+                        _ => OverlayTile::Platform,
+                    };
+
+                    self.map_mut().set_overlay(coords.0, coords.1, tile_to_set);
                 }
                 TileSelection::Stone => {
                     self.map_mut().set_base(coords.0, coords.1, BaseTile::Stone);
@@ -171,6 +186,7 @@ impl GameStateDebugMenu for Editor {
                     TileSelection::Clear,
                     TileSelection::Wood,
                     TileSelection::Ladder,
+                    TileSelection::Platform,
                     TileSelection::Stone,
                 ] {
                     if ui

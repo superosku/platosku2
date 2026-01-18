@@ -19,6 +19,8 @@ pub enum BaseTile {
 pub enum OverlayTile {
     None = 0,
     Ladder = 1,
+    Platform = 2,
+    LadderPlatform = 3,
 }
 
 pub trait MapLike {
@@ -26,10 +28,19 @@ pub trait MapLike {
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
     fn get_ladders(&self) -> Vec<Pos>;
+    fn get_platforms(&self) -> Vec<Pos>;
 
     fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
-        let (_base, overlay) = self.get_at(tx, ty);
-        matches!(overlay, OverlayTile::Ladder)
+        matches!(
+            self.get_at(tx, ty),
+            (_, OverlayTile::Ladder) | (_, OverlayTile::LadderPlatform)
+        )
+    }
+    fn is_platform_at(&self, tx: i32, ty: i32) -> bool {
+        matches!(
+            self.get_at(tx, ty),
+            (_, OverlayTile::Platform) | (_, OverlayTile::LadderPlatform)
+        )
     }
     fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool;
 
@@ -490,7 +501,27 @@ impl MapLike for Room {
 
         for x in 0..self.w {
             for y in 0..self.h {
-                if let (_, OverlayTile::Ladder) = self.get_absolute(x, y) {
+                if matches!(
+                    self.get_absolute(x, y),
+                    (_, OverlayTile::Ladder) | (_, OverlayTile::LadderPlatform)
+                ) {
+                    all_pos.push(Pos::new(x as f32 + self.x as f32, y as f32 + self.y as f32));
+                }
+            }
+        }
+
+        all_pos
+    }
+
+    fn get_platforms(&self) -> Vec<Pos> {
+        let mut all_pos = Vec::new();
+
+        for x in 0..self.w {
+            for y in 0..self.h {
+                if matches!(
+                    self.get_absolute(x, y),
+                    (_, OverlayTile::Platform) | (_, OverlayTile::LadderPlatform)
+                ) {
                     all_pos.push(Pos::new(x as f32 + self.x as f32, y as f32 + self.y as f32));
                 }
             }
@@ -638,6 +669,7 @@ pub struct GameMap {
 
     // These are used for when returning the game data for optimization reasons
     ladder_pos: Vec<Pos>,
+    platform_pos: Vec<Pos>,
     x: i32,
     y: i32,
     w: u32,
@@ -729,7 +761,7 @@ impl GameMap {
             rooms,
             doors: Vec::new(),
             ladder_pos: Vec::new(),
-
+            platform_pos: Vec::new(),
             x: 0,
             y: 0,
             h: 0,
@@ -862,6 +894,9 @@ impl GameMap {
         for room in &game_map.rooms {
             let mut room_ladders = room.get_ladders();
             game_map.ladder_pos.append(&mut room_ladders);
+
+            let mut room_platforms = room.get_platforms();
+            game_map.platform_pos.append(&mut room_platforms);
         }
 
         let (x, y, w, h) = game_map.get_bounds();
@@ -934,6 +969,10 @@ impl MapLike for GameMap {
 
     fn get_ladders(&self) -> Vec<Pos> {
         self.ladder_pos.clone()
+    }
+
+    fn get_platforms(&self) -> Vec<Pos> {
+        self.platform_pos.clone()
     }
 
     fn set_base(&mut self, _x: i32, _y: i32, _tile: BaseTile) {

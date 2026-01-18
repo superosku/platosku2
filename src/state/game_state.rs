@@ -5,7 +5,7 @@ use super::player::Player;
 use crate::camera::Camera;
 use crate::state::BoundingBox;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct InputState {
     pub left: bool,
     pub right: bool,
@@ -81,7 +81,10 @@ pub struct Game {
     cur_room_index: Option<usize>,
     prev_room_index: Option<usize>,
     prev_room_show_frames: i32,
+    room_change_position: (i32, i32),
 }
+
+const ROOM_TRANSITION_FRAMES: i32 = 30;
 
 impl Game {
     pub fn new() -> Game {
@@ -98,10 +101,11 @@ impl Game {
             cur_room_index: None,
             prev_room_index: None,
             prev_room_show_frames: 0,
+            room_change_position: (0, 0),
         }
     }
 
-    pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>, f32) {
+    pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>, f32, (i32, i32)) {
         let cur_room = self.cur_room_index.map(|index| &self.map.rooms[index]);
         let mut prev_room = self.prev_room_index.map(|index| &self.map.rooms[index]);
         if self.prev_room_show_frames == 0 {
@@ -110,7 +114,8 @@ impl Game {
         (
             cur_room,
             prev_room,
-            self.prev_room_show_frames as f32 / 60.0,
+            self.prev_room_show_frames as f32 / ROOM_TRANSITION_FRAMES as f32,
+            self.room_change_position,
         )
     }
 }
@@ -210,15 +215,20 @@ impl GameState for Game {
         // Store the current and previous room as well as how many frames the previous has
         // been the previous. This is used for centering the camera and displaying the "black"
         // around the current room (/ rooms).
-        if let Some((room_index, _room)) = self.map.get_room_at(
-            // TODO: Use bb.get_center() here
-            self.player.bb.x + self.player.bb.w * 0.5,
-            self.player.bb.y + self.player.bb.h * 0.5,
-        ) && self.cur_room_index != Some(room_index)
+
+        // TODO: Use bb.get_center() here
+        let player_center_x = self.player.bb.x + self.player.bb.w * 0.5;
+        let player_center_y = self.player.bb.y + self.player.bb.h * 0.5;
+        if let Some((room_index, _room)) = self.map.get_room_at(player_center_x, player_center_y)
+            && self.cur_room_index != Some(room_index)
         {
             self.prev_room_index = self.cur_room_index;
             self.cur_room_index = Some(room_index);
-            self.prev_room_show_frames = 60;
+            self.prev_room_show_frames = ROOM_TRANSITION_FRAMES;
+            self.room_change_position = (
+                player_center_x.floor() as i32,
+                player_center_y.floor() as i32,
+            );
 
             // Set the door closed here if the player is moving up and the door
             // type is up down. This helps in going to a room above

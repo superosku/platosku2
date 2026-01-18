@@ -1,7 +1,7 @@
 use super::common::{BoundingBox, Dir, Health, Pos};
 use super::game_map::MapLike;
 use super::game_state::InputState;
-use crate::physics::{check_and_snap_hang, integrate_kinematic};
+use crate::physics::{check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 
 pub enum PlayerState {
@@ -191,10 +191,11 @@ impl Player {
             self.safe_edge_frames -= 1;
         }
 
-        if input.jump && (self.on_ground || self.safe_edge_frames > 0) {
+        // 1. Want to jump 2. Not trying to go down ledge 3. Can jump
+        if input.jump && !input.down && (self.on_ground || self.safe_edge_frames > 0) {
             self.safe_edge_frames = 0;
             self.bb.vy = -0.125;
-        } else if input.jump && self.max_jump_frames > 0 {
+        } else if input.jump && !input.down && self.max_jump_frames > 0 {
             self.max_jump_frames -= 1;
             self.bb.vy = -0.125;
         } else {
@@ -211,20 +212,25 @@ impl Player {
         }
 
         let res = integrate_kinematic(map, &self.bb, true);
-        let new_bb = res.new_bb;
-        let on_ground = res.on_bottom;
+        let mut new_bb = res.new_bb;
+        let mut on_ground = res.on_bottom;
 
         let could_ladder = map.is_ladder_at(
             (new_bb.x + new_bb.w * 0.5).floor() as i32,
             (new_bb.y + new_bb.h * 0.5).floor() as i32,
         );
-        if could_ladder && (input.up || input.down) && !(input.down && self.on_ground) {
+
+        if could_ladder && (input.up || input.down) && !(input.down && res.on_bottom) {
             self.state = PlayerState::OnLadder;
             let middle_tx = (new_bb.x + new_bb.w * 0.5).floor() as i32;
             self.bb.x = (middle_tx as f32 + 0.5) - self.bb.w * 0.5;
             self.bb.vx = 0.0;
 
             return;
+        }
+
+        if !(input.down && input.jump) {
+            on_ground |= check_and_snap_platforms(&self.bb, &mut new_bb, map);
         }
 
         if self.bb.vy > 0.0 && (pressing_left || pressing_right) {
@@ -347,6 +353,7 @@ impl Player {
                         self.state = PlayerState::Normal;
                         self.on_ground = true;
                         self.bb.vy = 0.0;
+                        self.bb.y = feet_y.floor() - self.bb.h - 0.0001;
                         return;
                     }
                 } else {
