@@ -4,6 +4,16 @@ use super::game_state::InputState;
 use crate::physics::{check_and_snap_hang, integrate_kinematic};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 
+pub trait PlayerLike {
+    fn bb(&self) -> &BoundingBox;
+}
+
+impl PlayerLike for Player {
+    fn bb(&self) -> &BoundingBox {
+        &self.bb
+    }
+}
+
 pub enum PlayerState {
     Normal,
     Swinging { total_frames: u32, frames_left: u32 },
@@ -306,6 +316,7 @@ impl Player {
             PlayerState::Dead => {
                 let res = integrate_kinematic(map, &self.bb, true);
                 self.bb = res.new_bb;
+                self.bb.vx = 0.0;
                 self.on_ground = res.on_bottom;
 
                 self.animation_handler

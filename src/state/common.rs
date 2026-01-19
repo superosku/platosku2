@@ -109,6 +109,13 @@ impl BoundingBox {
             || other.y + other.h <= self.y)
     }
 
+    pub fn in_range(&self, other: &BoundingBox, range: f32) -> bool {
+		!(self.x + self.w + range < other.x
+			|| other.x + other.w + range < self.x
+			|| self.y + self.h + range < other.y
+			|| other.y + other.h + range < self.y)
+	}
+
     pub fn point_inside(&self, pos: &Pos) -> bool {
         pos.x >= self.x && pos.x <= self.x + self.w && pos.y >= self.y && pos.y <= self.y + self.h
     }

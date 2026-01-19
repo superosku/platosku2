@@ -1,5 +1,6 @@
 use super::common::{BoundingBox, Health};
 use super::game_map::MapLike;
+use super::player::PlayerLike;
 use crate::physics::integrate_kinematic;
 use crate::state::Dir;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
@@ -9,7 +10,7 @@ use rand::prelude::*;
 pub trait Enemy {
     fn bb(&self) -> &BoundingBox;
 
-    fn update(&mut self, map: &dyn MapLike);
+    fn update(&mut self, map: &dyn MapLike, player: &dyn PlayerLike);
     fn got_stomped(&mut self);
     fn can_be_stomped(&self) -> bool;
     fn got_hit(&mut self);
@@ -79,7 +80,7 @@ impl Enemy for Slime {
         &self.bb
     }
 
-    fn update(&mut self, map: &dyn MapLike) {
+    fn update(&mut self, map: &dyn MapLike, player: &dyn PlayerLike) {
         let result = integrate_kinematic(map, &self.bb, true);
         self.bb = result.new_bb;
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
@@ -251,7 +252,7 @@ impl Enemy for Bat {
         &self.bb
     }
 
-    fn update(&mut self, map: &dyn MapLike) {
+    fn update(&mut self, map: &dyn MapLike, player: &dyn PlayerLike) {
         let mut new_state: Option<BatState> = None;
 
         match &mut self.state {
@@ -414,7 +415,7 @@ impl Enemy for Worm {
         &self.bb
     }
 
-    fn update(&mut self, map: &dyn MapLike) {
+    fn update(&mut self, map: &dyn MapLike, player: &dyn PlayerLike) {
         match self.dir {
             Dir::Left => {
                 self.bb.vx = -0.01;
@@ -497,7 +498,7 @@ impl AnimationConfig for MageAnimationState {
 	fn get_config(&self) -> AnimationConfigResult {
 		match self {
 			MageAnimationState::Idle => AnimationConfigResult::new(0, 1, 60),
-			MageAnimationState::Walking => AnimationConfigResult::new(2, 5, 15),
+			MageAnimationState::Walking => AnimationConfigResult::new(2, 5, 10),
 			MageAnimationState::Casting => AnimationConfigResult::new_no_loop(6, 8, 20),
 		}
 	}
@@ -545,27 +546,77 @@ impl Enemy for Mage {
 		&self.bb
 	}
 
-	fn update(&mut self, map: &dyn MapLike) {
+	fn update(&mut self, map: &dyn MapLike, player: &dyn PlayerLike) {
 		let result = integrate_kinematic(map, &self.bb, true);
         self.bb = result.new_bb;
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
 
+        if self.bb.in_range(player.bb(), 4.0) {
+            self.state = MageState::Casting { frames_remaining: 60 };
+            self.bb.vx = 0.0;
+            self.dir = if player.bb().x > self.bb.x {
+                Dir::Right
+            } else {
+                Dir::Left
+            };
+        }
+
         match self.state {
             MageState::Idle { frames_remaining } => {
                 self.animation_handler.set_state(MageAnimationState::Idle);
+                self.bb.vx = 0.0;
+                if frames_remaining == 0 {
+                    self.state = MageState::Walking {
+                        frames_remaining: 100,
+                    };
+                    self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
+                } else {
+                    self.state = MageState::Idle {
+                        frames_remaining: frames_remaining - 1,
+                    }
+                }
             }
             MageState::Walking { frames_remaining } => {
                 self.animation_handler.set_state(MageAnimationState::Walking);
+                
+                match self.dir {
+                    Dir::Left => {
+                        self.bb.vx = -0.01;
+                    }
+                    Dir::Right => {
+                        self.bb.vx = 0.01;
+                    }
+                }
+
+                if frames_remaining == 0 {
+                    self.state = MageState::Idle {
+                        frames_remaining: 100,
+                    };
+                    
+                } else {
+                    self.state = MageState::Walking {
+                        frames_remaining: frames_remaining - 1,
+                    }
+                }
             }
             MageState::Casting { frames_remaining } => {
                 self.animation_handler.set_state(MageAnimationState::Casting);
+                if frames_remaining == 0 {
+					self.state = MageState::Idle {
+						frames_remaining: 100,
+					};
+				} else {
+                    self.state = MageState::Casting {
+                        frames_remaining: frames_remaining - 1,
+                    }
+                }
             }
         }
         self.animation_handler.increment_frame();
     }
 
 	fn got_stomped(&mut self) {
-		self.immunity_frames = 10;
+		self.immunity_frames = 20;
         self.state = MageState::Idle {
             frames_remaining: 50,
         };
@@ -578,7 +629,7 @@ impl Enemy for Mage {
 
 	fn got_hit(&mut self) {
 		if self.immunity_frames == 0 {
-            self.immunity_frames = 10;
+            self.immunity_frames = 20;
             self.state = MageState::Idle {
                 frames_remaining: 50,
             };

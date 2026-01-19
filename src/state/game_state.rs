@@ -187,7 +187,7 @@ impl GameState for Game {
         self.coins.retain(|c| !c.overlaps(&self.player.bb));
 
         for enemy in &mut self.enemies {
-            enemy.update(&self.map);
+            enemy.update(&self.map, &self.player);
 
             if enemy.bb().overlaps(&self.player.bb) {
                 if enemy.can_be_stomped() && self.player.maybe_stomp(enemy.bb()) {
