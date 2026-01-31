@@ -1,9 +1,9 @@
 pub mod animation_handler;
-pub mod coin;
 pub mod common;
 pub mod enemies;
 pub mod game_map;
 pub mod game_state;
+pub mod item;
 pub mod player;
 
 pub use common::{BoundingBox, Dir, Pos};

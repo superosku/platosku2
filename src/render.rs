@@ -114,7 +114,7 @@ pub trait DrawableGameState: GameState {
 }
 
 impl DrawableGameState for Game {
-    fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
+    fn draw_extra_mid(&self, _camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
         // Draw the doors
         for door in &self.map.doors {
             renderer.draw_from_texture_atlas(
@@ -130,15 +130,8 @@ impl DrawableGameState for Game {
         }
 
         // Coins
-        for coin in &self.coins {
-            renderer.draw_rect(
-                camera,
-                coin.bb.x,
-                coin.bb.y,
-                coin.bb.w,
-                coin.bb.h,
-                [1.0, 0.85, 0.2, 1.0],
-            );
+        for item in &self.items {
+            item.draw(renderer);
         }
 
         // draw enemies
@@ -655,7 +648,7 @@ impl Renderer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn draw_from_texture_atlas(
+    pub fn draw_from_texture_atlas(
         &mut self,
         texture_index: &str,
         atlas_index: u32,
