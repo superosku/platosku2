@@ -156,9 +156,8 @@ impl Player {
         let pressing_right = input.right && !input.left;
 
         if pressing_left {
-            if self.bb.vx > -self.max_speed {
-                self.bb.vx -= 0.01;
-            }
+            self.bb.vx = (-self.max_speed).max(self.bb.vx - 0.02);
+
             match self.state {
                 PlayerState::Swinging { .. } => {}
                 _ => {
@@ -166,9 +165,8 @@ impl Player {
                 }
             }
         } else if pressing_right {
-            if self.bb.vx < self.max_speed {
-                self.bb.vx += 0.01;
-            }
+            self.bb.vx = self.max_speed.min(self.bb.vx + 0.02);
+
             match self.state {
                 PlayerState::Swinging { .. } => {}
                 _ => {
@@ -178,7 +176,7 @@ impl Player {
         } else {
             // Ground and air friction
             if !(-0.002..=0.002).contains(&self.bb.vx) {
-                self.bb.vx = self.bb.vx - self.bb.vx * 0.2;
+                self.bb.vx = self.bb.vx - self.bb.vx * 0.3;
             } else {
                 self.bb.vx = 0.0;
             }

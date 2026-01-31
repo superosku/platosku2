@@ -1,9 +1,10 @@
-use super::coin::Coin;
 use super::enemies::Enemy;
 use super::game_map::{GameMap, MapLike, Room};
 use super::player::Player;
 use crate::camera::Camera;
 use crate::state::BoundingBox;
+use crate::state::item::Item;
+use rand::Rng;
 
 #[derive(Default, Debug)]
 pub struct InputState {
@@ -75,7 +76,7 @@ impl GameState for Editor {
 pub struct Game {
     pub player: Player,
     pub map: GameMap,
-    pub coins: Vec<Coin>,
+    pub items: Vec<Item>,
     pub enemies: Vec<Box<dyn Enemy>>,
 
     cur_room_index: Option<usize>,
@@ -93,10 +94,26 @@ impl Game {
         let player = Player::new(pos.0, pos.1);
         let enemies = map.get_enemies_from_templates();
 
+        // Add some random items to the map
+        let mut items = vec![];
+        for _ in 0..10000 {
+            let (min_x, min_y, width, height) = map.get_bounds();
+            let mut rng = rand::rng();
+            let x = rng.random_range(min_x..min_x + width);
+            let y = rng.random_range(min_y..min_y + height);
+
+            if !map.is_solid_at_tile(x, y) {
+                items.push(Item::new_random(x as f32 + 0.5, y as f32 + 0.5));
+            }
+            if items.len() > 50 {
+                break;
+            }
+        }
+
         Game {
             player,
             map,
-            coins: vec![],
+            items,
             enemies,
             cur_room_index: None,
             prev_room_index: None,
@@ -186,10 +203,10 @@ impl GameState for Game {
             self.player.update(input, &self.map);
         }
 
-        for coin in &mut self.coins {
-            coin.update(&self.map);
+        for item in &mut self.items {
+            item.update(&self.map);
         }
-        self.coins.retain(|c| !c.overlaps(&self.player.bb));
+        // self.coins.retain(|c| !c.overlaps(&self.player.bb));
 
         for enemy in &mut self.enemies {
             enemy.update(&self.map);
@@ -260,10 +277,12 @@ impl GameState for Game {
                 })
                 .collect();
             list_of_bools.retain(|b| *b);
-            let room_has_enemies = !list_of_bools.is_empty();
+            let _room_has_enemies = !list_of_bools.is_empty();
 
             for door in &mut self.map.doors {
-                door.update(!room_has_enemies);
+                // door.update(!room_has_enemies);
+                // TODO: TEMP DOORS ALWAYS OPEN
+                door.update(true);
             }
         } else {
             for door in &mut self.map.doors {

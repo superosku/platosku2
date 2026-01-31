@@ -45,7 +45,17 @@ impl AtlasInfo {
 
         for frame in file_content.frames {
             let without_ext = frame.file_name.strip_suffix(".aseprite").unwrap();
-            let (name, number) = without_ext.rsplit_once(' ').unwrap();
+
+            let (name, number) = if without_ext.contains(" ") {
+                without_ext.rsplit_once(' ').unwrap()
+            } else {
+                (without_ext, "0")
+            };
+
+            // println!("without_ext: {}", without_ext);
+            // let (name, number) = without_ext.rsplit_once(' ').unwrap();
+            // println!("name: {}, number: {}", name, number);
+
             let index = number.parse::<i32>().ok().unwrap();
             mapper.insert(
                 (name.to_string(), index),
