@@ -19,11 +19,7 @@ impl GameStateDebugMenu for Game {
 
     fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu) {
         if ui.add(egui::Button::new("Regenerate map")).clicked() {
-            // TODO: This is hack to regenerate the state. Need to figure out somethign better...
-            let new_state = Game::new();
-            self.map = new_state.map;
-            self.enemies = new_state.enemies;
-            self.player = new_state.player;
+            *self = Game::new();
         }
 
         ui.add(egui::Checkbox::new(
