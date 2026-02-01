@@ -44,6 +44,8 @@ cargo check
 cargo fmt --all -- 
 cargo clippy --fix 
 cargo test
+git add .
+git commit -m "TMP linter fixes"
 ```
 
 ## Regenerate texture atlas:
