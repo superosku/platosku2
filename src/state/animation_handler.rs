@@ -42,6 +42,10 @@ impl<T: AnimationConfig + PartialEq> AnimationHandler<T> {
         }
     }
 
+    pub fn current_state(&self) -> &T {
+        &self.state
+    }
+
     pub fn set_state(&mut self, new_state: T) {
         if self.state != new_state {
             self.current_frame = 0;
