@@ -45,7 +45,7 @@ impl Item {
         }
     }
 
-    pub fn draw(&self, renderer: &mut Renderer) {
+    pub fn draw_fake_xy(&self, renderer: &mut Renderer, x: f32, y: f32) {
         renderer.draw_from_texture_atlas(
             match self.item_type {
                 ItemType::Coin => "coin",
@@ -55,21 +55,38 @@ impl Item {
             },
             0,
             false,
-            self.bb.x,
-            self.bb.y,
+            x,
+            y,
             self.bb.w,
             self.bb.h,
             1.0,
         );
     }
 
+    pub fn set_xyv(&mut self, x: f32, y: f32, vx: f32, vy: f32) {
+        self.bb.x = x;
+        self.bb.y = y;
+        self.bb.vx = vx;
+        self.bb.vy = vy;
+    }
+
+    pub fn overlaps(&self, bb: &BoundingBox) -> bool {
+        self.bb.overlaps(bb)
+    }
+
+    pub fn draw(&self, renderer: &mut Renderer) {
+        self.draw_fake_xy(renderer, self.bb.x, self.bb.y);
+    }
+
     pub fn new_random(center_x: f32, center_y: f32) -> Self {
         let mut rng = rand::rng();
 
-        let item_types = [ItemType::Coin,
+        let item_types = [
+            ItemType::Coin,
             ItemType::SmallStone,
             ItemType::LargeStone,
-            ItemType::Box];
+            ItemType::Box,
+        ];
 
         let random_type = item_types.choose(&mut rng).unwrap();
 

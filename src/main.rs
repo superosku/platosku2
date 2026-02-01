@@ -150,6 +150,9 @@ impl EventHandler for Stage {
                 .update_camera(&mut self.camera, !self.debug_menu.zoom_show_full); // HERE is the actual game call
             self.updates += 1;
             self.accumulator -= dt;
+
+            self.input.swing_pressed = false;
+            self.input.jump_pressed = false;
         }
 
         let elapsed = update_start - self.last_time_ups;
@@ -226,13 +229,23 @@ impl EventHandler for Stage {
         self.renderer.resize(width, height);
     }
 
-    fn key_down_event(&mut self, keycode: KeyCode, keymods: KeyMods, _repeat: bool) {
+    fn key_down_event(&mut self, keycode: KeyCode, keymods: KeyMods, repeat: bool) {
         match keycode {
             KeyCode::Left => self.input.left = true,
             KeyCode::Right => self.input.right = true,
             KeyCode::Up => self.input.up = true,
-            KeyCode::X => self.input.swing = true,
-            KeyCode::Z => self.input.jump = true,
+            KeyCode::X => {
+                if !repeat && !self.input.swing_held {
+                    self.input.swing_pressed = true
+                }
+                self.input.swing_held = true
+            }
+            KeyCode::Z => {
+                if !repeat && !self.input.swing_held {
+                    self.input.jump_pressed = true
+                }
+                self.input.jump_held = true
+            }
             KeyCode::Down => self.input.down = true,
             _ => {}
         }
@@ -244,8 +257,8 @@ impl EventHandler for Stage {
             KeyCode::Left => self.input.left = false,
             KeyCode::Right => self.input.right = false,
             KeyCode::Up => self.input.up = false,
-            KeyCode::X => self.input.swing = false,
-            KeyCode::Z => self.input.jump = false,
+            KeyCode::X => self.input.swing_held = false,
+            KeyCode::Z => self.input.jump_held = false,
             KeyCode::Down => self.input.down = false,
             _ => {}
         }

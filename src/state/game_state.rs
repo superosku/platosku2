@@ -1,6 +1,6 @@
 use super::enemies::Enemy;
 use super::game_map::{GameMap, MapLike, Room};
-use super::player::Player;
+use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
 use crate::state::BoundingBox;
 use crate::state::item::Item;
@@ -11,9 +11,12 @@ pub struct InputState {
     pub left: bool,
     pub right: bool,
     pub up: bool,
-    pub jump: bool,
     pub down: bool,
-    pub swing: bool,
+
+    pub swing_pressed: bool,
+    pub jump_pressed: bool,
+    pub swing_held: bool,
+    pub jump_held: bool,
 }
 
 pub trait GameState {
@@ -200,7 +203,24 @@ impl GameState for Game {
                 println!("No push dir found");
             }
         } else {
-            self.player.update(input, &self.map);
+            let update_results = self.player.update(input, &self.map);
+            for result in update_results {
+                match result {
+                    PlayerUpdateResult::AddItem { item } => {
+                        self.items.push(item);
+                    }
+                    PlayerUpdateResult::PickUpItem => {
+                        if let Some(item_match_index) = self
+                            .items
+                            .iter()
+                            .position(|item| item.overlaps(&self.player.bb))
+                        {
+                            let item_match = self.items.remove(item_match_index);
+                            self.player.set_item(item_match)
+                        }
+                    }
+                }
+            }
         }
 
         for item in &mut self.items {

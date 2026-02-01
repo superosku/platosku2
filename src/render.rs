@@ -1,10 +1,10 @@
 use super::state::enemies::Enemy;
 use crate::atlas_info::AtlasInfo;
 use crate::camera::Camera;
+use crate::state::BaseTile;
 use crate::state::GameState;
 use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
-use crate::state::{BaseTile, Dir};
 
 use image::GenericImageView;
 use miniquad::*;
@@ -87,7 +87,7 @@ fn load_texture(ctx: &mut Box<dyn RenderingBackend>, path: &str) -> TextureInfo 
     }
 }
 
-const TILE_SIZE: f32 = 16.0;
+pub const TILE_SIZE: f32 = 16.0;
 
 const DUAL_GRID_UV_TABLE: [(u32, u32); 16] = [
     (0, 0), // 0
@@ -129,12 +129,12 @@ impl DrawableGameState for Game {
             );
         }
 
-        // Coins
+        // Items
         for item in &self.items {
             item.draw(renderer);
         }
 
-        // draw enemies
+        // Enemies
         for enemy in &self.enemies {
             let bb = enemy.bb();
             // self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
@@ -547,58 +547,11 @@ impl Renderer {
         state.draw_extra_mid(camera, self, show_dark);
 
         // draw player on top
-        let px = state.player().bb.x;
-        let py = state.player().bb.y;
-        let pw = state.player().bb.w;
-        let ph = state.player().bb.h;
-
-        let alpha = if !state.player().can_be_hit() {
-            ((state.player().immunity_frames / 10) % 2) as f32
-        } else {
-            1.0
-        };
-
-        // self.draw_rect(state, px, py, pw, ph, [0.20, 0.3, 0.40, 1.0], alpha);
-        self.draw_from_texture_atlas(
-            "character",
-            state.player().get_atlas_index(),
-            match state.player().dir {
-                Dir::Left => true,
-                Dir::Right => false,
-            },
-            px - 1.0 / TILE_SIZE,
-            py - 1.0 / TILE_SIZE,
-            pw + 2.0 / TILE_SIZE,
-            ph + 2.0 / TILE_SIZE,
-            alpha,
-        );
+        state.player().draw(self, camera);
 
         // Flush all queued atlas sprites in one draw call
         self.flush_atlas_batch(camera);
 
-        // Draw the sword as the last step
-        if let Some(swing_info) = state.player().get_swing_info() {
-            self.draw_rect_rotated(
-                camera,
-                swing_info.pivot.x - 0.05,
-                swing_info.pivot.y - 0.15,
-                0.1,
-                swing_info.length + 0.15,
-                swing_info.pivot.x,
-                swing_info.pivot.y,
-                swing_info.angle_rad,
-                [0.5, 0.5, 0.5, 1.0],
-            );
-
-            self.draw_rect(
-                camera,
-                swing_info.end.x - 0.05,
-                swing_info.end.y - 0.05,
-                0.1,
-                0.1,
-                [1.0, 0.5, 0.5, 1.0],
-            )
-        }
         self.ctx.end_render_pass();
 
         // Draw hud new HUD pipeline
@@ -721,7 +674,15 @@ impl Renderer {
         ]);
     }
 
-    fn draw_rect(&mut self, camera: &Camera, px: f32, py: f32, w: f32, h: f32, color: [f32; 4]) {
+    pub fn draw_rect(
+        &mut self,
+        camera: &Camera,
+        px: f32,
+        py: f32,
+        w: f32,
+        h: f32,
+        color: [f32; 4],
+    ) {
         // bind white texture and use full-quad UVs
         let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
         let white = self.textures.get(&TextureIndexes::White1x1).unwrap();
@@ -786,7 +747,7 @@ impl Renderer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn draw_rect_rotated(
+    pub fn draw_rect_rotated(
         &mut self,
         camera: &Camera,
         px: f32,
