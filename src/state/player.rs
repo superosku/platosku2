@@ -46,6 +46,7 @@ enum PlayerAnimationState {
     Laddering,
     Hanging,
     Dying,
+    Crouching,
 }
 
 impl AnimationConfig for PlayerAnimationState {
@@ -58,6 +59,7 @@ impl AnimationConfig for PlayerAnimationState {
             PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 10),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
             PlayerAnimationState::Dying => AnimationConfigResult::new_no_loop(17, 20, 10),
+            PlayerAnimationState::Crouching => AnimationConfigResult::new(22, 22, 10),
         }
     }
 }
@@ -123,7 +125,13 @@ impl Player {
         );
 
         if let Some(item) = &self.item {
-            item.draw_fake_xy(renderer, self.bb.x, self.bb.y);
+            let crouch_offset_y =
+                if self.animation_handler.current_state() == &PlayerAnimationState::Crouching {
+                    2.0 / 16.0
+                } else {
+                    0.0
+                };
+            item.draw_fake_xy(renderer, self.bb.x, self.bb.y + crouch_offset_y);
         }
 
         // Draw the sword as the last step
@@ -356,6 +364,9 @@ impl Player {
             if pressing_right || pressing_left {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Walking);
+            } else if input.down {
+                self.animation_handler
+                    .set_state(PlayerAnimationState::Crouching);
             } else {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Standing);
