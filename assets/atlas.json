@@ -64,11 +64,11 @@
    },
    {
     "filename": "box.aseprite",
-    "frame": { "x": 99, "y": 96, "w": 6, "h": 8 },
+    "frame": { "x": 99, "y": 88, "w": 8, "h": 10 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 6, "h": 8 },
-    "sourceSize": { "w": 6, "h": 8 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 8, "h": 10 },
+    "sourceSize": { "w": 8, "h": 10 },
     "duration": 100
    },
    {
@@ -280,11 +280,11 @@
    },
    {
     "filename": "coin.aseprite",
-    "frame": { "x": 107, "y": 78, "w": 4, "h": 4 },
+    "frame": { "x": 107, "y": 78, "w": 5, "h": 5 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 4 },
-    "sourceSize": { "w": 4, "h": 4 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 5, "h": 5 },
+    "sourceSize": { "w": 5, "h": 5 },
     "duration": 100
    },
    {
@@ -541,7 +541,7 @@
    },
    {
     "filename": "large_stone.aseprite",
-    "frame": { "x": 99, "y": 88, "w": 8, "h": 8 },
+    "frame": { "x": 99, "y": 98, "w": 8, "h": 8 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 8, "h": 8 },
@@ -604,11 +604,11 @@
    },
    {
     "filename": "small_stone.aseprite",
-    "frame": { "x": 107, "y": 82, "w": 3, "h": 3 },
+    "frame": { "x": 107, "y": 83, "w": 5, "h": 5 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 3, "h": 3 },
-    "sourceSize": { "w": 3, "h": 3 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 5, "h": 5 },
+    "sourceSize": { "w": 5, "h": 5 },
     "duration": 100
    },
    {

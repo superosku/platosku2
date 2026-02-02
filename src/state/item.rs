@@ -23,10 +23,10 @@ pub struct Item {
 impl Item {
     pub fn new(center_x: f32, center_y: f32, item_type: ItemType) -> Self {
         let (width_px, height_px) = match item_type {
-            ItemType::Coin => (4, 4),
-            ItemType::SmallStone => (3, 3),
+            ItemType::Coin => (5, 5),
+            ItemType::SmallStone => (4, 4),
             ItemType::LargeStone => (8, 8),
-            ItemType::Box => (6, 8),
+            ItemType::Box => (8, 10),
         };
 
         let width = width_px as f32 / 16.0;
