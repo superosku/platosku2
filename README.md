@@ -36,6 +36,18 @@ Run linters locally with this command
 cargo fix --bin platosku2 && cargo check && cargo fmt --all -- && cargo clippy --fix && cargo test
 ```
 
+OR
+
+```
+cargo fix --bin platosku2 
+cargo check 
+cargo fmt --all -- 
+cargo clippy --fix 
+cargo test
+git add .
+git commit -m "TMP linter fixes"
+```
+
 ## Regenerate texture atlas:
 
 Run this command to regenrate texture atlas

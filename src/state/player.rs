@@ -1,11 +1,15 @@
 use super::common::{BoundingBox, Dir, Health, Pos};
 use super::game_map::MapLike;
 use super::game_state::InputState;
+use crate::camera::Camera;
 use crate::physics::{check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
+use crate::render::Renderer;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
+use crate::state::item::{Item, ItemType};
 
 pub enum PlayerState {
     Normal,
+    // TODO: Swinging should be an optional part of Player struct so swinging can happen while on ladder etc.
     Swinging { total_frames: u32, frames_left: u32 },
     Hanging { pos: Pos },
     OnLadder,
@@ -23,13 +27,14 @@ pub struct Player {
     pub bb: BoundingBox,
     pub health: Health,
     pub immunity_frames: u32,
-    pub on_ground: bool,
-    pub safe_edge_frames: u32,
-    pub state: PlayerState,
-    pub max_speed: f32,
-    pub max_jump_frames: u32,
+    on_ground: bool,
+    safe_edge_frames: u32,
+    state: PlayerState,
+    max_speed: f32,
+    max_jump_frames: u32,
     pub dir: Dir,
     animation_handler: AnimationHandler<PlayerAnimationState>,
+    item: Option<Item>,
 }
 
 #[derive(PartialEq)]
@@ -41,6 +46,7 @@ enum PlayerAnimationState {
     Laddering,
     Hanging,
     Dying,
+    Crouching,
 }
 
 impl AnimationConfig for PlayerAnimationState {
@@ -53,8 +59,14 @@ impl AnimationConfig for PlayerAnimationState {
             PlayerAnimationState::Laddering => AnimationConfigResult::new(12, 15, 10),
             PlayerAnimationState::Hanging => AnimationConfigResult::new(16, 16, 5),
             PlayerAnimationState::Dying => AnimationConfigResult::new_no_loop(17, 20, 10),
+            PlayerAnimationState::Crouching => AnimationConfigResult::new(22, 22, 10),
         }
     }
+}
+
+pub enum PlayerUpdateResult {
+    AddItem { item: Item },
+    PickUpItem,
 }
 
 impl Player {
@@ -77,6 +89,73 @@ impl Player {
             max_jump_frames: 0,
             dir: Dir::Right,
             animation_handler: AnimationHandler::new(PlayerAnimationState::Standing),
+            // item: None,
+            item: Some(Item::new(0.0, 0.0, ItemType::Box)),
+        }
+    }
+
+    pub fn set_item(&mut self, item: Item) {
+        self.item = Some(item);
+    }
+
+    pub fn draw(&self, renderer: &mut Renderer, camera: &Camera) {
+        let px = self.bb.x;
+        let py = self.bb.y;
+        let pw = self.bb.w;
+        let ph = self.bb.h;
+
+        let alpha = if !self.can_be_hit() {
+            ((self.immunity_frames / 10) % 2) as f32
+        } else {
+            1.0
+        };
+
+        renderer.draw_from_texture_atlas(
+            "character",
+            self.animation_handler.get_atlas_index(),
+            match self.dir {
+                Dir::Left => true,
+                Dir::Right => false,
+            },
+            px - 1.0 / crate::render::TILE_SIZE,
+            py - 1.0 / crate::render::TILE_SIZE,
+            pw + 2.0 / crate::render::TILE_SIZE,
+            ph + 2.0 / crate::render::TILE_SIZE,
+            alpha,
+        );
+
+        if let Some(item) = &self.item {
+            let crouch_offset_y =
+                if self.animation_handler.current_state() == &PlayerAnimationState::Crouching {
+                    2.0 / 16.0
+                } else {
+                    0.0
+                };
+            item.draw_fake_xy(renderer, self.bb.x, self.bb.y + crouch_offset_y);
+        }
+
+        // Draw the sword as the last step
+        if let Some(swing_info) = self.get_swing_info() {
+            renderer.draw_rect_rotated(
+                camera,
+                swing_info.pivot.x - 0.05,
+                swing_info.pivot.y - 0.15,
+                0.1,
+                swing_info.length + 0.15,
+                swing_info.pivot.x,
+                swing_info.pivot.y,
+                swing_info.angle_rad,
+                [0.5, 0.5, 0.5, 1.0],
+            );
+
+            renderer.draw_rect(
+                camera,
+                swing_info.end.x - 0.05,
+                swing_info.end.y - 0.05,
+                0.1,
+                0.1,
+                [1.0, 0.5, 0.5, 1.0],
+            )
         }
     }
 
@@ -151,14 +230,19 @@ impl Player {
         }
     }
 
-    pub fn _handle_normal(&mut self, input: &InputState, map: &dyn MapLike) {
+    pub fn _handle_normal(
+        &mut self,
+        input: &InputState,
+        map: &dyn MapLike,
+    ) -> Vec<PlayerUpdateResult> {
+        let mut update_results = vec![];
+
         let pressing_left = input.left && !input.right;
         let pressing_right = input.right && !input.left;
 
         if pressing_left {
-            if self.bb.vx > -self.max_speed {
-                self.bb.vx -= 0.01;
-            }
+            self.bb.vx = (-self.max_speed).max(self.bb.vx - 0.02);
+
             match self.state {
                 PlayerState::Swinging { .. } => {}
                 _ => {
@@ -166,9 +250,8 @@ impl Player {
                 }
             }
         } else if pressing_right {
-            if self.bb.vx < self.max_speed {
-                self.bb.vx += 0.01;
-            }
+            self.bb.vx = self.max_speed.min(self.bb.vx + 0.02);
+
             match self.state {
                 PlayerState::Swinging { .. } => {}
                 _ => {
@@ -178,7 +261,7 @@ impl Player {
         } else {
             // Ground and air friction
             if !(-0.002..=0.002).contains(&self.bb.vx) {
-                self.bb.vx = self.bb.vx - self.bb.vx * 0.2;
+                self.bb.vx = self.bb.vx - self.bb.vx * 0.3;
             } else {
                 self.bb.vx = 0.0;
             }
@@ -192,23 +275,49 @@ impl Player {
         }
 
         // 1. Want to jump 2. Not trying to go down ledge 3. Can jump
-        if input.jump && !input.down && (self.on_ground || self.safe_edge_frames > 0) {
+        if input.jump_pressed && !input.down && (self.on_ground || self.safe_edge_frames > 0) {
             self.safe_edge_frames = 0;
             self.bb.vy = -0.125;
-        } else if input.jump && !input.down && self.max_jump_frames > 0 {
+        } else if input.jump_held && !input.down && self.max_jump_frames > 0 {
             self.max_jump_frames -= 1;
             self.bb.vy = -0.125;
         } else {
             self.max_jump_frames = 0; // if no input.jump reset to 0
         }
 
-        if input.swing
+        // Want to swing / throw / leave item / pick up item
+        if input.swing_pressed
             && let PlayerState::Normal = self.state
         {
-            self.state = PlayerState::Swinging {
-                total_frames: 20,
-                frames_left: 20,
-            };
+            let some_item: Option<Item> = self.item.take();
+            if let Some(mut item) = some_item {
+                if input.down {
+                    // Drop item
+                    item.set_xyv(self.bb.x, self.bb.y, 0.0, 0.0);
+                } else {
+                    // Throw item
+                    item.set_xyv(
+                        self.bb.x,
+                        self.bb.y,
+                        self.bb.vx
+                            + match self.dir {
+                                Dir::Left => -0.1,
+                                Dir::Right => 0.1,
+                            },
+                        self.bb.vy + if input.up { -0.2 } else { -0.1 },
+                    );
+                }
+                update_results.push(PlayerUpdateResult::AddItem { item });
+            } else if input.down {
+                // Pick up
+                update_results.push(PlayerUpdateResult::PickUpItem);
+            } else {
+                // Swing
+                self.state = PlayerState::Swinging {
+                    total_frames: 20,
+                    frames_left: 20,
+                };
+            }
         }
 
         let res = integrate_kinematic(map, &self.bb, true);
@@ -226,10 +335,10 @@ impl Player {
             self.bb.x = (middle_tx as f32 + 0.5) - self.bb.w * 0.5;
             self.bb.vx = 0.0;
 
-            return;
+            return update_results;
         }
 
-        if !(input.down && input.jump) {
+        if !(input.down && input.jump_pressed) {
             on_ground |= check_and_snap_platforms(&self.bb, &mut new_bb, map);
         }
 
@@ -244,7 +353,7 @@ impl Player {
                 self.dir = dir;
                 self.bb.vy = 0.0;
                 self.on_ground = false;
-                return;
+                return update_results;
             }
         }
 
@@ -255,6 +364,9 @@ impl Player {
             if pressing_right || pressing_left {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Walking);
+            } else if input.down {
+                self.animation_handler
+                    .set_state(PlayerAnimationState::Crouching);
             } else {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Standing);
@@ -266,13 +378,13 @@ impl Player {
             self.animation_handler
                 .set_state(PlayerAnimationState::JumpingDown);
         }
+
+        update_results
     }
 
-    pub fn get_atlas_index(&self) -> u32 {
-        self.animation_handler.get_atlas_index()
-    }
+    pub fn update(&mut self, input: &InputState, map: &dyn MapLike) -> Vec<PlayerUpdateResult> {
+        let mut update_results = vec![];
 
-    pub fn update(&mut self, input: &InputState, map: &dyn MapLike) {
         let mut increment_frame = true;
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
 
@@ -284,7 +396,7 @@ impl Player {
                 self.bb.vx = 0.0;
                 self.on_ground = false;
 
-                if input.jump {
+                if input.jump_pressed {
                     self.state = PlayerState::Normal;
                     if input.down {
                         self.bb.vy = 0.0;
@@ -308,7 +420,7 @@ impl Player {
                     self.state = PlayerState::Normal;
                 }
 
-                self._handle_normal(input, map);
+                update_results.append(&mut self._handle_normal(input, map));
             }
             PlayerState::Dead => {
                 let res = integrate_kinematic(map, &self.bb, true);
@@ -320,16 +432,16 @@ impl Player {
             }
 
             PlayerState::Normal => {
-                self._handle_normal(input, map);
+                update_results.append(&mut self._handle_normal(input, map));
             }
             PlayerState::OnLadder => {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Laddering);
-                if input.jump && !input.up {
+                if input.jump_pressed && !input.up {
                     self.state = PlayerState::Normal;
                     self.bb.vy = -0.125;
                     self.bb.y += 0.05;
-                    return;
+                    return update_results;
                 }
 
                 let middle_tx = (self.bb.x + self.bb.w * 0.5).floor() as i32;
@@ -342,7 +454,7 @@ impl Player {
                         self.bb.vy = -self.max_speed;
                     } else {
                         self.bb.vy = 0.0;
-                        return;
+                        return update_results;
                     }
                 } else if input.down && !input.up {
                     self.bb.vy = self.max_speed;
@@ -354,7 +466,7 @@ impl Player {
                         self.on_ground = true;
                         self.bb.vy = 0.0;
                         self.bb.y = feet_y.floor() - self.bb.h - 0.0001;
-                        return;
+                        return update_results;
                     }
                 } else {
                     self.bb.vy = 0.0;
@@ -369,5 +481,7 @@ impl Player {
         if increment_frame {
             self.animation_handler.increment_frame();
         }
+
+        update_results
     }
 }
