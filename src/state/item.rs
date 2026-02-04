@@ -1,7 +1,9 @@
 use crate::physics::integrate_kinematic;
 use crate::render::Renderer;
-use crate::state::BoundingBox;
+use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::game_map::MapLike;
+use crate::state::{BoundingBox, Pos};
+use rand::Rng;
 use rand::seq::IndexedRandom;
 
 #[derive(Copy, Clone)]
@@ -20,8 +22,20 @@ pub struct Item {
     item_type: ItemType,
 }
 
+pub enum ItemInteractionResult {
+    RemoveItem,
+    IncreaseScore, // TODO: Add amount to increase by
+    SpawnItem { item: Item },
+}
+
 impl Item {
-    pub fn new(center_x: f32, center_y: f32, item_type: ItemType) -> Self {
+    pub fn new_with_velocity(
+        center_x: f32,
+        center_y: f32,
+        vx: f32,
+        vy: f32,
+        item_type: ItemType,
+    ) -> Self {
         let (width_px, height_px) = match item_type {
             ItemType::Coin => (5, 5),
             ItemType::SmallStone => (4, 4),
@@ -38,11 +52,15 @@ impl Item {
                 y: center_y - height / 2.0,
                 w: width,
                 h: height,
-                vx: 0.0,
-                vy: 0.0,
+                vx,
+                vy,
             },
             item_type,
         }
+    }
+
+    pub fn new(center_x: f32, center_y: f32, item_type: ItemType) -> Self {
+        Self::new_with_velocity(center_x, center_y, 0.0, 0.0, item_type)
     }
 
     pub fn draw_fake_xy(&self, renderer: &mut Renderer, x: f32, y: f32) {
@@ -72,6 +90,10 @@ impl Item {
 
     pub fn overlaps(&self, bb: &BoundingBox) -> bool {
         self.bb.overlaps(bb)
+    }
+
+    pub fn overlaps_line(&self, a: &Pos, b: &Pos) -> bool {
+        self.bb.overlaps_line(a, b)
     }
 
     pub fn draw(&self, renderer: &mut Renderer) {
@@ -110,6 +132,50 @@ impl Item {
             if self.bb.vx.abs() < 0.001 {
                 self.bb.vx = 0.0;
             }
+        }
+    }
+
+    pub fn handle_player_touch(
+        &mut self,
+        sound_handler: &SoundHandler,
+    ) -> Vec<ItemInteractionResult> {
+        match self.item_type {
+            ItemType::Coin => {
+                sound_handler.play(Sound::CollectCoin);
+                vec![
+                    ItemInteractionResult::RemoveItem,
+                    ItemInteractionResult::IncreaseScore,
+                ]
+            }
+            _ => vec![],
+        }
+    }
+
+    pub fn handle_being_swung(
+        &mut self,
+        sound_handler: &SoundHandler,
+    ) -> Vec<ItemInteractionResult> {
+        match self.item_type {
+            ItemType::Box => {
+                let mut results = vec![ItemInteractionResult::RemoveItem];
+                let mut rng = rand::rng();
+                for _ in 0..rng.random_range(1..5) {
+                    let vy = rng.random_range(-0.05..0.05);
+                    let vx = rng.random_range(-0.05..0.05);
+                    results.push(ItemInteractionResult::SpawnItem {
+                        item: Item::new_with_velocity(
+                            self.bb.x + self.bb.w * 0.5,
+                            self.bb.y + self.bb.h * 0.5,
+                            vx,
+                            vy,
+                            ItemType::Coin,
+                        ),
+                    })
+                }
+                sound_handler.play(Sound::Clink);
+                results
+            }
+            _ => vec![],
         }
     }
 }
