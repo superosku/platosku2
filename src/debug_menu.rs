@@ -112,6 +112,8 @@ impl GameStateDebugMenu for Editor {
                     (DoorSelection::Down, DoorDir::Down),
                     (DoorSelection::Right, DoorDir::Right),
                     (DoorSelection::Left, DoorDir::Left),
+                    (DoorSelection::LevelStart, DoorDir::LevelStart),
+                    (DoorSelection::LevelEnd, DoorDir::LevelEnd),
                 ] {
                     if *selection == sel {
                         self.room.set_door(coords.0, coords.1, direction);
@@ -231,6 +233,8 @@ impl GameStateDebugMenu for Editor {
                     DoorSelection::Left,
                     DoorSelection::Up,
                     DoorSelection::Down,
+                    DoorSelection::LevelStart,
+                    DoorSelection::LevelEnd,
                     DoorSelection::Remove,
                 ] {
                     if ui

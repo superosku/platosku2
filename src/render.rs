@@ -229,6 +229,8 @@ impl DrawableGameState for Editor {
                 DoorDir::Right => 4,
                 DoorDir::Down => 5,
                 DoorDir::Left => 6,
+                DoorDir::LevelStart => 7,
+                DoorDir::LevelEnd => 8,
             };
 
             renderer.draw_from_texture_atlas(
