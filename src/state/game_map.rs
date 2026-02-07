@@ -21,14 +21,17 @@ pub enum OverlayTile {
     Ladder = 1,
     Platform = 2,
     LadderPlatform = 3,
+    StartDoor = 4,
 }
 
 pub trait MapLike {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile);
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
+
     fn get_ladders(&self) -> Vec<Pos>;
     fn get_platforms(&self) -> Vec<Pos>;
+    fn get_doors(&self) -> &Vec<RoomDoor>;
 
     fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
         matches!(
@@ -71,6 +74,8 @@ pub enum DoorDir {
     Right,
     Up,
     Down,
+    LevelStart,
+    LevelEnd,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -177,10 +182,6 @@ impl Room {
     pub fn add_object_template(&mut self, x: f32, y: f32, template: ObjectTemplateType) {
         self.object_templates
             .push(ObjectTemplate::new(x, y, template))
-    }
-
-    pub fn get_doors(&self) -> &Vec<RoomDoor> {
-        &self.doors
     }
 
     pub fn get_center(&self) -> (f32, f32) {
@@ -317,6 +318,15 @@ impl Room {
             self.base[(x + self.w * y) as usize],
             self.overlay[(x + self.w * y) as usize],
         )
+    }
+
+    pub fn get_door_at_relative(&self, x: i32, y: i32) -> Option<&DoorDir> {
+        for door in &self.doors {
+            if door.x as i32 + self.x == x && door.y as i32 + self.y == y {
+                return Some(&door.dir);
+            }
+        }
+        None
     }
 
     pub fn get_relative(&self, x: i32, y: i32) -> Option<(BaseTile, OverlayTile)> {
@@ -530,6 +540,10 @@ impl MapLike for Room {
         all_pos
     }
 
+    fn get_doors(&self) -> &Vec<RoomDoor> {
+        &self.doors
+    }
+
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
         if let Some(rel) = self.abs_to_rel((x, y)) {
             self.set_base_absolute(rel.0, rel.1, tile);
@@ -670,21 +684,30 @@ pub struct GameMap {
     // These are used for when returning the game data for optimization reasons
     ladder_pos: Vec<Pos>,
     platform_pos: Vec<Pos>,
+    base: Vec<BaseTile>,
+    overlay: Vec<OverlayTile>,
     x: i32,
     y: i32,
     w: u32,
     h: u32,
-    base: Vec<BaseTile>,
-    overlay: Vec<OverlayTile>,
 }
 
 impl GameMap {
     pub fn player_start_pos(&self) -> (f32, f32) {
         let room = &self.rooms[0];
-        (
-            room.x as f32 + room.w as f32 * 0.5,
-            room.y as f32 + room.h as f32 * 0.5,
-        )
+        let start_door: Option<&RoomDoor> = room.doors
+            .iter()
+            .filter(|door| door.dir == DoorDir::LevelStart)
+            .next();
+
+        if let Some(start_door) = start_door {
+            return (
+                room.x as f32 + start_door.x as f32,
+                room.y as f32 + start_door.y as f32,
+            )
+        }
+
+        panic!("First room does not have start door");
     }
 
     pub fn get_bounds(&self) -> (i32, i32, i32, i32) {
@@ -754,8 +777,18 @@ impl GameMap {
     pub fn new_random() -> GameMap {
         let room_candidates = Room::load_rooms_from_folder();
         let mut rng = rand::rng();
-        let first_room = room_candidates.choose(&mut rng).unwrap().1.clone();
-        let rooms = vec![first_room];
+
+        let first_room_candidates: Vec<Room> = room_candidates
+            .iter()
+            .map(|(_, room)| room.clone())
+            .filter(|room| {
+                room.doors.iter().filter(|door| door.dir == DoorDir::LevelStart).count() >= 1
+            })
+            .collect();
+
+        let first_room = first_room_candidates.choose(&mut rng).unwrap();
+
+        let rooms = vec![first_room.clone()];
 
         let mut game_map = GameMap {
             rooms,
@@ -798,6 +831,8 @@ impl GameMap {
                     DoorDir::Up => random_door.dir == DoorDir::Down,
                     DoorDir::Left => random_door.dir == DoorDir::Right,
                     DoorDir::Right => random_door.dir == DoorDir::Left,
+                    DoorDir::LevelStart => false,
+                    DoorDir::LevelEnd => false,
                 })
                 .cloned()
                 .collect();
@@ -820,6 +855,8 @@ impl GameMap {
                 DoorDir::Up => true,
                 DoorDir::Left => false,
                 DoorDir::Right => false,
+                DoorDir::LevelStart => false,  // These should be filtered out in the previous step
+                DoorDir::LevelEnd => false,
             };
 
             // random_new_room.x += -new_door_world_pos.0 + door_world_pos.0;
@@ -911,7 +948,21 @@ impl GameMap {
 
         for xx in 0..w {
             for yy in 0..h {
-                let (base, overlay) = game_map.get_at_from_room(x + xx, y + yy);
+                let (mut base, mut overlay) = game_map.get_at_from_room(x + xx, y + yy);
+
+                if let Some(room_here) = game_map.get_room_at((x + xx) as f32, (y + yy) as f32) {
+                    if room_here.0 == 0 {
+                        // Check if any of the rooms doors is a StartDoor and located here
+                        // Then set the overlay to InDoor
+                        if let Some(door) = room_here.1.get_door_at_relative(x + xx, y + yy) {
+                            if *door == DoorDir::LevelStart {
+                                overlay = OverlayTile::StartDoor;
+                                // base = BaseTile::Wood;
+                            }
+                        }
+                    }
+                }
+
                 game_map.overlay[(xx + yy * w) as usize] = overlay;
                 game_map.base[(xx + yy * w) as usize] = base;
             }

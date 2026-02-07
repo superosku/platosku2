@@ -41,6 +41,8 @@ enum DoorSelection {
     Right,
     Up,
     Down,
+    LevelStart,
+    LevelEnd,
     Remove,
 }
 
