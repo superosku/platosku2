@@ -4,6 +4,7 @@ use super::game_state::InputState;
 use crate::camera::Camera;
 use crate::physics::{check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
 use crate::render::Renderer;
+use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::item::{Item, ItemType};
 
@@ -234,6 +235,7 @@ impl Player {
         &mut self,
         input: &InputState,
         map: &dyn MapLike,
+        sound_handler: &SoundHandler,
     ) -> Vec<PlayerUpdateResult> {
         let mut update_results = vec![];
 
@@ -276,6 +278,7 @@ impl Player {
 
         // 1. Want to jump 2. Not trying to go down ledge 3. Can jump
         if input.jump_pressed && !input.down && (self.on_ground || self.safe_edge_frames > 0) {
+            sound_handler.play(Sound::Jump);
             self.safe_edge_frames = 0;
             self.bb.vy = -0.125;
         } else if input.jump_held && !input.down && self.max_jump_frames > 0 {
@@ -296,6 +299,7 @@ impl Player {
                     item.set_xyv(self.bb.x, self.bb.y, 0.0, 0.0);
                 } else {
                     // Throw item
+                    sound_handler.play(Sound::Throw);
                     item.set_xyv(
                         self.bb.x,
                         self.bb.y,
@@ -313,6 +317,7 @@ impl Player {
                 update_results.push(PlayerUpdateResult::PickUpItem);
             } else {
                 // Swing
+                sound_handler.play(Sound::Swing);
                 self.state = PlayerState::Swinging {
                     total_frames: 20,
                     frames_left: 20,
@@ -382,7 +387,12 @@ impl Player {
         update_results
     }
 
-    pub fn update(&mut self, input: &InputState, map: &dyn MapLike) -> Vec<PlayerUpdateResult> {
+    pub fn update(
+        &mut self,
+        input: &InputState,
+        map: &dyn MapLike,
+        sound_handler: &SoundHandler,
+    ) -> Vec<PlayerUpdateResult> {
         let mut update_results = vec![];
 
         let mut increment_frame = true;
@@ -420,7 +430,7 @@ impl Player {
                     self.state = PlayerState::Normal;
                 }
 
-                update_results.append(&mut self._handle_normal(input, map));
+                update_results.append(&mut self._handle_normal(input, map, sound_handler));
             }
             PlayerState::Dead => {
                 let res = integrate_kinematic(map, &self.bb, true);
@@ -432,7 +442,7 @@ impl Player {
             }
 
             PlayerState::Normal => {
-                update_results.append(&mut self._handle_normal(input, map));
+                update_results.append(&mut self._handle_normal(input, map, sound_handler));
             }
             PlayerState::OnLadder => {
                 self.animation_handler
