@@ -295,8 +295,23 @@ impl Player {
             let some_item: Option<Item> = self.item.take();
             if let Some(mut item) = some_item {
                 if input.down {
-                    // Drop item
-                    item.set_xyv(self.bb.x, self.bb.y, 0.0, 0.0);
+                    if self.on_ground {
+                        // Drop item
+                        item.set_xyv(self.bb.x, self.bb.y, 0.0, 0.0);
+                    } else {
+                        // Throw item downwards
+                        sound_handler.play(Sound::Throw);
+                        item.set_xyv(
+                            self.bb.x,
+                            self.bb.y,
+                            self.bb.vx
+                                + match self.dir {
+                                    Dir::Left => -0.1,
+                                    Dir::Right => 0.1,
+                                },
+                            self.bb.vy + 0.1,
+                        )
+                    }
                 } else {
                     // Throw item
                     sound_handler.play(Sound::Throw);

@@ -4,7 +4,7 @@ use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::BoundingBox;
-use crate::state::item::Item;
+use crate::state::item::{Item, ItemInteractionResult};
 use rand::Rng;
 
 #[derive(Default, Debug)]
@@ -224,10 +224,40 @@ impl GameState for Game {
             }
         }
 
-        for item in &mut self.items {
+        let mut new_items = Vec::new();
+        self.items.retain_mut(|item| {
+            let mut keep_item = true;
             item.update(&self.map);
-        }
-        // self.coins.retain(|c| !c.overlaps(&self.player.bb));
+
+            let mut handle_item_results = |results: Vec<ItemInteractionResult>| {
+                for result in results {
+                    match result {
+                        ItemInteractionResult::RemoveItem => {
+                            keep_item = false;
+                        }
+                        ItemInteractionResult::IncreaseScore => {}
+                        ItemInteractionResult::SpawnItem { item } => {
+                            new_items.push(item);
+                        }
+                    }
+                }
+            };
+
+            if item.overlaps(&self.player.bb) {
+                let results = item.handle_player_touch(sound_handler);
+                handle_item_results(results);
+            }
+
+            if let Some(swing_info) = self.player.get_swing_info()
+                && item.overlaps_line(&swing_info.pivot, &swing_info.end)
+            {
+                let results = item.handle_being_swung(sound_handler);
+                handle_item_results(results);
+            }
+
+            keep_item
+        });
+        self.items.extend(new_items);
 
         for enemy in &mut self.enemies {
             enemy.update(&self.map);
