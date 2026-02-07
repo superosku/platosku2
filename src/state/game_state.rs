@@ -2,6 +2,7 @@ use super::enemies::Enemy;
 use super::game_map::{GameMap, MapLike, Room};
 use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
+use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::BoundingBox;
 use crate::state::item::Item;
 use rand::Rng;
@@ -20,7 +21,7 @@ pub struct InputState {
 }
 
 pub trait GameState {
-    fn update(&mut self, input: &InputState);
+    fn update(&mut self, input: &InputState, sound_handler: &SoundHandler);
     fn update_camera(&mut self, camera: &mut Camera, zoom_show_all: bool);
     fn player(&self) -> &Player;
     fn player_mut(&mut self) -> &mut Player;
@@ -43,8 +44,8 @@ impl Editor {
 }
 
 impl GameState for Editor {
-    fn update(&mut self, input: &InputState) {
-        self.player.update(input, &self.room);
+    fn update(&mut self, input: &InputState, sound_handler: &SoundHandler) {
+        self.player.update(input, &self.room, sound_handler);
     }
 
     fn update_camera(&mut self, camera: &mut Camera, _zoom_show_all: bool) {
@@ -141,7 +142,7 @@ impl Game {
 }
 
 impl GameState for Game {
-    fn update(&mut self, input: &InputState) {
+    fn update(&mut self, input: &InputState, sound_handler: &SoundHandler) {
         let door_bbs: Vec<BoundingBox> = self
             .map
             .doors
@@ -203,7 +204,7 @@ impl GameState for Game {
                 println!("No push dir found");
             }
         } else {
-            let update_results = self.player.update(input, &self.map);
+            let update_results = self.player.update(input, &self.map, sound_handler);
             for result in update_results {
                 match result {
                     PlayerUpdateResult::AddItem { item } => {
@@ -233,6 +234,7 @@ impl GameState for Game {
 
             if enemy.bb().overlaps(&self.player.bb) {
                 if enemy.can_be_stomped() && self.player.maybe_stomp(enemy.bb()) {
+                    sound_handler.play(Sound::Clink);
                     enemy.got_stomped();
                 } else if self.player.can_be_hit() {
                     self.player.got_hit(enemy.contanct_damage());
