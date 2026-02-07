@@ -7,10 +7,12 @@ use crate::state::{GameState, InputState};
 mod atlas_info;
 mod debug_menu;
 mod render;
+mod sound_handler;
 
 use crate::camera::Camera;
 use crate::debug_menu::GameStateDebugMenu;
 use crate::render::{DrawableGameState, Renderer};
+use crate::sound_handler::SoundHandler;
 use crate::state::game_map::Room;
 use crate::state::game_state::{Editor, Game};
 use egui_miniquad as egui_mq;
@@ -81,6 +83,8 @@ impl<T: GameState + DrawableGameState + GameStateDebugMenu> FullGameState for T 
 struct Stage {
     egui_mq: egui_mq::EguiMq,
 
+    sound_handler: SoundHandler,
+
     input: InputState,
     state: Box<dyn FullGameState>,
     renderer: Renderer,
@@ -108,6 +112,7 @@ impl Stage {
 
         Stage {
             egui_mq: egui_mq::EguiMq::new(&mut *renderer.ctx),
+            sound_handler: SoundHandler::new(),
             state,
             renderer,
             last_time: date::now(),
@@ -145,7 +150,7 @@ impl EventHandler for Stage {
         let dt = 1.0 / 60.0;
 
         while self.accumulator >= dt {
-            self.state.update(&self.input); // HERE is the actual game call
+            self.state.update(&self.input, &self.sound_handler); // HERE is the actual game call
             self.state
                 .update_camera(&mut self.camera, !self.debug_menu.zoom_show_full); // HERE is the actual game call
             self.updates += 1;
