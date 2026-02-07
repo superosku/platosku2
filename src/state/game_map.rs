@@ -31,7 +31,7 @@ pub trait MapLike {
 
     fn get_ladders(&self) -> Vec<Pos>;
     fn get_platforms(&self) -> Vec<Pos>;
-    fn get_doors(&self) -> &Vec<RoomDoor>;
+    // fn get_doors(&self) -> &Vec<RoomDoor>;
 
     fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
         matches!(
@@ -140,6 +140,10 @@ pub struct Room {
 impl Room {
     pub fn get_pos(&self) -> (i32, i32) {
         (self.x, self.y)
+    }
+
+    pub fn get_doors(&self) -> &Vec<RoomDoor> {
+        &self.doors
     }
 
     pub fn set_pos(&mut self, pos: (i32, i32)) {
@@ -538,10 +542,6 @@ impl MapLike for Room {
         }
 
         all_pos
-    }
-
-    fn get_doors(&self) -> &Vec<RoomDoor> {
-        &self.doors
     }
 
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
