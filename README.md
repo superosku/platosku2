@@ -56,3 +56,6 @@ Run this command to regenrate texture atlas
 aseprite assets/sprites/*.aseprite --sheet-pack --sheet assets/atlas.png --data assets/atlas.json --batch --format json-array
 ```
 
+## Sounds
+
+You will need to place the sounds in the `assets/sounds` folder. Not committed due to license not allowing it.
