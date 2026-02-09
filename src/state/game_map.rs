@@ -1,6 +1,6 @@
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::enemies::{Enemy, Slime, Worm};
-use crate::state::{Bat, BoundingBox, Pos};
+use crate::state::{Bat, BoundingBox};
 use rand::Rng;
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
@@ -21,14 +21,22 @@ pub enum OverlayTile {
     Ladder = 1,
     Platform = 2,
     LadderPlatform = 3,
+    StartDoor = 4,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct OverlayInfo {
+    pub tile: OverlayTile,
+    pub x: i32,
+    pub y: i32,
 }
 
 pub trait MapLike {
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile);
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
-    fn get_ladders(&self) -> Vec<Pos>;
-    fn get_platforms(&self) -> Vec<Pos>;
+    fn get_overlays(&self) -> &Vec<OverlayInfo>;
+    fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool;
 
     fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
         matches!(
@@ -42,8 +50,6 @@ pub trait MapLike {
             (_, OverlayTile::Platform) | (_, OverlayTile::LadderPlatform)
         )
     }
-    fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool;
-
     fn is_solid_at_tile(&self, tx: i32, ty: i32) -> bool {
         let (base, _overlay) = self.get_at(tx, ty);
         match base {
@@ -130,11 +136,19 @@ pub struct Room {
     pub w: u32,
     doors: Vec<RoomDoor>,
     pub object_templates: Vec<ObjectTemplate>,
+
+    #[serde(skip, default)]
+    // #[serde(skip, default = "default_all_overlays")]
+    all_overlays: Vec<OverlayInfo>, // For cached values for rendering
 }
 
 impl Room {
     pub fn get_pos(&self) -> (i32, i32) {
         (self.x, self.y)
+    }
+
+    pub fn get_doors(&self) -> &Vec<RoomDoor> {
+        &self.doors
     }
 
     pub fn set_pos(&mut self, pos: (i32, i32)) {
@@ -164,6 +178,7 @@ impl Room {
             overlay,
             doors: Vec::new(),
             object_templates: Vec::new(),
+            all_overlays: Vec::new(),
         }
     }
 
@@ -177,10 +192,6 @@ impl Room {
     pub fn add_object_template(&mut self, x: f32, y: f32, template: ObjectTemplateType) {
         self.object_templates
             .push(ObjectTemplate::new(x, y, template))
-    }
-
-    pub fn get_doors(&self) -> &Vec<RoomDoor> {
-        &self.doors
     }
 
     pub fn get_center(&self) -> (f32, f32) {
@@ -277,12 +288,14 @@ impl Room {
         let mut rooms: Vec<(String, Self)> = Vec::new();
         for entry in entries {
             let path = entry.path();
-            if let Ok(room) = Self::load_json(&path) {
-                rooms.push((
-                    String::from(path.file_name().unwrap().to_str().unwrap_or("<ERROR>")),
-                    room,
-                ));
-            }
+
+            let mut room = Self::load_json(&path).unwrap();
+            room.update_overlays_cache();
+
+            rooms.push((
+                String::from(path.file_name().unwrap().to_str().unwrap_or("<ERROR>")),
+                room,
+            ));
         }
 
         rooms
@@ -484,6 +497,39 @@ impl Room {
                 .retain(|door| !(door.x == rel_pos.0 && door.y == rel_pos.1))
         }
     }
+
+    pub fn get_start_pos(&self) -> Option<(i32, i32)> {
+        for overlay in self.get_overlays() {
+            if let OverlayTile::StartDoor = overlay.tile {
+                return Some((overlay.x, overlay.y));
+            }
+        }
+        None
+    }
+
+    pub fn update_overlays_cache(&mut self) {
+        let mut all_overlays = Vec::new();
+
+        for x in 0..self.w {
+            for y in 0..self.h {
+                let (_base, overlay) = self.get_absolute(x, y);
+                match overlay {
+                    OverlayTile::None => {}
+                    tile => {
+                        all_overlays.push(OverlayInfo {
+                            x: x as i32 + self.x,
+                            y: y as i32 + self.y,
+                            // x: x as i32,
+                            // y: y as i32,
+                            tile,
+                        })
+                    }
+                }
+            }
+        }
+
+        self.all_overlays = all_overlays;
+    }
 }
 
 impl MapLike for Room {
@@ -496,38 +542,8 @@ impl MapLike for Room {
             .unwrap_or((BaseTile::NotPartOfRoom, OverlayTile::None))
     }
 
-    fn get_ladders(&self) -> Vec<Pos> {
-        let mut all_pos = Vec::new();
-
-        for x in 0..self.w {
-            for y in 0..self.h {
-                if matches!(
-                    self.get_absolute(x, y),
-                    (_, OverlayTile::Ladder) | (_, OverlayTile::LadderPlatform)
-                ) {
-                    all_pos.push(Pos::new(x as f32 + self.x as f32, y as f32 + self.y as f32));
-                }
-            }
-        }
-
-        all_pos
-    }
-
-    fn get_platforms(&self) -> Vec<Pos> {
-        let mut all_pos = Vec::new();
-
-        for x in 0..self.w {
-            for y in 0..self.h {
-                if matches!(
-                    self.get_absolute(x, y),
-                    (_, OverlayTile::Platform) | (_, OverlayTile::LadderPlatform)
-                ) {
-                    all_pos.push(Pos::new(x as f32 + self.x as f32, y as f32 + self.y as f32));
-                }
-            }
-        }
-
-        all_pos
+    fn get_overlays(&self) -> &Vec<OverlayInfo> {
+        &self.all_overlays
     }
 
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
@@ -542,6 +558,7 @@ impl MapLike for Room {
         }
         // Maybe shrink afterwards
         self.resize_shrink();
+        self.update_overlays_cache();
     }
 
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile) {
@@ -556,6 +573,7 @@ impl MapLike for Room {
         }
         // Maybe shrink afterwards
         self.resize_shrink();
+        self.update_overlays_cache();
     }
 }
 
@@ -668,23 +686,22 @@ pub struct GameMap {
     pub doors: Vec<MapDoor>,
 
     // These are used for when returning the game data for optimization reasons
-    ladder_pos: Vec<Pos>,
-    platform_pos: Vec<Pos>,
+    base: Vec<BaseTile>,
+    overlay: Vec<OverlayTile>,
+    all_overlays: Vec<OverlayInfo>,
     x: i32,
     y: i32,
     w: u32,
     h: u32,
-    base: Vec<BaseTile>,
-    overlay: Vec<OverlayTile>,
 }
 
 impl GameMap {
     pub fn player_start_pos(&self) -> (f32, f32) {
         let room = &self.rooms[0];
-        (
-            room.x as f32 + room.w as f32 * 0.5,
-            room.y as f32 + room.h as f32 * 0.5,
-        )
+
+        let start_pos = room.get_start_pos().unwrap();
+
+        (start_pos.0 as f32, start_pos.1 as f32)
     }
 
     pub fn get_bounds(&self) -> (i32, i32, i32, i32) {
@@ -754,14 +771,32 @@ impl GameMap {
     pub fn new_random() -> GameMap {
         let room_candidates = Room::load_rooms_from_folder();
         let mut rng = rand::rng();
-        let first_room = room_candidates.choose(&mut rng).unwrap().1.clone();
-        let rooms = vec![first_room];
+
+        let first_room_candidates: Vec<Room> = room_candidates
+            .iter()
+            .map(|(_, room)| room.clone())
+            .filter(|room| room.get_start_pos().is_some())
+            .collect();
+
+        let first_room = first_room_candidates[0].clone();
+
+        // let first_room = first_room_candidates
+        //     .choose(&mut rng)
+        //     .unwrap();
+
+        println!("First room: {:?}", first_room.get_start_pos());
+
+        assert!(
+            first_room.get_start_pos().is_some(),
+            "First room must have a start pos"
+        );
+
+        let rooms = vec![first_room.clone()];
 
         let mut game_map = GameMap {
             rooms,
             doors: Vec::new(),
-            ladder_pos: Vec::new(),
-            platform_pos: Vec::new(),
+            all_overlays: Vec::new(),
             x: 0,
             y: 0,
             h: 0,
@@ -877,6 +912,8 @@ impl GameMap {
                 BaseTile::Empty,
             );
 
+            random_new_room.update_overlays_cache();
+
             game_map.rooms.push(random_new_room);
             game_map.doors.push(MapDoor::new(
                 door_world_pos.0,
@@ -889,14 +926,6 @@ impl GameMap {
             if room_count >= 10 {
                 break;
             }
-        }
-
-        for room in &game_map.rooms {
-            let mut room_ladders = room.get_ladders();
-            game_map.ladder_pos.append(&mut room_ladders);
-
-            let mut room_platforms = room.get_platforms();
-            game_map.platform_pos.append(&mut room_platforms);
         }
 
         let (x, y, w, h) = game_map.get_bounds();
@@ -912,10 +941,17 @@ impl GameMap {
         for xx in 0..w {
             for yy in 0..h {
                 let (base, overlay) = game_map.get_at_from_room(x + xx, y + yy);
+
                 game_map.overlay[(xx + yy * w) as usize] = overlay;
                 game_map.base[(xx + yy * w) as usize] = base;
             }
         }
+
+        game_map.all_overlays = game_map
+            .rooms
+            .iter_mut()
+            .flat_map(|room| room.get_overlays().clone())
+            .collect();
 
         game_map
     }
@@ -967,12 +1003,8 @@ impl MapLike for GameMap {
         (self.base[index], self.overlay[index])
     }
 
-    fn get_ladders(&self) -> Vec<Pos> {
-        self.ladder_pos.clone()
-    }
-
-    fn get_platforms(&self) -> Vec<Pos> {
-        self.platform_pos.clone()
+    fn get_overlays(&self) -> &Vec<OverlayInfo> {
+        &self.all_overlays
     }
 
     fn set_base(&mut self, _x: i32, _y: i32, _tile: BaseTile) {

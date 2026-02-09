@@ -76,6 +76,11 @@ impl GameStateDebugMenu for Editor {
                     self.map_mut()
                         .set_overlay(coords.0, coords.1, OverlayTile::None);
                 }
+                TileSelection::StartDoor => {
+                    self.map_mut().set_base(coords.0, coords.1, BaseTile::Empty);
+                    self.map_mut()
+                        .set_overlay(coords.0, coords.1, OverlayTile::StartDoor);
+                }
             }
         }
     }
@@ -184,6 +189,7 @@ impl GameStateDebugMenu for Editor {
                     TileSelection::Ladder,
                     TileSelection::Platform,
                     TileSelection::Stone,
+                    TileSelection::StartDoor,
                 ] {
                     if ui
                         .add(egui::RadioButton::new(
@@ -231,6 +237,8 @@ impl GameStateDebugMenu for Editor {
                     DoorSelection::Left,
                     DoorSelection::Up,
                     DoorSelection::Down,
+                    DoorSelection::LevelStart,
+                    DoorSelection::LevelEnd,
                     DoorSelection::Remove,
                 ] {
                     if ui
