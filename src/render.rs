@@ -1,10 +1,10 @@
 use super::state::enemies::Enemy;
 use crate::atlas_info::AtlasInfo;
 use crate::camera::Camera;
-use crate::state::BaseTile;
 use crate::state::GameState;
 use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
+use crate::state::{BaseTile, OverlayTile};
 
 use image::GenericImageView;
 use miniquad::*;
@@ -809,11 +809,68 @@ impl Renderer {
     }
 
     fn draw_overlay(&mut self, map: &dyn MapLike) {
-        for ladder in map.get_ladders() {
-            self.draw_from_texture_atlas("tiles", 0, false, ladder.x, ladder.y, 1.0, 1.0, 1.0);
-        }
-        for platform in map.get_platforms() {
-            self.draw_from_texture_atlas("tiles", 2, false, platform.x, platform.y, 1.0, 1.0, 1.0);
+        for item in map.get_overlays() {
+            match item.tile {
+                OverlayTile::None => {}
+                OverlayTile::Ladder => {
+                    self.draw_from_texture_atlas(
+                        "tiles",
+                        0,
+                        false,
+                        item.x as f32,
+                        item.y as f32,
+                        1.0,
+                        1.0,
+                        1.0,
+                    );
+                }
+                OverlayTile::Platform => {
+                    self.draw_from_texture_atlas(
+                        "tiles",
+                        2,
+                        false,
+                        item.x as f32,
+                        item.y as f32,
+                        1.0,
+                        1.0,
+                        1.0,
+                    );
+                }
+                OverlayTile::LadderPlatform => {
+                    self.draw_from_texture_atlas(
+                        "tiles",
+                        0,
+                        false,
+                        item.x as f32,
+                        item.y as f32,
+                        1.0,
+                        1.0,
+                        1.0,
+                    );
+                    self.draw_from_texture_atlas(
+                        "tiles",
+                        2,
+                        false,
+                        item.x as f32,
+                        item.y as f32,
+                        1.0,
+                        1.0,
+                        1.0,
+                    );
+                }
+                OverlayTile::StartDoor => {
+                    self.draw_from_texture_atlas(
+                        "tiles",
+                        7,
+                        false,
+                        item.x as f32,
+                        item.y as f32,
+                        1.0,
+                        1.0,
+                        1.0,
+                    );
+                }
+            };
         }
     }
 

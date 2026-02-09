@@ -25,6 +25,7 @@ enum TileSelection {
     Wood,
     Ladder,
     Platform,
+    StartDoor,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -41,6 +42,8 @@ enum DoorSelection {
     Right,
     Up,
     Down,
+    LevelStart,
+    LevelEnd,
     Remove,
 }
 
