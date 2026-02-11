@@ -106,6 +106,7 @@ impl GameStateDebugMenu for Editor {
                     EnemySelection::Bat => ObjectTemplateType::Bat,
                     EnemySelection::Slime => ObjectTemplateType::Slime,
                     EnemySelection::Worm => ObjectTemplateType::Worm,
+                    EnemySelection::Burrower => ObjectTemplateType::Burrower,
                 };
                 self.room
                     .add_object_template(coords.x, coords.y, template_type);
@@ -212,6 +213,7 @@ impl GameStateDebugMenu for Editor {
                     EnemySelection::Bat,
                     EnemySelection::Slime,
                     EnemySelection::Worm,
+                    EnemySelection::Burrower,
                 ] {
                     if ui
                         .add(egui::RadioButton::new(

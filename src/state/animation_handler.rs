@@ -3,6 +3,7 @@ pub struct AnimationConfigResult {
     end: u32,
     dur: u32,
     loops: bool,
+    reverse: bool,
 }
 
 impl AnimationConfigResult {
@@ -12,6 +13,7 @@ impl AnimationConfigResult {
             end,
             dur,
             loops: true,
+            reverse: false,
         }
     }
 
@@ -21,6 +23,17 @@ impl AnimationConfigResult {
             end,
             dur,
             loops: false,
+            reverse: false,
+        }
+    }
+
+    pub fn new_reverse_no_loop(start: u32, end: u32, dur: u32) -> Self {
+        Self {
+            start,
+            end,
+            dur,
+            loops: false,
+            reverse: true,
         }
     }
 }
@@ -61,10 +74,16 @@ impl<T: AnimationConfig + PartialEq> AnimationHandler<T> {
         let config = self.state.get_config();
         let frame_index = self.current_frame / config.dur;
         let total_frames = config.end - config.start + 1;
-        if !config.loops && frame_index >= total_frames {
+        let non_reverse_frame = if !config.loops && frame_index >= total_frames {
             config.start + total_frames - 1
         } else {
             config.start + frame_index % total_frames
+        };
+
+        if config.reverse {
+            total_frames - 1 - (non_reverse_frame - config.start) + config.start
+        } else {
+            non_reverse_frame
         }
     }
 }
