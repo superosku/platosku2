@@ -1,7 +1,9 @@
 use crate::physics::integrate_kinematic;
+use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
 use crate::state::game_map::MapLike;
 
 // Worm moves back and fort
@@ -73,46 +75,34 @@ impl Enemy for Worm {
         self.animation_handler.increment_frame();
     }
 
-    fn got_stomped(&mut self) {
-        self.is_dead = true;
-    }
-
-    fn can_be_stomped(&self) -> bool {
-        true
-    }
-
-    fn got_hit(&mut self) {
-        self.got_stomped();
-    }
-
-    fn can_be_hit(&self) -> bool {
-        self.can_be_stomped()
-    }
-
     fn should_remove(&self) -> bool {
         self.is_dead
-    }
-
-    fn contanct_damage(&self) -> u32 {
-        1
     }
 
     fn get_health(&self) -> Health {
         Health { current: 1, max: 1 }
     }
 
-    fn get_texture_index(&self) -> &str {
-        "worm"
+    fn maybe_got_hit(&mut self, _hit_type: EnemyHitType) -> EnemyHitResult {
+        self.is_dead = true;
+        EnemyHitResult::GotHit
     }
 
-    fn get_atlas_index(&self) -> u32 {
-        self.animation_handler.get_atlas_index()
+    fn maybe_damage_player(&self) -> Option<u32> {
+        Some(1)
     }
 
-    fn goes_right(&self) -> bool {
-        match self.dir {
-            Dir::Right => false,
-            Dir::Left => true,
-        }
+    fn draw(&self, renderer: &mut crate::render::Renderer) {
+        let bb = self.bb();
+        renderer.draw_from_texture_atlas(
+            "worm",
+            self.animation_handler.get_atlas_index(),
+            self.dir.goes_right(),
+            bb.x - 1.0 / TILE_SIZE,
+            bb.y - 1.0 / TILE_SIZE,
+            bb.w + 2.0 / TILE_SIZE,
+            bb.h + 2.0 / TILE_SIZE,
+            1.0,
+        );
     }
 }

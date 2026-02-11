@@ -1,7 +1,9 @@
 use crate::physics::integrate_kinematic;
+use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
 use crate::state::game_map::MapLike;
 use rand::prelude::IndexedRandom;
 
@@ -118,60 +120,48 @@ impl Enemy for Slime {
         self.animation_handler.increment_frame();
     }
 
-    fn got_stomped(&mut self) {
-        self.immunity_frames = 10;
-        self.state = SlimeState::Idle {
-            frames_remaining: 50,
-        };
-        self.health.current -= 1;
-    }
-
-    fn can_be_stomped(&self) -> bool {
-        self.immunity_frames == 0
-    }
-
-    fn got_hit(&mut self) {
-        if self.immunity_frames == 0 {
-            self.immunity_frames = 10;
-            self.state = SlimeState::Idle {
-                frames_remaining: 50,
-            };
-            self.health.current -= 1;
-        }
-    }
-
-    fn can_be_hit(&self) -> bool {
-        self.immunity_frames == 0
-    }
-
     fn should_remove(&self) -> bool {
         self.health.current == 0
-    }
-
-    fn contanct_damage(&self) -> u32 {
-        if matches!(self.state, SlimeState::Jumping { .. }) {
-            2
-        } else {
-            1
-        }
     }
 
     fn get_health(&self) -> Health {
         self.health
     }
 
-    fn get_texture_index(&self) -> &str {
-        "slime"
-    }
+    fn maybe_got_hit(&mut self, _hit_type: EnemyHitType) -> EnemyHitResult {
+        if self.immunity_frames == 0 {
+            self.health.current -= 1;
 
-    fn get_atlas_index(&self) -> u32 {
-        self.animation_handler.get_atlas_index()
-    }
+            self.immunity_frames = 10;
+            self.state = SlimeState::Idle {
+                frames_remaining: 50,
+            };
 
-    fn goes_right(&self) -> bool {
-        match self.dir {
-            Dir::Right => true,
-            Dir::Left => false,
+            EnemyHitResult::GotHit
+        } else {
+            EnemyHitResult::DidNotHit
         }
+    }
+
+    fn maybe_damage_player(&self) -> Option<u32> {
+        if matches!(self.state, SlimeState::Jumping { .. }) {
+            Some(2)
+        } else {
+            Some(1)
+        }
+    }
+
+    fn draw(&self, renderer: &mut crate::render::Renderer) {
+        let bb = self.bb();
+        renderer.draw_from_texture_atlas(
+            "slime",
+            self.animation_handler.get_atlas_index(),
+            self.dir.goes_right(),
+            bb.x - 1.0 / TILE_SIZE,
+            bb.y - 1.0 / TILE_SIZE,
+            bb.w + 2.0 / TILE_SIZE,
+            bb.h + 2.0 / TILE_SIZE,
+            1.0,
+        );
     }
 }

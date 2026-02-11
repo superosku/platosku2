@@ -136,18 +136,7 @@ impl DrawableGameState for Game {
 
         // Enemies
         for enemy in &self.enemies {
-            let bb = enemy.bb();
-            // self.draw_rect(state, bb.x, bb.y, bb.w, bb.h, [0.5, 0.25, 0.25, 1.0]);
-            renderer.draw_from_texture_atlas(
-                enemy.get_texture_index(),
-                enemy.get_atlas_index(),
-                !enemy.goes_right(),
-                bb.x - 1.0 / TILE_SIZE,
-                bb.y - 1.0 / TILE_SIZE,
-                bb.w + 2.0 / TILE_SIZE,
-                bb.h + 2.0 / TILE_SIZE,
-                1.0,
-            );
+            enemy.draw(renderer);
         }
     }
 
