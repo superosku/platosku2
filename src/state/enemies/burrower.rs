@@ -1,6 +1,8 @@
+use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
 use crate::state::game_map::MapLike;
 
 #[derive(PartialEq)]
@@ -101,59 +103,51 @@ impl Enemy for Burrower {
         self.animation_handler.increment_frame();
     }
 
-    fn got_stomped(&mut self) {
-        match self.animation_handler.current_state() {
-            BurrowerAnimationState::Hidden => {}
-            _ => {
-                self.is_dead = true;
-            }
-        }
-    }
-
-    fn can_be_stomped(&self) -> bool {
-        !matches!(
-            self.animation_handler.current_state(),
-            BurrowerAnimationState::Hidden
-        )
-    }
-
-    fn got_hit(&mut self) {
-        match self.animation_handler.current_state() {
-            BurrowerAnimationState::Hidden => {}
-            _ => {
-                self.is_dead = true;
-            }
-        }
-    }
-
-    fn can_be_hit(&self) -> bool {
-        !matches!(
-            self.animation_handler.current_state(),
-            BurrowerAnimationState::Hidden
-        )
-    }
-
     fn should_remove(&self) -> bool {
         self.is_dead
-    }
-
-    fn contanct_damage(&self) -> u32 {
-        0
     }
 
     fn get_health(&self) -> Health {
         Health { current: 1, max: 1 }
     }
 
-    fn get_texture_index(&self) -> &str {
-        "burrower"
+    fn maybe_got_hit(&mut self, _hit_type: EnemyHitType) -> EnemyHitResult {
+        match self.animation_handler.current_state() {
+            BurrowerAnimationState::Hidden | BurrowerAnimationState::Digging => {
+                EnemyHitResult::DidNotHit
+            }
+            _ => {
+                self.is_dead = true;
+                EnemyHitResult::GotHit
+            }
+        }
     }
 
-    fn get_atlas_index(&self) -> u32 {
-        self.animation_handler.get_atlas_index()
+    fn maybe_damage_player(&self) -> Option<u32> {
+        match self.animation_handler.current_state() {
+            BurrowerAnimationState::Hidden | BurrowerAnimationState::Digging => None,
+            _ => Some(1),
+        }
     }
 
-    fn goes_right(&self) -> bool {
-        true
+    fn draw(&self, renderer: &mut crate::render::Renderer) {
+        if matches!(
+            self.animation_handler.current_state(),
+            BurrowerAnimationState::Hidden
+        ) {
+            return;
+        }
+
+        let bb = self.bb();
+        renderer.draw_from_texture_atlas(
+            "burrower",
+            self.animation_handler.get_atlas_index(),
+            true,
+            bb.x - 1.0 / TILE_SIZE,
+            bb.y - 1.0 / TILE_SIZE,
+            bb.w + 2.0 / TILE_SIZE,
+            bb.h + 2.0 / TILE_SIZE,
+            1.0,
+        );
     }
 }

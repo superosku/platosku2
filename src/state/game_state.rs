@@ -4,6 +4,7 @@ use crate::camera::Camera;
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::BoundingBox;
 use crate::state::enemies::Enemy;
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
 use crate::state::item::{Item, ItemInteractionResult};
 use rand::Rng;
 
@@ -263,19 +264,35 @@ impl GameState for Game {
             enemy.update(&self.map);
 
             if enemy.bb().overlaps(&self.player.bb) {
-                if enemy.can_be_stomped() && self.player.maybe_stomp(enemy.bb()) {
-                    sound_handler.play(Sound::Clink);
-                    enemy.got_stomped();
-                } else if self.player.can_be_hit() {
-                    self.player.got_hit(enemy.contanct_damage());
+                let mut should_hit_player = false;
+                if self.player.maybe_stomp(enemy.bb()) {
+                    match enemy.maybe_got_hit(EnemyHitType::Stomp) {
+                        EnemyHitResult::DidNotHit => {
+                            should_hit_player = true;
+                        }
+                        EnemyHitResult::GotHit => {
+                            sound_handler.play(Sound::Clink);
+                        }
+                    }
+                } else {
+                    should_hit_player = true;
+                }
+                if should_hit_player && let Some(contact_damage) = enemy.maybe_damage_player() {
+                    self.player.got_hit(contact_damage);
                 }
             }
 
             if let Some(swing_info) = self.player.get_swing_info()
-                && enemy.can_be_hit()
+                // && enemy.can_be_hit()
                 && enemy.bb().overlaps_line(&swing_info.pivot, &swing_info.end)
             {
-                enemy.got_hit()
+                match enemy.maybe_got_hit(EnemyHitType::Swing) {
+                    EnemyHitResult::DidNotHit => {}
+                    EnemyHitResult::GotHit => {
+                        sound_handler.play(Sound::Clink);
+                        // TODO: Maybe play a different sound here than what the stomp plays?
+                    }
+                }
             }
         }
         // Filter the enemies that are dead by enemy.is_dead() value

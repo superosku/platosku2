@@ -1,7 +1,9 @@
 use crate::physics::integrate_kinematic;
+use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
 use crate::state::game_map::MapLike;
 use rand::Rng;
 
@@ -133,51 +135,46 @@ impl Enemy for Bat {
         self.animation_handler.increment_frame();
     }
 
-    fn got_stomped(&mut self) {
-        match self.state {
-            BatState::Falling { .. } => {}
-            _ => {
-                self.state = BatState::Falling {
-                    frames_remaining: 120,
-                };
-                self.health.current -= 1;
-            }
-        }
-    }
-
-    fn can_be_stomped(&self) -> bool {
-        !matches!(self.state, BatState::Falling { .. })
-    }
-
-    fn got_hit(&mut self) {
-        self.got_stomped();
-    }
-
-    fn can_be_hit(&self) -> bool {
-        self.can_be_stomped()
-    }
-
     fn should_remove(&self) -> bool {
         self.health.current == 0
-    }
-
-    fn contanct_damage(&self) -> u32 {
-        if self.can_be_hit() { 1 } else { 0 }
     }
 
     fn get_health(&self) -> Health {
         self.health
     }
 
-    fn get_texture_index(&self) -> &str {
-        "bat"
+    fn maybe_got_hit(&mut self, _hit_type: EnemyHitType) -> EnemyHitResult {
+        if matches!(self.state, BatState::Falling { .. }) {
+            EnemyHitResult::DidNotHit
+        } else {
+            self.state = BatState::Falling {
+                frames_remaining: 120,
+            };
+            self.health.current -= 1; // TODO: Can this overflow?
+
+            EnemyHitResult::GotHit
+        }
     }
 
-    fn get_atlas_index(&self) -> u32 {
-        self.animation_handler.get_atlas_index()
+    fn maybe_damage_player(&self) -> Option<u32> {
+        if matches!(self.state, BatState::Falling { .. }) {
+            None
+        } else {
+            Some(1)
+        }
     }
 
-    fn goes_right(&self) -> bool {
-        true
+    fn draw(&self, renderer: &mut crate::render::Renderer) {
+        let bb = self.bb();
+        renderer.draw_from_texture_atlas(
+            "bat",
+            self.animation_handler.get_atlas_index(),
+            true,
+            bb.x - 1.0 / TILE_SIZE,
+            bb.y - 1.0 / TILE_SIZE,
+            bb.w + 2.0 / TILE_SIZE,
+            bb.h + 2.0 / TILE_SIZE,
+            1.0,
+        );
     }
 }

@@ -4,6 +4,12 @@ pub enum Dir {
     Right,
 }
 
+impl Dir {
+    pub fn goes_right(&self) -> bool {
+        matches!(self, Dir::Right)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Health {
     pub current: u32,
