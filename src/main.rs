@@ -49,10 +49,18 @@ enum DoorSelection {
 }
 
 enum EditorSelection {
-    Tiles { selection: TileSelection },
-    Enemies { selection: EnemySelection },
+    Tiles {
+        selection: TileSelection,
+    },
+    Enemies {
+        snap_bottom: bool,
+        snap_top: bool,
+        selection: EnemySelection,
+    },
     PlayerPos,
-    Doors { selection: DoorSelection },
+    Doors {
+        selection: DoorSelection,
+    },
 }
 
 struct DebugMenu {
