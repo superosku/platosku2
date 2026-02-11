@@ -693,6 +693,15 @@
     "duration": 100
    },
    {
+    "filename": "green_projectile.aseprite",
+    "frame": { "x": 121, "y": 62, "w": 6, "h": 6 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 6, "h": 6 },
+    "sourceSize": { "w": 6, "h": 6 },
+    "duration": 100
+   },
+   {
     "filename": "large_stone.aseprite",
     "frame": { "x": 20, "y": 108, "w": 8, "h": 8 },
     "rotated": false,

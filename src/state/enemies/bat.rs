@@ -3,7 +3,7 @@ use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
-use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::game_map::MapLike;
 use rand::Rng;
 
@@ -65,7 +65,7 @@ impl Enemy for Bat {
         &self.bb
     }
 
-    fn update(&mut self, map: &dyn MapLike) {
+    fn update(&mut self, map: &dyn MapLike) -> Vec<EnemyUpdateResult> {
         let mut new_state: Option<BatState> = None;
 
         match &mut self.state {
@@ -133,6 +133,8 @@ impl Enemy for Bat {
         }
 
         self.animation_handler.increment_frame();
+
+        vec![]
     }
 
     fn should_remove(&self) -> bool {

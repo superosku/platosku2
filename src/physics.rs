@@ -14,6 +14,12 @@ pub struct KinematicResult {
     pub on_right: bool,
 }
 
+impl KinematicResult {
+    pub fn on_something(&self) -> bool {
+        self.on_bottom || self.on_top || self.on_left || self.on_right
+    }
+}
+
 pub fn integrate_kinematic(
     world: &dyn MapLike,
     bb: &BoundingBox,
