@@ -3,7 +3,7 @@ use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
-use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::game_map::MapLike;
 
 // Worm moves back and fort
@@ -50,7 +50,7 @@ impl Enemy for Worm {
         &self.bb
     }
 
-    fn update(&mut self, map: &dyn MapLike) {
+    fn update(&mut self, map: &dyn MapLike) -> Vec<EnemyUpdateResult> {
         match self.dir {
             Dir::Left => {
                 self.bb.vx = -0.01;
@@ -73,6 +73,8 @@ impl Enemy for Worm {
         self.animation_handler.set_state(WormAnimationState::Moving);
 
         self.animation_handler.increment_frame();
+
+        vec![]
     }
 
     fn should_remove(&self) -> bool {

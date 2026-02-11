@@ -15,6 +15,7 @@ pub enum ItemType {
     Box,
     // Vase,
     // Arrow,
+    GreenProjectile,
 }
 
 pub struct Item {
@@ -41,6 +42,7 @@ impl Item {
             ItemType::SmallStone => (4, 4),
             ItemType::LargeStone => (8, 8),
             ItemType::Box => (8, 10),
+            ItemType::GreenProjectile => (6, 6),
         };
 
         let width = width_px as f32 / 16.0;
@@ -59,6 +61,10 @@ impl Item {
         }
     }
 
+    pub fn bb(&self) -> &BoundingBox {
+        &self.bb
+    }
+
     pub fn new(center_x: f32, center_y: f32, item_type: ItemType) -> Self {
         Self::new_with_velocity(center_x, center_y, 0.0, 0.0, item_type)
     }
@@ -70,6 +76,7 @@ impl Item {
                 ItemType::SmallStone => "small_stone",
                 ItemType::LargeStone => "large_stone",
                 ItemType::Box => "box",
+                ItemType::GreenProjectile => "green_projectile",
             },
             0,
             false,
@@ -79,6 +86,11 @@ impl Item {
             self.bb.h,
             1.0,
         );
+    }
+
+    pub fn set_v(&mut self, vx: f32, vy: f32) {
+        self.bb.vx = vx;
+        self.bb.vy = vy;
     }
 
     pub fn set_xyv(&mut self, x: f32, y: f32, vx: f32, vy: f32) {
@@ -115,8 +127,14 @@ impl Item {
         Item::new(center_x, center_y, *random_type)
     }
 
-    pub fn update(&mut self, map: &dyn MapLike) {
+    pub fn update(&mut self, map: &dyn MapLike) -> Vec<ItemInteractionResult> {
         let res = integrate_kinematic(map, &self.bb, true);
+
+        if res.on_something()
+            && let ItemType::GreenProjectile = self.item_type {
+                return vec![ItemInteractionResult::RemoveItem];
+            }
+
         self.bb = res.new_bb;
 
         if res.on_left || res.on_right {
@@ -133,6 +151,8 @@ impl Item {
                 self.bb.vx = 0.0;
             }
         }
+
+        vec![]
     }
 
     pub fn handle_player_touch(

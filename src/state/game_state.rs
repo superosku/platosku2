@@ -4,7 +4,7 @@ use crate::camera::Camera;
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::BoundingBox;
 use crate::state::enemies::Enemy;
-use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::item::{Item, ItemInteractionResult};
 use rand::Rng;
 
@@ -228,7 +228,6 @@ impl GameState for Game {
         let mut new_items = Vec::new();
         self.items.retain_mut(|item| {
             let mut keep_item = true;
-            item.update(&self.map);
 
             let mut handle_item_results = |results: Vec<ItemInteractionResult>| {
                 for result in results {
@@ -243,6 +242,8 @@ impl GameState for Game {
                     }
                 }
             };
+
+            handle_item_results(item.update(&self.map));
 
             if item.overlaps(&self.player.bb) {
                 let results = item.handle_player_touch(sound_handler);
@@ -261,7 +262,16 @@ impl GameState for Game {
         self.items.extend(new_items);
 
         for enemy in &mut self.enemies {
-            enemy.update(&self.map);
+            for result in enemy.update(&self.map) {
+                match result {
+                    EnemyUpdateResult::SpawnItemThrowTowardsPlayer { mut item } => {
+                        let x_diff = (self.player.bb.x - item.bb().x).clamp(-7.0, 7.0);
+
+                        item.set_v(x_diff * 0.025, -0.15);
+                        self.items.push(item);
+                    }
+                }
+            }
 
             if enemy.bb().overlaps(&self.player.bb) {
                 let mut should_hit_player = false;

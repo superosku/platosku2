@@ -2,8 +2,9 @@ use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
-use crate::state::enemies::common::{EnemyHitResult, EnemyHitType};
+use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::game_map::MapLike;
+use crate::state::item::{Item, ItemType};
 
 #[derive(PartialEq)]
 enum BurrowerAnimationState {
@@ -60,16 +61,26 @@ impl Enemy for Burrower {
         &self.bb
     }
 
-    fn update(&mut self, _map: &dyn MapLike) {
+    fn update(&mut self, _map: &dyn MapLike) -> Vec<EnemyUpdateResult> {
+        let mut update_results = Vec::new();
+
         if self.frames_remaining == 0 {
             match self.animation_handler.current_state() {
                 BurrowerAnimationState::BurrowingUp => {
-                    self.frames_remaining = 60;
+                    self.frames_remaining = 30;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::Burbing);
                 }
                 BurrowerAnimationState::Burbing => {
-                    // TODO: Throw the projectile here
+                    let projectile = Item::new(
+                        self.bb.x + self.bb.w / 2.0,
+                        self.bb.y + self.bb.w / 2.0, // Use the w (not h) here to center at "head circle"
+                        ItemType::GreenProjectile,
+                    );
+
+                    update_results
+                        .push(EnemyUpdateResult::SpawnItemThrowTowardsPlayer { item: projectile });
+
                     self.frames_remaining = 180;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::Wiggling);
@@ -101,6 +112,8 @@ impl Enemy for Burrower {
         self.frames_remaining -= 1;
 
         self.animation_handler.increment_frame();
+
+        update_results
     }
 
     fn should_remove(&self) -> bool {
