@@ -1,5 +1,5 @@
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
-use crate::state::enemies::{Enemy, Slime, Worm};
+use crate::state::enemies::{Burrower, Enemy, Slime, Worm};
 use crate::state::{Bat, BoundingBox};
 use rand::Rng;
 use rand::seq::IndexedRandom;
@@ -91,6 +91,7 @@ pub enum ObjectTemplateType {
     Bat = 0,
     Slime = 1,
     Worm = 2,
+    Burrower = 3,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -114,6 +115,7 @@ impl ObjectTemplate {
             ObjectTemplateType::Bat => "bat",
             ObjectTemplateType::Slime => "slime",
             ObjectTemplateType::Worm => "worm",
+            ObjectTemplateType::Burrower => "burrower",
         }
     }
 
@@ -122,6 +124,7 @@ impl ObjectTemplate {
             ObjectTemplateType::Bat => Box::new(Bat::new(self.x, self.y)),
             ObjectTemplateType::Slime => Box::new(Slime::new(self.x, self.y)),
             ObjectTemplateType::Worm => Box::new(Worm::new(self.x, self.y)),
+            ObjectTemplateType::Burrower => Box::new(Burrower::new(self.x, self.y)),
         }
     }
 }
@@ -778,6 +781,12 @@ impl GameMap {
             .filter(|room| room.get_start_pos().is_some())
             .collect();
 
+        let non_first_room_candidates: Vec<Room> = room_candidates
+            .iter()
+            .map(|(_, room)| room.clone())
+            .filter(|room| room.get_start_pos().is_none())
+            .collect();
+
         let first_room = first_room_candidates[0].clone();
 
         // let first_room = first_room_candidates
@@ -823,7 +832,7 @@ impl GameMap {
             let door_world_pos = random_existing_room.rel_to_abs((random_door.x, random_door.y));
 
             println!(" b) Choosing a random room to add");
-            let mut random_new_room = room_candidates.choose(&mut rng).unwrap().1.clone();
+            let mut random_new_room = non_first_room_candidates.choose(&mut rng).unwrap().clone();
             println!(" c) Choosing a random door");
             let door_match_candidates: Vec<RoomDoor> = random_new_room
                 .doors
