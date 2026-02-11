@@ -78,7 +78,7 @@ enum Axis {
     Y,
 }
 
-const EPS: f32 = 0.0001;
+pub const EPS: f32 = 0.0001;
 
 fn sweep_axis(
     world: &dyn MapLike,

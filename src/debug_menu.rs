@@ -1,5 +1,6 @@
 use crate::camera::MouseCoords;
-use crate::state::game_map::{DoorDir, ObjectTemplateType, Room};
+use crate::physics::EPS;
+use crate::state::game_map::{DoorDir, MapLike, ObjectTemplate, ObjectTemplateType, Room};
 use crate::state::game_state::{Editor, Game};
 use crate::state::{BaseTile, GameState, OverlayTile};
 use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
@@ -91,7 +92,11 @@ impl GameStateDebugMenu for Editor {
                 self.player_mut().bb.x = coords.x;
                 self.player_mut().bb.y = coords.y;
             }
-            EditorSelection::Enemies { selection } => {
+            EditorSelection::Enemies {
+                snap_top,
+                snap_bottom,
+                selection,
+            } => {
                 let template_type = match selection {
                     EnemySelection::Remove => {
                         self.room.object_templates.retain(|template| {
@@ -108,8 +113,50 @@ impl GameStateDebugMenu for Editor {
                     EnemySelection::Worm => ObjectTemplateType::Worm,
                     EnemySelection::Burrower => ObjectTemplateType::Burrower,
                 };
-                self.room
-                    .add_object_template(coords.x, coords.y, template_type);
+
+                let template = ObjectTemplate::new(coords.x, coords.y, template_type.clone());
+                let bb = template.get_bb();
+
+                match (snap_top, snap_bottom) {
+                    (false, false) => {
+                        self.room.add_object_template(template);
+                    }
+                    (_, true) => {
+                        let x1 = bb.x as i32;
+                        let x2 = (bb.x + bb.w) as i32;
+                        let mut y = bb.y.floor() as i32;
+
+                        while !self.room.is_solid_at_tile(x1, y + 1)
+                            && !self.room.is_solid_at_tile(x2, y + 1)
+                        {
+                            y += 1;
+                        }
+
+                        let new_template = ObjectTemplate::new(
+                            coords.x,
+                            y as f32 + (1.0 - bb.h) - EPS,
+                            template_type,
+                        );
+
+                        self.room.add_object_template(new_template);
+                    }
+                    (true, _) => {
+                        let x1 = bb.x as i32;
+                        let x2 = (bb.x + bb.w) as i32;
+                        let mut y = bb.y.floor() as i32;
+
+                        while !self.room.is_solid_at_tile(x1, y - 1)
+                            && !self.room.is_solid_at_tile(x2, y - 1)
+                        {
+                            y -= 1;
+                        }
+
+                        let new_template =
+                            ObjectTemplate::new(coords.x, y as f32 + EPS, template_type);
+
+                        self.room.add_object_template(new_template);
+                    }
+                }
             }
             EditorSelection::Doors { selection } => {
                 let coords = coords.as_i();
@@ -153,6 +200,8 @@ impl GameStateDebugMenu for Editor {
             .clicked()
         {
             stage.editor_selection = EditorSelection::Enemies {
+                snap_bottom: false,
+                snap_top: false,
                 selection: EnemySelection::Bat,
             };
         }
@@ -179,7 +228,7 @@ impl GameStateDebugMenu for Editor {
 
         let mut new_selection: Option<EditorSelection> = None;
 
-        match &stage.editor_selection {
+        match &mut stage.editor_selection {
             EditorSelection::Tiles { selection } => {
                 ui.add(egui::Label::new("Tile:"));
 
@@ -205,7 +254,11 @@ impl GameStateDebugMenu for Editor {
                     }
                 }
             }
-            EditorSelection::Enemies { selection } => {
+            EditorSelection::Enemies {
+                snap_top,
+                snap_bottom,
+                selection,
+            } => {
                 ui.add(egui::Label::new("Enemy:"));
 
                 for candidate in [
@@ -224,9 +277,14 @@ impl GameStateDebugMenu for Editor {
                     {
                         new_selection = Some(EditorSelection::Enemies {
                             selection: candidate,
+                            snap_bottom: *snap_bottom,
+                            snap_top: *snap_top,
                         });
                     }
                 }
+
+                ui.add(egui::Checkbox::new(snap_bottom, "Snap bottom"));
+                ui.add(egui::Checkbox::new(snap_top, "Snap top"));
             }
             EditorSelection::PlayerPos => {
                 ui.add(egui::Label::new("Click to set player pos"));

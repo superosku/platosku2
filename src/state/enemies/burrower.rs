@@ -19,12 +19,12 @@ impl AnimationConfig for BurrowerAnimationState {
     fn get_config(&self) -> AnimationConfigResult {
         match self {
             BurrowerAnimationState::Wiggling => AnimationConfigResult::new(0, 3, 10),
-            BurrowerAnimationState::Burbing => AnimationConfigResult::new_no_loop(4, 6, 10),
+            BurrowerAnimationState::Burbing => AnimationConfigResult::new_no_loop(4, 6, 8),
             BurrowerAnimationState::BurrowingUp => {
-                AnimationConfigResult::new_reverse_no_loop(7, 12, 10)
+                AnimationConfigResult::new_reverse_no_loop(7, 12, 6)
             }
-            BurrowerAnimationState::BurrowingDown => AnimationConfigResult::new_no_loop(7, 12, 10),
-            BurrowerAnimationState::Digging => AnimationConfigResult::new(13, 16, 10),
+            BurrowerAnimationState::BurrowingDown => AnimationConfigResult::new_no_loop(7, 12, 6),
+            BurrowerAnimationState::Digging => AnimationConfigResult::new(13, 16, 6),
             BurrowerAnimationState::Hidden => AnimationConfigResult::new(0, 1, 10), // Should not be drawn
         }
     }
@@ -70,12 +70,12 @@ impl Enemy for Burrower {
                 }
                 BurrowerAnimationState::Burbing => {
                     // TODO: Throw the projectile here
-                    self.frames_remaining = 240;
+                    self.frames_remaining = 180;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::Wiggling);
                 }
                 BurrowerAnimationState::Wiggling => {
-                    self.frames_remaining = 60;
+                    self.frames_remaining = 30;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::BurrowingDown);
                 }
@@ -86,12 +86,12 @@ impl Enemy for Burrower {
                 }
                 BurrowerAnimationState::Hidden => {
                     // TODO: Change location here
-                    self.frames_remaining = 120;
+                    self.frames_remaining = 90;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::Digging);
                 }
                 BurrowerAnimationState::Digging => {
-                    self.frames_remaining = 60;
+                    self.frames_remaining = 30;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::BurrowingUp);
                 }

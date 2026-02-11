@@ -102,7 +102,7 @@ pub struct ObjectTemplate {
 }
 
 impl ObjectTemplate {
-    fn new(x: f32, y: f32, object_type: ObjectTemplateType) -> ObjectTemplate {
+    pub fn new(x: f32, y: f32, object_type: ObjectTemplateType) -> ObjectTemplate {
         ObjectTemplate { x, y, object_type }
     }
 
@@ -192,9 +192,8 @@ impl Room {
             .collect()
     }
 
-    pub fn add_object_template(&mut self, x: f32, y: f32, template: ObjectTemplateType) {
-        self.object_templates
-            .push(ObjectTemplate::new(x, y, template))
+    pub fn add_object_template(&mut self, template: ObjectTemplate) {
+        self.object_templates.push(template)
     }
 
     pub fn get_center(&self) -> (f32, f32) {
