@@ -1,9 +1,9 @@
-use super::enemies::Enemy;
 use super::game_map::{GameMap, MapLike, Room};
 use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::BoundingBox;
+use crate::state::enemies::Enemy;
 use crate::state::item::{Item, ItemInteractionResult};
 use rand::Rng;
 
