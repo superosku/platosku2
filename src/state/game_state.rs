@@ -275,12 +275,13 @@ impl GameState for Game {
 
             if enemy.bb().overlaps(&self.player.bb) {
                 let mut should_hit_player = false;
-                if self.player.maybe_stomp(enemy.bb()) {
+                if self.player.check_if_could_stomp(enemy.bb()) {
                     match enemy.maybe_got_hit(EnemyHitType::Stomp) {
                         EnemyHitResult::DidNotHit => {
                             should_hit_player = true;
                         }
                         EnemyHitResult::GotHit => {
+                            self.player.apply_stomping(enemy.bb().y);
                             sound_handler.play(Sound::Clink);
                         }
                     }

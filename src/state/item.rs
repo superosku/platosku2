@@ -131,9 +131,10 @@ impl Item {
         let res = integrate_kinematic(map, &self.bb, true);
 
         if res.on_something()
-            && let ItemType::GreenProjectile = self.item_type {
-                return vec![ItemInteractionResult::RemoveItem];
-            }
+            && let ItemType::GreenProjectile = self.item_type
+        {
+            return vec![ItemInteractionResult::RemoveItem];
+        }
 
         self.bb = res.new_bb;
 
