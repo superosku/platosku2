@@ -2,7 +2,7 @@ use super::common::{BoundingBox, Dir, Health, Pos};
 use super::game_map::MapLike;
 use super::game_state::InputState;
 use crate::camera::Camera;
-use crate::physics::{check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
+use crate::physics::{EPS, check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
 use crate::render::Renderer;
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
@@ -177,12 +177,16 @@ impl Player {
         }
     }
 
-    pub fn maybe_stomp(&mut self, other_bb: &BoundingBox) -> bool {
+    pub fn check_if_could_stomp(&mut self, other_bb: &BoundingBox) -> bool {
         if self.bb.vy > 0.0 && (self.bb.y + self.bb.h) - other_bb.y < self.bb.vy * 2.0 {
-            self.bb.vy = -0.12;
             return true;
         }
         false
+    }
+
+    pub fn apply_stomping(&mut self, other_top_y: f32) {
+        self.bb.y = other_top_y - self.bb.h - EPS;
+        self.bb.vy = -0.12;
     }
 
     pub fn get_swing_info(&self) -> Option<SwingState> {
@@ -426,6 +430,7 @@ impl Player {
                     if input.down {
                         self.bb.vy = 0.0;
                     } else {
+                        sound_handler.play(Sound::Jump);
                         self.bb.vy = -0.12;
                     }
                 }
@@ -463,6 +468,7 @@ impl Player {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Laddering);
                 if input.jump_pressed && !input.up {
+                    sound_handler.play(Sound::Jump);
                     self.state = PlayerState::Normal;
                     self.bb.vy = -0.125;
                     self.bb.y += 0.05;
