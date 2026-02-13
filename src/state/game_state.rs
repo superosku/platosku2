@@ -288,7 +288,7 @@ impl GameState for Game {
                 } else {
                     should_hit_player = true;
                 }
-                if should_hit_player && let Some(contact_damage) = enemy.maybe_damage_player() {
+                if should_hit_player && let Some(contact_damage) = enemy.maybe_damage_player() && self.player.can_be_hit() {
                     self.player.got_hit(contact_damage);
                 }
             }
