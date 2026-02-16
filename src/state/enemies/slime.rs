@@ -48,7 +48,7 @@ impl Slime {
                 vx: 0.02,
                 vy: 0.0,
             },
-            health: Health { current: 2, max: 2 },
+            health: Health::new(2),
             immunity_frames: 0,
             dir: Dir::Right,
             animation_handler: AnimationHandler::new(SlimeAnimationState::Idle),
@@ -132,9 +132,9 @@ impl Enemy for Slime {
 
     fn maybe_got_hit(&mut self, _hit_type: EnemyHitType) -> EnemyHitResult {
         if self.immunity_frames == 0 {
-            self.health.current -= 1;
+            self.health.decrease();
 
-            self.immunity_frames = 10;
+            self.immunity_frames = 30;
             self.state = SlimeState::Idle {
                 frames_remaining: 50,
             };

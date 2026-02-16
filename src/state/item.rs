@@ -30,6 +30,45 @@ pub enum ItemInteractionResult {
 }
 
 impl Item {
+    pub fn slow_down(&mut self, fraction: f32) {
+        self.bb.vx *= fraction;
+        self.bb.vy *= fraction;
+    }
+
+    pub fn can_hit_enemy(&self) -> bool {
+        if let ItemType::GreenProjectile = self.item_type {
+            return false;
+        }
+        self.bb.vx.abs() > 0.001 || self.bb.vy.abs() > 0.001
+    }
+
+    pub fn randomize_speed(&mut self) {
+        let min_max_speed = 0.95;
+
+        let mut rng = rand::rng();
+        let speed = rng.random_range(min_max_speed..1.0 / min_max_speed);
+        self.bb.vx *= speed;
+        self.bb.vy *= speed;
+    }
+
+    pub fn randomize_direction(&mut self) {
+        let min_max_degrees = 5.0_f32;
+
+        let min_max_radians = min_max_degrees.to_radians();
+        let mut rng = rand::rng();
+        let angle = rng.random_range(-min_max_radians..min_max_radians);
+
+        let cos = angle.cos();
+        let sin = angle.sin();
+
+        let vx = self.bb.vx;
+        let vy = self.bb.vy;
+
+        // rotate (vx, vy)
+        self.bb.vx = vx * cos - vy * sin;
+        self.bb.vy = vx * sin + vy * cos;
+    }
+
     pub fn new_with_velocity(
         center_x: f32,
         center_y: f32,

@@ -82,7 +82,7 @@ impl Enemy for Worm {
     }
 
     fn get_health(&self) -> Health {
-        Health { current: 1, max: 1 }
+        Health::new(1)
     }
 
     fn maybe_got_hit(&mut self, _hit_type: EnemyHitType) -> EnemyHitResult {

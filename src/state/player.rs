@@ -165,7 +165,7 @@ impl Player {
     }
 
     pub fn got_hit(&mut self, damage: u32) {
-        self.health.current = 0.max(self.health.current as i32 - damage as i32) as u32;
+        self.health.decrease_by(damage);
 
         // If no health set to dead
         if self.health.current == 0 {
@@ -313,7 +313,7 @@ impl Player {
                                     Dir::Left => -0.1,
                                     Dir::Right => 0.1,
                                 },
-                            self.bb.vy + 0.1,
+                            self.bb.vy + 0.05,
                         )
                     }
                 } else {
