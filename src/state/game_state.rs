@@ -228,6 +228,7 @@ impl GameState for Game {
         let mut new_items = Vec::new();
         self.items.retain_mut(|item| {
             let mut keep_item = true;
+            let mut player_damage = 0;
 
             let mut handle_item_results = |results: Vec<ItemInteractionResult>| {
                 for result in results {
@@ -238,6 +239,12 @@ impl GameState for Game {
                         ItemInteractionResult::IncreaseScore => {}
                         ItemInteractionResult::SpawnItem { item } => {
                             new_items.push(item);
+                        }
+                        ItemInteractionResult::PlayerGotHit => {
+                            if self.player.can_be_hit() {
+                                sound_handler.play(Sound::PlayerHit);
+                                player_damage += 1;
+                            }
                         }
                     }
                 }
@@ -277,6 +284,11 @@ impl GameState for Game {
                         }
                     }
                 }
+            }
+
+            // Player damage from items
+            if player_damage > 0 {
+                self.player.got_hit(player_damage);
             }
 
             keep_item

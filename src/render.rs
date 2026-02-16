@@ -142,10 +142,9 @@ impl DrawableGameState for Game {
 
     fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool) {
         for enemy in &self.enemies {
-            if enemy.get_health().ratio() < 1.0
-                && enemy.should_render_health_bar() {
-                    renderer.draw_enemy_health_bar(camera, enemy.as_ref());
-                }
+            if enemy.get_health().ratio() < 1.0 && enemy.should_render_health_bar() {
+                renderer.draw_enemy_health_bar(camera, enemy.as_ref());
+            }
         }
 
         // Draw "the dark" (the overaly)

@@ -27,6 +27,7 @@ pub enum ItemInteractionResult {
     RemoveItem,
     IncreaseScore, // TODO: Add amount to increase by
     SpawnItem { item: Item },
+    PlayerGotHit,
 }
 
 impl Item {
@@ -205,6 +206,12 @@ impl Item {
                 vec![
                     ItemInteractionResult::RemoveItem,
                     ItemInteractionResult::IncreaseScore,
+                ]
+            }
+            ItemType::GreenProjectile => {
+                vec![
+                    ItemInteractionResult::RemoveItem,
+                    ItemInteractionResult::PlayerGotHit,
                 ]
             }
             _ => vec![],
