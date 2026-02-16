@@ -243,18 +243,40 @@ impl GameState for Game {
                 }
             };
 
+            // Update items (gravity etc.)
             handle_item_results(item.update(&self.map));
 
+            // Player collecting items
             if item.overlaps(&self.player.bb) {
                 let results = item.handle_player_touch(sound_handler);
                 handle_item_results(results);
             }
 
+            // Player hitting / swinging items
             if let Some(swing_info) = self.player.get_swing_info()
                 && item.overlaps_line(&swing_info.pivot, &swing_info.end)
             {
                 let results = item.handle_being_swung(sound_handler);
                 handle_item_results(results);
+            }
+
+            // Item hitting enemies
+            if item.can_hit_enemy() {
+                for enemy in &mut self.enemies {
+                    if enemy.bb().overlaps(item.bb()) {
+                        match enemy
+                            .maybe_got_hit_with_sound(EnemyHitType::Projectile, sound_handler)
+                        {
+                            EnemyHitResult::GotHit => {
+                                item.slow_down(0.5);
+                                // Projectile slows down here?
+                            }
+                            EnemyHitResult::DidNotHit => {
+                                // Projectile does not slow down here?
+                            }
+                        }
+                    }
+                }
             }
 
             keep_item
@@ -268,6 +290,10 @@ impl GameState for Game {
                         let x_diff = (self.player.bb.x - item.bb().x).clamp(-7.0, 7.0);
 
                         item.set_v(x_diff * 0.025, -0.15);
+
+                        item.randomize_direction();
+                        item.randomize_speed();
+
                         self.items.push(item);
                     }
                 }
@@ -276,7 +302,7 @@ impl GameState for Game {
             if enemy.bb().overlaps(&self.player.bb) {
                 let mut should_hit_player = false;
                 if self.player.check_if_could_stomp(enemy.bb()) {
-                    match enemy.maybe_got_hit(EnemyHitType::Stomp) {
+                    match enemy.maybe_got_hit_with_sound(EnemyHitType::Stomp, sound_handler) {
                         EnemyHitResult::DidNotHit => {
                             should_hit_player = true;
                         }
@@ -288,7 +314,11 @@ impl GameState for Game {
                 } else {
                     should_hit_player = true;
                 }
-                if should_hit_player && let Some(contact_damage) = enemy.maybe_damage_player() && self.player.can_be_hit() {
+                if should_hit_player
+                    && let Some(contact_damage) = enemy.maybe_damage_player()
+                    && self.player.can_be_hit()
+                {
+                    sound_handler.play(Sound::PlayerHit);
                     self.player.got_hit(contact_damage);
                 }
             }
@@ -297,7 +327,7 @@ impl GameState for Game {
                 // && enemy.can_be_hit()
                 && enemy.bb().overlaps_line(&swing_info.pivot, &swing_info.end)
             {
-                match enemy.maybe_got_hit(EnemyHitType::Swing) {
+                match enemy.maybe_got_hit_with_sound(EnemyHitType::Swing, sound_handler) {
                     EnemyHitResult::DidNotHit => {}
                     EnemyHitResult::GotHit => {
                         sound_handler.play(Sound::Clink);
@@ -313,18 +343,16 @@ impl GameState for Game {
         // been the previous. This is used for centering the camera and displaying the "black"
         // around the current room (/ rooms).
 
-        // TODO: Use bb.get_center() here
-        let player_center_x = self.player.bb.x + self.player.bb.w * 0.5;
-        let player_center_y = self.player.bb.y + self.player.bb.h * 0.5;
-        if let Some((room_index, _room)) = self.map.get_room_at(player_center_x, player_center_y)
+        let player_center = self.player.bb.get_center();
+        if let Some((room_index, _room)) = self.map.get_room_at(player_center.x, player_center.y)
             && self.cur_room_index != Some(room_index)
         {
             self.prev_room_index = self.cur_room_index;
             self.cur_room_index = Some(room_index);
             self.prev_room_show_frames = ROOM_TRANSITION_FRAMES;
             self.room_change_position = (
-                player_center_x.floor() as i32,
-                player_center_y.floor() as i32,
+                player_center.x.floor() as i32,
+                player_center.y.floor() as i32,
             );
 
             // Set the door closed here if the player is moving up and the door
@@ -357,12 +385,12 @@ impl GameState for Game {
                 })
                 .collect();
             list_of_bools.retain(|b| *b);
-            let _room_has_enemies = !list_of_bools.is_empty();
+            let room_has_enemies = !list_of_bools.is_empty();
 
             for door in &mut self.map.doors {
-                // door.update(!room_has_enemies);
+                door.update(!room_has_enemies);
                 // TODO: TEMP DOORS ALWAYS OPEN
-                door.update(true);
+                // door.update(true);
             }
         } else {
             for door in &mut self.map.doors {

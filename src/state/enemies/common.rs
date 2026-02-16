@@ -1,3 +1,4 @@
+use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::common::{BoundingBox, Health};
 use crate::state::game_map::MapLike;
 use crate::state::item::Item;
@@ -5,6 +6,7 @@ use crate::state::item::Item;
 pub enum EnemyHitType {
     Swing,
     Stomp,
+    Projectile,
 }
 
 pub enum EnemyHitResult {
@@ -27,4 +29,18 @@ pub trait Enemy {
 
     fn should_remove(&self) -> bool;
     fn get_health(&self) -> Health;
+
+    fn maybe_got_hit_with_sound(
+        &mut self,
+        hit_type: EnemyHitType,
+        sound_handler: &SoundHandler,
+    ) -> EnemyHitResult {
+        match self.maybe_got_hit(hit_type) {
+            EnemyHitResult::DidNotHit => EnemyHitResult::DidNotHit,
+            EnemyHitResult::GotHit => {
+                sound_handler.play(Sound::EnemyHit);
+                EnemyHitResult::GotHit
+            }
+        }
+    }
 }

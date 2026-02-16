@@ -35,8 +35,11 @@ pub struct Burrower {
     bb: BoundingBox,
     animation_handler: AnimationHandler<BurrowerAnimationState>,
     frames_remaining: u32,
-    is_dead: bool,
+    health: Health,
+    immunity_frames: u32,
 }
+
+const BURROWING_DOWN_FRAMES: u32 = 30;
 
 impl Burrower {
     pub fn new(x: f32, y: f32) -> Self {
@@ -49,9 +52,10 @@ impl Burrower {
                 vx: 0.0,
                 vy: 0.0,
             },
-            frames_remaining: 0,
+            frames_remaining: 180,
             animation_handler: AnimationHandler::new(BurrowerAnimationState::Digging),
-            is_dead: false,
+            health: Health::new(3),
+            immunity_frames: 0,
         }
     }
 }
@@ -63,6 +67,7 @@ impl Enemy for Burrower {
 
     fn update(&mut self, _map: &dyn MapLike) -> Vec<EnemyUpdateResult> {
         let mut update_results = Vec::new();
+        self.immunity_frames = self.immunity_frames.saturating_sub(1);
 
         if self.frames_remaining == 0 {
             match self.animation_handler.current_state() {
@@ -86,7 +91,7 @@ impl Enemy for Burrower {
                         .set_state(BurrowerAnimationState::Wiggling);
                 }
                 BurrowerAnimationState::Wiggling => {
-                    self.frames_remaining = 30;
+                    self.frames_remaining = BURROWING_DOWN_FRAMES;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::BurrowingDown);
                 }
@@ -97,6 +102,7 @@ impl Enemy for Burrower {
                 }
                 BurrowerAnimationState::Hidden => {
                     // TODO: Change location here
+
                     self.frames_remaining = 90;
                     self.animation_handler
                         .set_state(BurrowerAnimationState::Digging);
@@ -117,20 +123,27 @@ impl Enemy for Burrower {
     }
 
     fn should_remove(&self) -> bool {
-        self.is_dead
+        self.health.is_empty()
     }
 
     fn get_health(&self) -> Health {
-        Health { current: 1, max: 1 }
+        self.health
     }
 
     fn maybe_got_hit(&mut self, _hit_type: EnemyHitType) -> EnemyHitResult {
+        if self.immunity_frames > 0 {
+            return EnemyHitResult::DidNotHit;
+        }
         match self.animation_handler.current_state() {
             BurrowerAnimationState::Hidden | BurrowerAnimationState::Digging => {
                 EnemyHitResult::DidNotHit
             }
             _ => {
-                self.is_dead = true;
+                self.frames_remaining = BURROWING_DOWN_FRAMES;
+                self.animation_handler
+                    .set_state(BurrowerAnimationState::BurrowingDown);
+                self.health.decrease();
+                self.immunity_frames = 90;
                 EnemyHitResult::GotHit
             }
         }
@@ -138,7 +151,10 @@ impl Enemy for Burrower {
 
     fn maybe_damage_player(&self) -> Option<u32> {
         match self.animation_handler.current_state() {
-            BurrowerAnimationState::Hidden | BurrowerAnimationState::Digging => None,
+            BurrowerAnimationState::Hidden
+            | BurrowerAnimationState::Digging
+            | BurrowerAnimationState::BurrowingDown
+            | BurrowerAnimationState::BurrowingUp => None,
             _ => Some(1),
         }
     }

@@ -51,7 +51,7 @@ impl Bat {
                 vx: 0.0,
                 vy: 0.0,
             },
-            health: Health { current: 3, max: 3 },
+            health: Health::new(3),
             state: BatState::Flying {
                 dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
             },
@@ -152,7 +152,7 @@ impl Enemy for Bat {
             self.state = BatState::Falling {
                 frames_remaining: 120,
             };
-            self.health.current -= 1; // TODO: Can this overflow?
+            self.health.decrease();
 
             EnemyHitResult::GotHit
         }

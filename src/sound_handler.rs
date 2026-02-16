@@ -31,6 +31,8 @@ define_sounds! {
     Swing       => "swing",
     Throw       => "throw",
     Clink       => "clink",
+    EnemyHit    => "enemy_hit__bong_clunk_hit_short_01",
+    PlayerHit   => "player_hit__bong_clunk_hit_short_05",
 }
 
 fn load_sound(path: &str) -> std::io::Result<Vec<u8>> {

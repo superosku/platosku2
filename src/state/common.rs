@@ -17,6 +17,22 @@ pub struct Health {
 }
 
 impl Health {
+    pub fn new(max: u32) -> Self {
+        Health { current: max, max }
+    }
+
+    pub fn decrease(&mut self) {
+        self.current = self.current.saturating_sub(1);
+    }
+
+    pub fn decrease_by(&mut self, amount: u32) {
+        self.current = self.current.saturating_sub(amount);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.current == 0
+    }
+
     pub fn ratio(&self) -> f32 {
         self.current as f32 / self.max as f32
     }
@@ -45,6 +61,13 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
+    pub fn get_center(&self) -> Pos {
+        Pos {
+            x: self.x + self.w * 0.5,
+            y: self.y + self.h * 0.5,
+        }
+    }
+
     pub fn overlaps_line(&self, a: &Pos, b: &Pos) -> bool {
         if self.point_inside(a) || self.point_inside(b) {
             return true;
