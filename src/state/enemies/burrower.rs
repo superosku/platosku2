@@ -1,10 +1,12 @@
+use crate::physics::EPS;
 use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
-use crate::state::game_map::MapLike;
+use crate::state::game_map::{GameMap, MapLike};
 use crate::state::item::{Item, ItemType};
+use rand::Rng;
 
 #[derive(PartialEq)]
 enum BurrowerAnimationState {
@@ -54,10 +56,55 @@ impl Burrower {
             },
             frames_remaining: 180,
             animation_handler: AnimationHandler::new(BurrowerAnimationState::Digging),
-            health: Health::new(3),
+            health: Health::new(2),
             immunity_frames: 0,
         }
     }
+}
+
+fn find_random_close_floor_pos_at_room_here(
+    current_pos: &BoundingBox,
+    map: &GameMap,
+) -> Option<BoundingBox> {
+    let center = current_pos.get_center();
+
+    let current_room = map.get_room_at(center.x, center.y)?;
+
+    let current_x = center.x.floor() as i32;
+    let current_y = center.y.floor() as i32;
+
+    for _ in 0..50 {
+        let mut rng = rand::rng();
+        let x_diff = rng.random_range(-10..10);
+        let y_diff = rng.random_range(-10..10);
+
+        let new_x = current_x + x_diff;
+        let new_y = current_y + y_diff;
+
+        if let Some(new_room) = map.get_room_at(new_x as f32 + 0.5, new_y as f32 + 0.5) {
+            if new_room.0 != current_room.0 {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+        if map.is_solid_at_tile(new_x, new_y)
+            || map.is_solid_at_tile(new_x, new_y - 1)
+            || !map.is_solid_at_tile(new_x, new_y + 1)
+        {
+            continue;
+        }
+
+        let mut new_bounding_box = *current_pos;
+        new_bounding_box.x =
+            new_x as f32 + EPS + rng.random_range(0.0..1.0 - new_bounding_box.w - 2.0 * EPS);
+        new_bounding_box.y = new_y as f32 - EPS + (1.0 - new_bounding_box.h);
+
+        return Some(new_bounding_box);
+    }
+
+    None
 }
 
 impl Enemy for Burrower {
@@ -65,7 +112,7 @@ impl Enemy for Burrower {
         &self.bb
     }
 
-    fn update(&mut self, _map: &dyn MapLike) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
         let mut update_results = Vec::new();
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
 
@@ -101,7 +148,10 @@ impl Enemy for Burrower {
                         .set_state(BurrowerAnimationState::Hidden);
                 }
                 BurrowerAnimationState::Hidden => {
-                    // TODO: Change location here
+                    // Randomize the position of the burrower
+                    if let Some(new_bb) = find_random_close_floor_pos_at_room_here(&self.bb, map) {
+                        self.bb = new_bb;
+                    }
 
                     self.frames_remaining = 90;
                     self.animation_handler
@@ -178,5 +228,12 @@ impl Enemy for Burrower {
             bb.h + 2.0 / TILE_SIZE,
             1.0,
         );
+    }
+
+    fn should_render_health_bar(&self) -> bool {
+        !matches!(
+            self.animation_handler.current_state(),
+            BurrowerAnimationState::Hidden | BurrowerAnimationState::Digging
+        )
     }
 }

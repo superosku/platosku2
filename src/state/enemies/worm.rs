@@ -4,7 +4,7 @@ use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, An
 use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
-use crate::state::game_map::MapLike;
+use crate::state::game_map::GameMap;
 
 // Worm moves back and fort
 #[derive(PartialEq)]
@@ -50,7 +50,7 @@ impl Enemy for Worm {
         &self.bb
     }
 
-    fn update(&mut self, map: &dyn MapLike) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
         match self.dir {
             Dir::Left => {
                 self.bb.vx = -0.01;
