@@ -296,6 +296,19 @@ impl GameState for Game {
         self.items.extend(new_items);
 
         for enemy in &mut self.enemies {
+            // Skip enemy if not in the current room
+            let enemy_center = enemy.bb().center();
+            if let Some((enemy_room_index, _)) =
+                self.map.get_room_at(enemy_center.x, enemy_center.y)
+                && let Some(cur_room_index) = self.cur_room_index
+            {
+                if enemy_room_index != cur_room_index {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+
             for result in enemy.update(&self.map) {
                 match result {
                     EnemyUpdateResult::SpawnItemThrowTowardsPlayer { mut item } => {
