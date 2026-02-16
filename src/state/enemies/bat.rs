@@ -4,7 +4,7 @@ use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, An
 use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
-use crate::state::game_map::MapLike;
+use crate::state::game_map::GameMap;
 use rand::Rng;
 
 // Bat flies around
@@ -65,7 +65,7 @@ impl Enemy for Bat {
         &self.bb
     }
 
-    fn update(&mut self, map: &dyn MapLike) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
         let mut new_state: Option<BatState> = None;
 
         match &mut self.state {

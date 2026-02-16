@@ -287,7 +287,7 @@ impl GameState for Game {
             for result in enemy.update(&self.map) {
                 match result {
                     EnemyUpdateResult::SpawnItemThrowTowardsPlayer { mut item } => {
-                        let x_diff = (self.player.bb.x - item.bb().x).clamp(-7.0, 7.0);
+                        let x_diff = (self.player.bb.x - item.bb().x).clamp(-4.0, 4.0);
 
                         item.set_v(x_diff * 0.025, -0.15);
 
