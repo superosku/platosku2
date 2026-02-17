@@ -1,4 +1,4 @@
-use super::game_map::{GameMap, MapLike, Room};
+use super::map_like::{GameMap, MapLike, Room};
 use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
 use crate::sound_handler::{Sound, SoundHandler};

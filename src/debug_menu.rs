@@ -1,7 +1,7 @@
 use crate::camera::MouseCoords;
 use crate::physics::EPS;
-use crate::state::game_map::{DoorDir, MapLike, ObjectTemplate, ObjectTemplateType, Room};
 use crate::state::game_state::{Editor, Game};
+use crate::state::map_like::{DoorDir, MapLike, ObjectTemplate, ObjectTemplateType, Room};
 use crate::state::{BaseTile, GameState, OverlayTile};
 use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
 use egui::Ui;
@@ -330,7 +330,7 @@ impl GameStateDebugMenu for Editor {
                 if ui.add(egui::Link::new(file_name)).clicked() {
                     println!("Clicked a link");
 
-                    self.room = room.clone();
+                    self.room = Room::clone(room);
                     stage.current_editor_room_index = room_index as u32;
                     self.player_mut().bb.x = self.room.get_center().0;
                     self.player_mut().bb.y = self.room.get_center().1;

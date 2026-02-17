@@ -4,7 +4,7 @@ use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, An
 use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
-use crate::state::game_map::GameMap;
+use crate::state::map_like::GameMap;
 
 // Worm moves back and fort
 #[derive(PartialEq)]

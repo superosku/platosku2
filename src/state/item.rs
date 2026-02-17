@@ -1,7 +1,7 @@
 use crate::physics::integrate_kinematic;
 use crate::render::Renderer;
 use crate::sound_handler::{Sound, SoundHandler};
-use crate::state::game_map::MapLike;
+use crate::state::map_like::MapLike;
 use crate::state::{BoundingBox, Pos};
 use rand::Rng;
 use rand::seq::IndexedRandom;

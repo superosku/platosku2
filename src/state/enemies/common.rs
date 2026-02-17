@@ -1,7 +1,7 @@
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::common::{BoundingBox, Health};
-use crate::state::game_map::GameMap;
 use crate::state::item::Item;
+use crate::state::map_like::GameMap;
 
 pub enum EnemyHitType {
     Swing,
