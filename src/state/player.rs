@@ -1,6 +1,6 @@
 use super::common::{BoundingBox, Dir, Health, Pos};
-use super::game_map::MapLike;
 use super::game_state::InputState;
+use super::map_like::MapLike;
 use crate::camera::Camera;
 use crate::physics::{EPS, check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
 use crate::render::Renderer;

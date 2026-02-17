@@ -2,8 +2,8 @@ use super::state::enemies::Enemy;
 use crate::atlas_info::AtlasInfo;
 use crate::camera::Camera;
 use crate::state::GameState;
-use crate::state::game_map::{DoorDir, MapLike};
 use crate::state::game_state::{Editor, Game};
+use crate::state::map_like::{DoorDir, MapLike};
 use crate::state::{BaseTile, OverlayTile};
 
 use image::GenericImageView;

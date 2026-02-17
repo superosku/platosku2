@@ -1,7 +1,7 @@
 use crate::state::BoundingBox;
 use crate::state::Dir;
 use crate::state::Pos;
-use crate::state::game_map::MapLike;
+use crate::state::map_like::MapLike;
 
 const GRAVITY: f32 = 0.0070;
 const TERMINAL_VELOCITY: f32 = 0.90;

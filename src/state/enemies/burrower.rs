@@ -4,8 +4,8 @@ use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, An
 use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
-use crate::state::game_map::{GameMap, MapLike};
 use crate::state::item::{Item, ItemType};
+use crate::state::map_like::{GameMap, MapLike};
 use rand::Rng;
 
 #[derive(PartialEq)]

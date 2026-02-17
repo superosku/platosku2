@@ -13,8 +13,8 @@ use crate::camera::Camera;
 use crate::debug_menu::GameStateDebugMenu;
 use crate::render::{DrawableGameState, Renderer};
 use crate::sound_handler::SoundHandler;
-use crate::state::game_map::Room;
 use crate::state::game_state::{Editor, Game};
+use crate::state::map_like::Room;
 use egui_miniquad as egui_mq;
 
 #[derive(Debug, Eq, PartialEq)]
