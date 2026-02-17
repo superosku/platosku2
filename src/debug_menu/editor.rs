@@ -1,35 +1,15 @@
-use crate::camera::MouseCoords;
+use super::common::{
+    DebugMenu, DoorSelection, EditorSelection, EnemySelection, GameStateDebugMenu, TileSelection,
+};
 use crate::physics::EPS;
-use crate::state::game_state::{Editor, Game};
+use crate::state::game_state::{Editor, GameState};
 use crate::state::map_like::{DoorDir, MapLike, ObjectTemplate, ObjectTemplateType, Room};
-use crate::state::{BaseTile, GameState, OverlayTile};
-use crate::{DebugMenu, DoorSelection, EditorSelection, EnemySelection, TileSelection};
+use crate::state::{BaseTile, OverlayTile};
 use egui::Ui;
 use std::fs;
 use std::path::Path;
 
-pub trait GameStateDebugMenu: GameState {
-    fn mouse_button_event(&mut self, coords: MouseCoords, stage: &mut DebugMenu);
-    fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu);
-    fn mouse_drawing(&mut self, coords: MouseCoords, debug_menu: &DebugMenu);
-}
-
-impl GameStateDebugMenu for Game {
-    fn mouse_button_event(&mut self, _coords: MouseCoords, _stage: &mut DebugMenu) {}
-    fn mouse_drawing(&mut self, _coords: MouseCoords, _debug_menu: &DebugMenu) {}
-
-    fn render_ui(&mut self, ui: &mut Ui, stage: &mut DebugMenu) {
-        if ui.add(egui::Button::new("Regenerate map")).clicked() {
-            *self = Game::new();
-        }
-
-        ui.add(egui::Checkbox::new(
-            &mut stage.zoom_show_full,
-            "Zoom to room",
-        ));
-        ui.add(egui::Checkbox::new(&mut stage.show_dark, "Show dark"));
-    }
-}
+use crate::camera::MouseCoords;
 
 impl GameStateDebugMenu for Editor {
     fn mouse_drawing(&mut self, coords: MouseCoords, debug_menu: &DebugMenu) {
@@ -304,7 +284,6 @@ impl GameStateDebugMenu for Editor {
                     if ui
                         .add(egui::RadioButton::new(
                             *selection == door_type,
-                            // matches!(selection, door_type),
                             format!("{:?}", door_type),
                         ))
                         .clicked()
@@ -360,7 +339,6 @@ impl GameStateDebugMenu for Editor {
             self.room = stage.all_rooms[0].1.clone();
             stage.current_editor_room_index = 0;
 
-            // Remove file_name_to_remove file name (in a folder called rooms)
             let path = Path::new("rooms").join(&file_name_to_remove);
 
             if let Err(err) = fs::remove_file(&path) {
