@@ -58,6 +58,4 @@ aseprite assets/sprites/*.aseprite --sheet-pack --sheet assets/atlas.png --data 
 
 ## Sounds
 
-You will need to place the sounds in the `assets/sounds` folder. Not committed due to license not allowing it.
-
-Run `sh make_sound_variants.sh` to generate different pitch versions of the sounds.
+Run `sh make_sound_variants.sh` to generate different pitch and DB versions of the sounds.
