@@ -7,24 +7,30 @@ DEST="assets/sounds/dest"
 mkdir -p "$DEST"
 
 # 9 pitch multipliers (roughly: -4, -3, -2, -1, 0, +1, +2, +3, +4 semitones)
-PITCH=(0.793701 0.840896 0.890899 0.943874 1.000000 1.059463 1.122462 1.189207 1.259921)
+#PITCH=(0.793701 0.840896 0.890899 0.943874 1.000000 1.059463 1.122462 1.189207 1.259921)
+PITCH=(0.793701 1.000000 1.259921)
 
 # small volume jitters (dB)
-GAIN=(-1.5 -1.0 -0.5 -0.2 0.0 0.2 0.5 1.0 1.5)
+#GAIN=(-1.5 -1.0 -0.5 -0.2 0.0 0.2 0.5 1.0 1.5)
+GAIN=(-2.0 0.0 2.0)
 
 i=0
 for f in "$SRC"/*.wav; do
   base="$(basename "$f" .wav)"
-  for v in {1..9}; do
-    p="${PITCH[$((v-1))]}"
-    g="${GAIN[$((v-1))]}"
-    out="$DEST/${base}__v$(printf "%02d" "$v").wav"
+  for v1 in {1..3}; do
+    for v2 in {1..3}; do
+      v=$(( (v1-1)*3 + v2 ))
+      p="${PITCH[$((v1-1))]}"
+      g="${GAIN[$((v2-1))]}"
+      out="$DEST/${base}__v$(printf "%02d" "$v").wav"
 
-    ffmpeg -hide_banner -loglevel error -y \
-      -i "$f" \
-      -af "rubberband=pitch=${p},volume=${g}dB" \
-      -c:a pcm_s16le \
-      "$out"
+      echo "Making $out"
+      ffmpeg -hide_banner -loglevel error -y \
+        -i "$f" \
+        -af "rubberband=pitch=${p},volume=${g}dB" \
+        -c:a pcm_s16le \
+        "$out"
+    done
   done
   echo "Made 9 variants for $base.wav"
 done
