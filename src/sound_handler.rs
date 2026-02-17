@@ -28,7 +28,7 @@ define_sounds! {
     Jump        => "jump",
     Walk        => "walk",
     CollectCoin => "collect_coin",
-    Swing       => "swing",
+    Swing       => "swipe__swipe_woosh_07",
     Throw       => "throw",
     Clink       => "clink",
     EnemyHit    => "enemy_hit__bong_clunk_hit_short_01",
