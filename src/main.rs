@@ -10,84 +10,11 @@ mod render;
 mod sound_handler;
 
 use crate::camera::Camera;
-use crate::debug_menu::GameStateDebugMenu;
+use crate::debug_menu::{DebugMenu, EditorSelection, GameStateDebugMenu, TileSelection};
 use crate::render::{DrawableGameState, Renderer};
 use crate::sound_handler::SoundHandler;
 use crate::state::game_state::{Editor, Game};
-use crate::state::map_like::Room;
 use egui_miniquad as egui_mq;
-
-#[derive(Debug, Eq, PartialEq)]
-enum TileSelection {
-    NotPartOf,
-    Clear,
-    Stone,
-    Wood,
-    Ladder,
-    Platform,
-    StartDoor,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum EnemySelection {
-    Remove,
-    Bat,
-    Slime,
-    Worm,
-    Burrower,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum DoorSelection {
-    Left,
-    Right,
-    Up,
-    Down,
-    LevelStart,
-    LevelEnd,
-    Remove,
-}
-
-enum EditorSelection {
-    Tiles {
-        selection: TileSelection,
-    },
-    Enemies {
-        snap_bottom: bool,
-        snap_top: bool,
-        selection: EnemySelection,
-    },
-    PlayerPos,
-    Doors {
-        selection: DoorSelection,
-    },
-}
-
-struct DebugMenu {
-    editor_selection: EditorSelection,
-    all_rooms: Vec<(String, Room)>,
-    current_editor_room_index: u32,
-    is_game: bool,
-    zoom_show_full: bool,
-    show_dark: bool,
-}
-
-impl DebugMenu {
-    pub fn new() -> DebugMenu {
-        let all_rooms = Room::load_rooms_from_folder();
-
-        DebugMenu {
-            editor_selection: EditorSelection::Tiles {
-                selection: TileSelection::Clear,
-            },
-            all_rooms,
-            current_editor_room_index: 0,
-            is_game: true,
-            zoom_show_full: true,
-            show_dark: true,
-        }
-    }
-}
 
 trait FullGameState: GameState + DrawableGameState + GameStateDebugMenu {}
 impl<T: GameState + DrawableGameState + GameStateDebugMenu> FullGameState for T {}

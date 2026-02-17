@@ -132,16 +132,18 @@ impl Room {
             let file_name_os = entry.file_name();
             let file_name = file_name_os.to_string_lossy();
 
-            if file_name.starts_with("room_") && file_name.ends_with(".json")
-                && file_name.len() > 10 {
-                    let digits_part = &file_name[5..file_name.len() - 5];
-                    digit_width = digit_width.max(digits_part.len());
-                    if let Ok(num) = digits_part.parse::<u32>()
-                        && num > max_index
-                    {
-                        max_index = num;
-                    }
+            if file_name.starts_with("room_")
+                && file_name.ends_with(".json")
+                && file_name.len() > 10
+            {
+                let digits_part = &file_name[5..file_name.len() - 5];
+                digit_width = digit_width.max(digits_part.len());
+                if let Ok(num) = digits_part.parse::<u32>()
+                    && num > max_index
+                {
+                    max_index = num;
                 }
+            }
         }
 
         let next_index = max_index + 1;
