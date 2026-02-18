@@ -17,6 +17,7 @@ pub enum EnemyHitResult {
 pub enum EnemyUpdateResult {
     // Spawn an item that will be thrown towards the player (with gravity and such)
     SpawnItemThrowTowardsPlayer { item: Item },
+    SpawnItemCastedTowardsPlayer { item: Item },
 }
 
 pub trait Enemy {

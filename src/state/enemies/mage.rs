@@ -5,6 +5,7 @@ use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::game_map::GameMap;
+use crate::state::item::{Item, ItemType};
 use rand::prelude::IndexedRandom;
 
 // Mage wonders and shoots bolts
@@ -25,21 +26,14 @@ impl AnimationConfig for MageAnimationState {
 	}
 }
 
-enum MageState {
-	Idle { frames_remaining: u32 },
-	Walking { frames_remaining: u32 },
-	Casting { frames_remaining: u32 },
-}
-
 pub struct Mage {
-	pub bb: BoundingBox,
+	bb: BoundingBox,
+    animation_handler: AnimationHandler<MageAnimationState>,
+    frames_remaining: u32,
 	health: Health,
     immunity_frames: u32,
 	dir: Dir,
-	animation_handler: AnimationHandler<MageAnimationState>,
-	state: MageState,
 }
-
 
 impl Mage {
     pub fn new(x: f32, y: f32) -> Self {
@@ -52,13 +46,11 @@ impl Mage {
 				vx: 0.0,
 				vy: 0.0,
 			},
-			health: Health { current: 5, max: 5 },
-			immunity_frames: 0,
-			dir: Dir::Right,
+            frames_remaining: 50,
 			animation_handler: AnimationHandler::new(MageAnimationState::Idle),
-			state: MageState::Idle {
-				frames_remaining: 50,
-			},
+            health: Health::new(3),
+            immunity_frames: 0,
+            dir: Dir::Right,
 		}
 	}
 }
@@ -69,8 +61,9 @@ impl Enemy for Mage {
 	}
 
 	fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
-		let result = integrate_kinematic(map, &self.bb, true);
-        self.bb = result.new_bb;
+        let res = integrate_kinematic(map, &self.bb, true);
+        self.bb = res.new_bb;
+        let mut update_results = Vec::new();
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
         
 //        if self.bb.in_range(player.bb(), 4.0) {
@@ -83,60 +76,63 @@ impl Enemy for Mage {
 //            };
 //        }
          
-        match self.state {
-            MageState::Idle { frames_remaining } => {
-                self.animation_handler.set_state(MageAnimationState::Idle);
-                self.bb.vx = 0.0;
-                if frames_remaining == 0 {
-                    self.state = MageState::Walking {
-                        frames_remaining: 100,
-                    };
-                    self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
-                } else {
-                    self.state = MageState::Idle {
-                        frames_remaining: frames_remaining - 1,
-                    }
-                }
-            }
-            MageState::Walking { frames_remaining } => {
-                self.animation_handler.set_state(MageAnimationState::Walking);
-                
-                match self.dir {
-                    Dir::Right => {
-                        self.bb.vx = -0.01;
-                    }
-                    Dir::Left => {
-                        self.bb.vx = 0.01;
-                    }
-                }
+        match self.animation_handler.current_state() {
+			MageAnimationState::Idle => {
+				self.bb.vx = 0.0;
+			}
+			MageAnimationState::Walking => {
+				match self.dir {
+					Dir::Left => {
+						self.bb.vx = 0.01;
+					}
+					Dir::Right => {
+						self.bb.vx = -0.01;
+					}
+				}
+			}
+            MageAnimationState::Casting => {
+				self.bb.vx = 0.0;
+			}
+        }
 
-                if frames_remaining == 0 {
-                    self.state = MageState::Idle {
-                        frames_remaining: 100,
-                    };
-                    
-                } else {
-                    self.state = MageState::Walking {
-                        frames_remaining: frames_remaining - 1,
-                    }
+        if self.frames_remaining == 0 {
+            match self.animation_handler.current_state() {
+                MageAnimationState::Idle => {
+					self.frames_remaining = 100;
+					self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
+                    self.animation_handler
+                        .set_state(MageAnimationState::Walking);
+				}
+                MageAnimationState::Walking => {
+                    self.frames_remaining = 100;
+					self.animation_handler
+						.set_state(MageAnimationState::Casting);
                 }
-            }
-            MageState::Casting { frames_remaining } => {
-                self.animation_handler.set_state(MageAnimationState::Casting);
-                if frames_remaining == 0 {
-					self.state = MageState::Idle {
-						frames_remaining: 100,
-					};
-				} else {
-                    self.state = MageState::Casting {
-                        frames_remaining: frames_remaining - 1,
-                    }
+				MageAnimationState::Casting => {
+					self.frames_remaining = 100;
+                    let projectile = Item::new(
+                        self.bb.x + match self.dir {
+                            Dir::Right => 0.0,
+                            Dir::Left => self.bb.w,
+                        },
+                        self.bb.y, 
+                        ItemType::MageProjectile,
+                    );
+
+                    update_results
+                        .push(EnemyUpdateResult::SpawnItemCastedTowardsPlayer { item: projectile });
+
+                    self.animation_handler
+                        .set_state(MageAnimationState::Idle);
                 }
             }
         }
+        
+        self.frames_remaining -= 1;
+
         self.animation_handler.increment_frame();
 
-        vec![]
+        update_results
     }
 
     fn should_remove(&self) -> bool {
@@ -152,9 +148,6 @@ impl Enemy for Mage {
             self.health.decrease();
 
             self.immunity_frames = 30;
-            self.state = MageState::Idle {
-                frames_remaining: 50,
-            };
 
             EnemyHitResult::GotHit
         } else {

@@ -16,6 +16,7 @@ pub enum ItemType {
     // Vase,
     // Arrow,
     GreenProjectile,
+    MageProjectile,
 }
 
 pub struct Item {
@@ -39,7 +40,9 @@ impl Item {
     pub fn can_hit_enemy(&self) -> bool {
         if let ItemType::GreenProjectile = self.item_type {
             return false;
-        }
+        } else if let ItemType::MageProjectile = self.item_type {
+			return false;
+		}
         self.bb.vx.abs() > 0.001 || self.bb.vy.abs() > 0.001
     }
 
@@ -83,6 +86,7 @@ impl Item {
             ItemType::LargeStone => (8, 8),
             ItemType::Box => (8, 10),
             ItemType::GreenProjectile => (6, 6),
+            ItemType::MageProjectile => (5, 5),
         };
 
         let width = width_px as f32 / 16.0;
@@ -117,6 +121,7 @@ impl Item {
                 ItemType::LargeStone => "large_stone",
                 ItemType::Box => "box",
                 ItemType::GreenProjectile => "green_projectile",
+                ItemType::MageProjectile => "mage_projectile",
             },
             0,
             false,
@@ -168,10 +173,21 @@ impl Item {
     }
 
     pub fn update(&mut self, map: &dyn MapLike) -> Vec<ItemInteractionResult> {
-        let res = integrate_kinematic(map, &self.bb, true);
+        let gravity = match self.item_type {
+			ItemType::MageProjectile => false,
+			_ => true,
+		};
 
+        let res = integrate_kinematic(map, &self.bb, gravity);
+		
         if res.on_something()
             && let ItemType::GreenProjectile = self.item_type
+        {
+            return vec![ItemInteractionResult::RemoveItem];
+        }
+
+        if res.on_something()
+            && let ItemType::MageProjectile = self.item_type
         {
             return vec![ItemInteractionResult::RemoveItem];
         }
@@ -214,6 +230,12 @@ impl Item {
                     ItemInteractionResult::PlayerGotHit,
                 ]
             }
+            ItemType::MageProjectile => {
+				vec![
+					ItemInteractionResult::RemoveItem,
+					ItemInteractionResult::PlayerGotHit,
+				]
+			}
             _ => vec![],
         }
     }
