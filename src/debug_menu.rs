@@ -112,6 +112,7 @@ impl GameStateDebugMenu for Editor {
                     EnemySelection::Slime => ObjectTemplateType::Slime,
                     EnemySelection::Worm => ObjectTemplateType::Worm,
                     EnemySelection::Burrower => ObjectTemplateType::Burrower,
+                    EnemySelection::Mage => ObjectTemplateType::Mage,
                 };
 
                 let template = ObjectTemplate::new(coords.x, coords.y, template_type.clone());
@@ -267,6 +268,7 @@ impl GameStateDebugMenu for Editor {
                     EnemySelection::Slime,
                     EnemySelection::Worm,
                     EnemySelection::Burrower,
+                    EnemySelection::Mage,
                 ] {
                     if ui
                         .add(egui::RadioButton::new(

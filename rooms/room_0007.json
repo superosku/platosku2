@@ -225,5 +225,16 @@
       "dir": "Up"
     }
   ],
-  "object_templates": []
+  "object_templates": [
+    {
+      "x": -0.035678864,
+      "y": -0.8751,
+      "object_type": "Mage"
+    },
+    {
+      "x": -1.5579774,
+      "y": 2.1249,
+      "object_type": "Mage"
+    }
+  ]
 }
