@@ -64,7 +64,7 @@ impl Enemy for Slime {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult> {
         let result = integrate_kinematic(map, &self.bb, true);
         self.bb = result.new_bb;
         self.immunity_frames = self.immunity_frames.saturating_sub(1);

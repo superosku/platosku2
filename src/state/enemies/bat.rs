@@ -65,7 +65,7 @@ impl Enemy for Bat {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult> {
         let mut new_state: Option<BatState> = None;
 
         match &mut self.state {

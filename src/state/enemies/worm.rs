@@ -50,7 +50,7 @@ impl Enemy for Worm {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult> {
         match self.dir {
             Dir::Left => {
                 self.bb.vx = -0.01;

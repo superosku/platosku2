@@ -112,7 +112,7 @@ impl Enemy for Burrower {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult> {
         let mut update_results = Vec::new();
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
 

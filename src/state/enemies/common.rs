@@ -22,7 +22,7 @@ pub enum EnemyUpdateResult {
 
 pub trait Enemy {
     fn bb(&self) -> &BoundingBox;
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult>;
+    fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult>;
 
     fn maybe_got_hit(&mut self, hit_type: EnemyHitType) -> EnemyHitResult;
     fn maybe_damage_player(&self) -> Option<u32>;

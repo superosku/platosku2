@@ -14,6 +14,8 @@ enum MageAnimationState {
 	Idle,
     Walking,
 	Casting,
+    Reading,
+    FlippingPage,
 }
 
 impl AnimationConfig for MageAnimationState {
@@ -21,7 +23,9 @@ impl AnimationConfig for MageAnimationState {
 		match self {
 			MageAnimationState::Idle => AnimationConfigResult::new(0, 1, 60),
 			MageAnimationState::Walking => AnimationConfigResult::new(2, 5, 10),
-			MageAnimationState::Casting => AnimationConfigResult::new_no_loop(6, 8, 20),
+			MageAnimationState::Casting => AnimationConfigResult::new_no_loop(6, 8, 10),
+            MageAnimationState::Reading => AnimationConfigResult::new_no_loop(9, 9, 20),
+            MageAnimationState::FlippingPage => AnimationConfigResult::new_no_loop(10, 14, 5),
 		}
 	}
 }
@@ -33,6 +37,8 @@ pub struct Mage {
 	health: Health,
     immunity_frames: u32,
 	dir: Dir,
+    alert: bool,
+    reading_cycle: u32,
 }
 
 impl Mage {
@@ -51,6 +57,8 @@ impl Mage {
             health: Health::new(3),
             immunity_frames: 0,
             dir: Dir::Right,
+            alert: true,
+            reading_cycle: 0,
 		}
 	}
 }
@@ -60,56 +68,85 @@ impl Enemy for Mage {
 		&self.bb
 	}
 
-	fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+	fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult> {
         let res = integrate_kinematic(map, &self.bb, true);
         self.bb = res.new_bb;
         let mut update_results = Vec::new();
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
         
-//        if self.bb.in_range(player.bb(), 4.0) {
-//            self.state = MageState::Casting { frames_remaining: 60 };
-//            self.bb.vx = 0.0;
-//            self.dir = if player.bb().x > self.bb.x {
-//                Dir::Right
-//            } else {
-//                Dir::Left
-//            };
-//        }
-         
-        match self.animation_handler.current_state() {
-			MageAnimationState::Idle => {
-				self.bb.vx = 0.0;
-			}
-			MageAnimationState::Walking => {
-				match self.dir {
-					Dir::Left => {
-						self.bb.vx = 0.01;
-					}
-					Dir::Right => {
-						self.bb.vx = -0.01;
-					}
-				}
-			}
-            MageAnimationState::Casting => {
-				self.bb.vx = 0.0;
-			}
+        if self.bb.in_range(player_bb, 4.0) 
+            && self.alert
+            && *self.animation_handler.current_state() != MageAnimationState::Casting
+        {
+            self.frames_remaining = 30;
+            self.animation_handler
+                .set_state(MageAnimationState::Casting);
+            self.bb.vx = 0.0;
+            self.dir = if player_bb.x > self.bb.x {
+                Dir::Left
+            } else {
+                Dir::Right
+            };
         }
+        
+        let vx = match self.animation_handler.current_state() {
+            MageAnimationState::Walking => match self.dir {
+                Dir::Left => 0.01,
+                Dir::Right => -0.01,
+            },
+            _ => 0.0,
+        };
+
+        self.bb.vx = vx;
 
         if self.frames_remaining == 0 {
             match self.animation_handler.current_state() {
                 MageAnimationState::Idle => {
-					self.frames_remaining = 100;
+					self.frames_remaining = 80 + rand::random::<u32>() % 80;
 					self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
+                    self.alert = true;
+                    self.reading_cycle = 3;
                     self.animation_handler
                         .set_state(MageAnimationState::Walking);
 				}
                 MageAnimationState::Walking => {
-                    self.frames_remaining = 100;
-					self.animation_handler
-						.set_state(MageAnimationState::Casting);
+                    let start_reading = rand::random::<f32>() < 0.25;
+
+                    if start_reading {
+                        self.frames_remaining = 120;
+                        self.alert = false;
+                        self.animation_handler
+                            .set_state(MageAnimationState::Reading);
+                    } else {
+                        self.frames_remaining = 80 + rand::random::<u32>() % 80;
+                        self.alert = true;
+                        self.animation_handler
+							.set_state(MageAnimationState::Idle);
+                    }
                 }
-				MageAnimationState::Casting => {
-					self.frames_remaining = 100;
+				MageAnimationState::Reading => {
+                     if self.reading_cycle == 0 {
+                        self.frames_remaining = 80 + rand::random::<u32>() % 80;
+						self.alert = true;
+						self.animation_handler
+							.set_state(MageAnimationState::Idle);
+                     } else {
+                        self.reading_cycle = self.reading_cycle.saturating_sub(1);
+					    self.frames_remaining = 25;
+                        self.alert = false;
+                        self.animation_handler
+                            .set_state(MageAnimationState::FlippingPage);
+                     }
+                }
+                MageAnimationState::FlippingPage => {
+                    self.frames_remaining = 120;
+                    self.alert = false;
+					self.animation_handler
+						.set_state(MageAnimationState::Reading);
+				}
+                MageAnimationState::Casting => {
+                    self.alert = true;
+					self.frames_remaining = 50;
                     let projectile = Item::new(
                         self.bb.x + match self.dir {
                             Dir::Right => 0.0,
@@ -148,7 +185,8 @@ impl Enemy for Mage {
             self.health.decrease();
 
             self.immunity_frames = 30;
-
+            self.animation_handler
+                    .set_state(MageAnimationState::Idle);
             EnemyHitResult::GotHit
         } else {
             EnemyHitResult::DidNotHit
