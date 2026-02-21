@@ -41,8 +41,8 @@ impl Item {
         if let ItemType::GreenProjectile = self.item_type {
             return false;
         } else if let ItemType::MageProjectile = self.item_type {
-			return false;
-		}
+            return false;
+        }
         self.bb.vx.abs() > 0.001 || self.bb.vy.abs() > 0.001
     }
 
@@ -174,12 +174,12 @@ impl Item {
 
     pub fn update(&mut self, map: &dyn MapLike) -> Vec<ItemInteractionResult> {
         let gravity = match self.item_type {
-			ItemType::MageProjectile => false,
-			_ => true,
-		};
+            ItemType::MageProjectile => false,
+            _ => true,
+        };
 
         let res = integrate_kinematic(map, &self.bb, gravity);
-		
+
         if res.on_something()
             && let ItemType::GreenProjectile = self.item_type
         {
@@ -231,11 +231,11 @@ impl Item {
                 ]
             }
             ItemType::MageProjectile => {
-				vec![
-					ItemInteractionResult::RemoveItem,
-					ItemInteractionResult::PlayerGotHit,
-				]
-			}
+                vec![
+                    ItemInteractionResult::RemoveItem,
+                    ItemInteractionResult::PlayerGotHit,
+                ]
+            }
             _ => vec![],
         }
     }

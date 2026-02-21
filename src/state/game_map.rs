@@ -1,5 +1,5 @@
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
-use crate::state::enemies::{Burrower, Enemy, Slime, Worm, Mage};
+use crate::state::enemies::{Burrower, Enemy, Mage, Slime, Worm};
 use crate::state::{Bat, BoundingBox};
 use rand::Rng;
 use rand::seq::IndexedRandom;

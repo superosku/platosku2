@@ -11,70 +11,70 @@ use rand::prelude::IndexedRandom;
 // Mage wonders and shoots bolts
 #[derive(PartialEq)]
 enum MageAnimationState {
-	Idle,
+    Idle,
     Walking,
-	Casting,
+    Casting,
     Reading,
     FlippingPage,
 }
 
 impl AnimationConfig for MageAnimationState {
-	fn get_config(&self) -> AnimationConfigResult {
-		match self {
-			MageAnimationState::Idle => AnimationConfigResult::new(0, 1, 60),
-			MageAnimationState::Walking => AnimationConfigResult::new(2, 5, 10),
-			MageAnimationState::Casting => AnimationConfigResult::new_no_loop(6, 8, 10),
+    fn get_config(&self) -> AnimationConfigResult {
+        match self {
+            MageAnimationState::Idle => AnimationConfigResult::new(0, 1, 60),
+            MageAnimationState::Walking => AnimationConfigResult::new(2, 5, 10),
+            MageAnimationState::Casting => AnimationConfigResult::new_no_loop(6, 8, 10),
             MageAnimationState::Reading => AnimationConfigResult::new_no_loop(9, 9, 20),
             MageAnimationState::FlippingPage => AnimationConfigResult::new_no_loop(10, 14, 5),
-		}
-	}
+        }
+    }
 }
 
 pub struct Mage {
-	bb: BoundingBox,
+    bb: BoundingBox,
     animation_handler: AnimationHandler<MageAnimationState>,
     frames_remaining: u32,
-	health: Health,
+    health: Health,
     immunity_frames: u32,
-	dir: Dir,
+    dir: Dir,
     alert: bool,
     reading_cycle: u32,
 }
 
 impl Mage {
     pub fn new(x: f32, y: f32) -> Self {
-		Mage {
-			bb: BoundingBox {
-				x,
-				y,
-				w: 12.0 / 16.0,
-				h: 14.0 / 16.0,
-				vx: 0.0,
-				vy: 0.0,
-			},
+        Mage {
+            bb: BoundingBox {
+                x,
+                y,
+                w: 12.0 / 16.0,
+                h: 14.0 / 16.0,
+                vx: 0.0,
+                vy: 0.0,
+            },
             frames_remaining: 50,
-			animation_handler: AnimationHandler::new(MageAnimationState::Idle),
+            animation_handler: AnimationHandler::new(MageAnimationState::Idle),
             health: Health::new(3),
             immunity_frames: 0,
             dir: Dir::Right,
             alert: true,
             reading_cycle: 0,
-		}
-	}
+        }
+    }
 }
 
 impl Enemy for Mage {
     fn bb(&self) -> &BoundingBox {
-		&self.bb
-	}
+        &self.bb
+    }
 
-	fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, player_bb: &BoundingBox) -> Vec<EnemyUpdateResult> {
         let res = integrate_kinematic(map, &self.bb, true);
         self.bb = res.new_bb;
         let mut update_results = Vec::new();
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
-        
-        if self.bb.in_range(player_bb, 4.0) 
+
+        if self.bb.in_range(player_bb, 4.0)
             && self.alert
             && *self.animation_handler.current_state() != MageAnimationState::Casting
         {
@@ -88,7 +88,7 @@ impl Enemy for Mage {
                 Dir::Right
             };
         }
-        
+
         if res.on_right {
             println!("on_right");
             self.dir = Dir::Right
@@ -111,13 +111,13 @@ impl Enemy for Mage {
         if self.frames_remaining == 0 {
             match self.animation_handler.current_state() {
                 MageAnimationState::Idle => {
-					self.frames_remaining = 80 + rand::random::<u32>() % 80;
-					self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
+                    self.frames_remaining = 80 + rand::random::<u32>() % 80;
+                    self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
                     self.alert = true;
                     self.reading_cycle = 3;
                     self.animation_handler
                         .set_state(MageAnimationState::Walking);
-				}
+                }
                 MageAnimationState::Walking => {
                     let start_reading = rand::random::<f32>() < 0.25;
 
@@ -129,51 +129,49 @@ impl Enemy for Mage {
                     } else {
                         self.frames_remaining = 80 + rand::random::<u32>() % 80;
                         self.alert = true;
-                        self.animation_handler
-							.set_state(MageAnimationState::Idle);
+                        self.animation_handler.set_state(MageAnimationState::Idle);
                     }
                 }
-				MageAnimationState::Reading => {
-                     if self.reading_cycle == 0 {
+                MageAnimationState::Reading => {
+                    if self.reading_cycle == 0 {
                         self.frames_remaining = 80 + rand::random::<u32>() % 80;
-						self.alert = true;
-						self.animation_handler
-							.set_state(MageAnimationState::Idle);
-                     } else {
+                        self.alert = true;
+                        self.animation_handler.set_state(MageAnimationState::Idle);
+                    } else {
                         self.reading_cycle = self.reading_cycle.saturating_sub(1);
-					    self.frames_remaining = 25;
+                        self.frames_remaining = 25;
                         self.alert = false;
                         self.animation_handler
                             .set_state(MageAnimationState::FlippingPage);
-                     }
+                    }
                 }
                 MageAnimationState::FlippingPage => {
                     self.frames_remaining = 120;
                     self.alert = false;
-					self.animation_handler
-						.set_state(MageAnimationState::Reading);
-				}
+                    self.animation_handler
+                        .set_state(MageAnimationState::Reading);
+                }
                 MageAnimationState::Casting => {
                     self.alert = true;
-					self.frames_remaining = 50;
+                    self.frames_remaining = 50;
                     let projectile = Item::new(
-                        self.bb.x + match self.dir {
-                            Dir::Right => self.bb.w * 0.2,
-                            Dir::Left => self.bb.w * 0.8,
-                        },
-                        self.bb.y, 
+                        self.bb.x
+                            + match self.dir {
+                                Dir::Right => self.bb.w * 0.2,
+                                Dir::Left => self.bb.w * 0.8,
+                            },
+                        self.bb.y,
                         ItemType::MageProjectile,
                     );
 
                     update_results
                         .push(EnemyUpdateResult::SpawnItemCastedTowardsPlayer { item: projectile });
 
-                    self.animation_handler
-                        .set_state(MageAnimationState::Idle);
+                    self.animation_handler.set_state(MageAnimationState::Idle);
                 }
             }
         }
-        
+
         self.frames_remaining -= 1;
 
         self.animation_handler.increment_frame();
@@ -195,8 +193,7 @@ impl Enemy for Mage {
 
             self.immunity_frames = 30;
             self.frames_remaining = 100;
-            self.animation_handler
-                    .set_state(MageAnimationState::Idle);
+            self.animation_handler.set_state(MageAnimationState::Idle);
             EnemyHitResult::GotHit
         } else {
             EnemyHitResult::DidNotHit

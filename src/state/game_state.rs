@@ -322,21 +322,18 @@ impl GameState for Game {
                         self.items.push(item);
                     }
                     EnemyUpdateResult::SpawnItemCastedTowardsPlayer { mut item } => {
-						let x_diff = self.player.bb.x - item.bb().x;
+                        let x_diff = self.player.bb.x - item.bb().x;
                         let y_diff = self.player.bb.y - item.bb().y;
 
                         let len = (x_diff * x_diff + y_diff * y_diff).sqrt();
 
-						if len != 0.0 {
+                        if len != 0.0 {
                             let speed = 0.08;
 
-                            item.set_v(
-                                x_diff / len * speed,
-                                y_diff / len * speed,
-                            );
+                            item.set_v(x_diff / len * speed, y_diff / len * speed);
                         }
 
-						self.items.push(item);
+                        self.items.push(item);
                     }
                 }
             }

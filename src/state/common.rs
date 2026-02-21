@@ -149,11 +149,11 @@ impl BoundingBox {
         }
     }
     pub fn in_range(&self, other: &BoundingBox, range: f32) -> bool {
-		let self_center = self.center();
-		let other_center = other.center();
-		let dx = self_center.x - other_center.x;
-		let dy = self_center.y - other_center.y;
+        let self_center = self.center();
+        let other_center = other.center();
+        let dx = self_center.x - other_center.x;
+        let dy = self_center.y - other_center.y;
 
-		dx * dx + dy * dy <= range * range
+        dx * dx + dy * dy <= range * range
     }
 }
