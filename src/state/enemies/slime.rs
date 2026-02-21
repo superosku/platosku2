@@ -97,8 +97,8 @@ impl Enemy for Slime {
                 if frames_remaining <= jump_total_frames - jump_before_jump {
                     self.bb.vx = 0.06
                         * match self.dir {
-                            Dir::Right => 1.0,
-                            Dir::Left => -1.0,
+                            Dir::Left => 1.0,
+                            Dir::Right => -1.0,
                         };
                 }
 

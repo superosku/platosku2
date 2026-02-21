@@ -89,6 +89,15 @@ impl Enemy for Mage {
             };
         }
         
+        if res.on_right {
+            println!("on_right");
+            self.dir = Dir::Right
+        };
+        if res.on_left {
+            println!("on_left");
+            self.dir = Dir::Left
+        };
+
         let vx = match self.animation_handler.current_state() {
             MageAnimationState::Walking => match self.dir {
                 Dir::Left => 0.01,
@@ -149,8 +158,8 @@ impl Enemy for Mage {
 					self.frames_remaining = 50;
                     let projectile = Item::new(
                         self.bb.x + match self.dir {
-                            Dir::Right => 0.0,
-                            Dir::Left => self.bb.w,
+                            Dir::Right => self.bb.w * 0.2,
+                            Dir::Left => self.bb.w * 0.8,
                         },
                         self.bb.y, 
                         ItemType::MageProjectile,
@@ -185,6 +194,7 @@ impl Enemy for Mage {
             self.health.decrease();
 
             self.immunity_frames = 30;
+            self.frames_remaining = 100;
             self.animation_handler
                     .set_state(MageAnimationState::Idle);
             EnemyHitResult::GotHit

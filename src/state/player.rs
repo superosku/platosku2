@@ -455,6 +455,7 @@ impl Player {
             PlayerState::Dead => {
                 let res = integrate_kinematic(map, &self.bb, true);
                 self.bb = res.new_bb;
+                self.bb.vx = 0.0;
                 self.on_ground = res.on_bottom;
 
                 self.animation_handler
