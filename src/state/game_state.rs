@@ -309,7 +309,7 @@ impl GameState for Game {
                 continue;
             }
 
-            for result in enemy.update(&self.map) {
+            for result in enemy.update(&self.map, &self.player.bb) {
                 match result {
                     EnemyUpdateResult::SpawnItemThrowTowardsPlayer { mut item } => {
                         let x_diff = (self.player.bb.x - item.bb().x).clamp(-4.0, 4.0);
@@ -318,6 +318,20 @@ impl GameState for Game {
 
                         item.randomize_direction();
                         item.randomize_speed();
+
+                        self.items.push(item);
+                    }
+                    EnemyUpdateResult::SpawnItemCastedTowardsPlayer { mut item } => {
+                        let x_diff = self.player.bb.x - item.bb().x;
+                        let y_diff = self.player.bb.y - item.bb().y;
+
+                        let len = (x_diff * x_diff + y_diff * y_diff).sqrt();
+
+                        if len != 0.0 {
+                            let speed = 0.08;
+
+                            item.set_v(x_diff / len * speed, y_diff / len * speed);
+                        }
 
                         self.items.push(item);
                     }

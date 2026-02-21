@@ -1,6 +1,7 @@
 pub mod bat;
 pub mod burrower;
 pub mod common;
+pub mod mage;
 pub mod slime;
 pub mod worm;
 
@@ -8,5 +9,6 @@ pub mod worm;
 pub use bat::Bat;
 pub use burrower::Burrower;
 pub use common::Enemy;
+pub use mage::Mage;
 pub use slime::Slime;
 pub use worm::Worm;

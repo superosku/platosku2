@@ -1,5 +1,5 @@
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
-use crate::state::enemies::{Burrower, Enemy, Slime, Worm};
+use crate::state::enemies::{Burrower, Enemy, Mage, Slime, Worm};
 use crate::state::{Bat, BoundingBox};
 use rand::Rng;
 use rand::seq::IndexedRandom;
@@ -92,6 +92,7 @@ pub enum ObjectTemplateType {
     Slime = 1,
     Worm = 2,
     Burrower = 3,
+    Mage = 4,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -116,6 +117,7 @@ impl ObjectTemplate {
             ObjectTemplateType::Slime => "slime",
             ObjectTemplateType::Worm => "worm",
             ObjectTemplateType::Burrower => "burrower",
+            ObjectTemplateType::Mage => "mage",
         }
     }
 
@@ -125,6 +127,7 @@ impl ObjectTemplate {
             ObjectTemplateType::Slime => Box::new(Slime::new(self.x, self.y)),
             ObjectTemplateType::Worm => Box::new(Worm::new(self.x, self.y)),
             ObjectTemplateType::Burrower => Box::new(Burrower::new(self.x, self.y)),
+            ObjectTemplateType::Mage => Box::new(Mage::new(self.x, self.y)),
         }
     }
 }
