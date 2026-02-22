@@ -225,5 +225,6 @@
       "dir": "Up"
     }
   ],
-  "object_templates": []
+  "object_templates": [],
+  "disabled": true
 }

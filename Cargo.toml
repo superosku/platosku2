@@ -5,10 +5,11 @@ edition = "2024"
 
 [dependencies]
 miniquad = "0.4.8"
-image = { version = "0.24", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 rand = "0.9.2"
 egui-miniquad = "0.16.0"
 egui = "0.31.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
 quad-snd = "0.2.8"
+egui_extras = { version = "0.31.1", features = ["all_loaders"] }

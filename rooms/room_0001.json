@@ -461,5 +461,6 @@
       "y": 3.0,
       "object_type": "Bat"
     }
-  ]
+  ],
+  "disabled": true
 }
