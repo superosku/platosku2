@@ -212,27 +212,49 @@ impl GameStateDebugMenu for Editor {
             EditorSelection::Tiles { selection } => {
                 ui.add(egui::Label::new("Tile:"));
 
-                for candidate in [
-                    TileSelection::NotPartOf,
-                    TileSelection::Clear,
-                    TileSelection::Wood,
-                    TileSelection::Ladder,
-                    TileSelection::Platform,
-                    TileSelection::Stone,
-                    TileSelection::StartDoor,
-                ] {
-                    if ui
-                        .add(egui::RadioButton::new(
-                            *selection == candidate,
-                            format!("{:?}", candidate),
-                        ))
-                        .clicked()
-                    {
-                        new_selection = Some(EditorSelection::Tiles {
-                            selection: candidate,
-                        });
+                ui.horizontal_wrapped(|ui| {
+                    for (candidate, image_source) in [
+                        (
+                            TileSelection::NotPartOf,
+                            egui::include_image!("../../assets/ui_sprites/not_part_of.png"),
+                        ),
+                        (
+                            TileSelection::Clear,
+                            egui::include_image!("../../assets/ui_sprites/clear.png"),
+                        ),
+                        (
+                            TileSelection::Stone,
+                            egui::include_image!("../../assets/ui_sprites/stone.png"),
+                        ),
+                        (
+                            TileSelection::Wood,
+                            egui::include_image!("../../assets/ui_sprites/wood.png"),
+                        ),
+                        (
+                            TileSelection::Ladder,
+                            egui::include_image!("../../assets/ui_sprites/ladder.png"),
+                        ),
+                        (
+                            TileSelection::Platform,
+                            egui::include_image!("../../assets/ui_sprites/platform.png"),
+                        ),
+                        (
+                            TileSelection::StartDoor,
+                            egui::include_image!("../../assets/ui_sprites/start_door.png"),
+                        ),
+                    ] {
+                        let image = egui::Image::new(image_source)
+                            .fit_to_exact_size(egui::Vec2::new(20.0, 20.0));
+                        if ui
+                            .add(egui::Button::image(image).selected(*selection == candidate))
+                            .clicked()
+                        {
+                            new_selection = Some(EditorSelection::Tiles {
+                                selection: candidate,
+                            });
+                        }
                     }
-                }
+                });
             }
             EditorSelection::Enemies {
                 snap_top,
@@ -241,27 +263,43 @@ impl GameStateDebugMenu for Editor {
             } => {
                 ui.add(egui::Label::new("Enemy:"));
 
-                for candidate in [
-                    EnemySelection::Remove,
-                    EnemySelection::Bat,
-                    EnemySelection::Slime,
-                    EnemySelection::Worm,
-                    EnemySelection::Burrower,
-                ] {
-                    if ui
-                        .add(egui::RadioButton::new(
-                            *selection == candidate,
-                            format!("{:?}", candidate),
-                        ))
-                        .clicked()
-                    {
-                        new_selection = Some(EditorSelection::Enemies {
-                            selection: candidate,
-                            snap_bottom: *snap_bottom,
-                            snap_top: *snap_top,
-                        });
+                ui.horizontal_wrapped(|ui| {
+                    for (candidate, image_source) in [
+                        (
+                            EnemySelection::Remove,
+                            egui::include_image!("../../assets/ui_sprites/remove.png"),
+                        ),
+                        (
+                            EnemySelection::Bat,
+                            egui::include_image!("../../assets/ui_sprites/bat.png"),
+                        ),
+                        (
+                            EnemySelection::Slime,
+                            egui::include_image!("../../assets/ui_sprites/slime.png"),
+                        ),
+                        (
+                            EnemySelection::Worm,
+                            egui::include_image!("../../assets/ui_sprites/worm.png"),
+                        ),
+                        (
+                            EnemySelection::Burrower,
+                            egui::include_image!("../../assets/ui_sprites/burrower.png"),
+                        ),
+                    ] {
+                        let image = egui::Image::new(image_source)
+                            .fit_to_exact_size(egui::Vec2::new(20.0, 20.0));
+                        if ui
+                            .add(egui::Button::image(image).selected(*selection == candidate))
+                            .clicked()
+                        {
+                            new_selection = Some(EditorSelection::Enemies {
+                                selection: candidate,
+                                snap_bottom: *snap_bottom,
+                                snap_top: *snap_top,
+                            });
+                        }
                     }
-                }
+                });
 
                 ui.add(egui::Checkbox::new(snap_bottom, "Snap bottom"));
                 ui.add(egui::Checkbox::new(snap_top, "Snap top"));
@@ -300,34 +338,115 @@ impl GameStateDebugMenu for Editor {
             stage.editor_selection = selection;
         }
 
+        ui.add(egui::Label::new("Sort levels by:"));
+        ui.horizontal(|ui| {
+            if ui.add(egui::Button::new("Name")).clicked() {
+                stage.all_rooms.sort_by(|a, b| a.0.cmp(&b.0));
+            }
+            if ui.add(egui::Button::new("Enemies")).clicked() {
+                stage
+                    .all_rooms
+                    .sort_by(|a, b| a.1.has_enemies().cmp(&b.1.has_enemies()));
+            }
+            if ui.add(egui::Button::new("InDoor")).clicked() {
+                stage
+                    .all_rooms
+                    .sort_by(|a, b| a.1.has_start_door().cmp(&b.1.has_start_door()));
+            }
+            if ui.add(egui::Button::new("Active")).clicked() {
+                stage
+                    .all_rooms
+                    .sort_by(|a, b| a.1.disabled.cmp(&b.1.disabled));
+            }
+        });
+
         ui.add(egui::Label::new("Levels:"));
 
         let mut remove_current = false;
         let mut reload_rooms = false;
-        for (room_index, (file_name, room)) in stage.all_rooms.iter().enumerate() {
-            ui.horizontal(|ui| {
-                if ui.add(egui::Link::new(file_name)).clicked() {
-                    println!("Clicked a link");
 
-                    self.room = Room::clone(room);
-                    stage.current_editor_room_index = room_index as u32;
-                    self.player_mut().bb.x = self.room.get_center().0;
-                    self.player_mut().bb.y = self.room.get_center().1;
+        // TODO: Set the min size of checkboxes and others (decreases padding)
+        // TODO: Find a better way to do this
+        // Maybe like this?
+        // ui.scope(|ui| {
+        //     ui.spacing_mut().interact_size = egui::vec2(16.0, 16.0);
+        // OR
+        //     let spacing = &mut ui.style_mut().spacing;
+        //     spacing.button_padding = egui::vec2(0.0, 0.0);
+        ui.spacing_mut().interact_size.x = 16.0;
+        ui.spacing_mut().interact_size.y = 16.0;
+
+        egui::Grid::new("some_unique_id").show(ui, |ui| {
+            for (room_index, (file_name, room)) in stage.all_rooms.iter().enumerate() {
+                let is_current_room = room_index as u32 == stage.current_editor_room_index;
+
+                // Enabled/Disabled checkbox
+                let mut is_checked = !room.disabled;
+                ui.add_enabled_ui(!is_current_room, |ui| {
+                    ui.add_sized([16.0, 16.0], egui::Checkbox::without_text(&mut is_checked));
+                });
+                // ui.add_enabled(
+                //     !is_current_room,
+                //     egui::Checkbox::without_text(&mut is_checked)
+                // );
+                if is_checked == room.disabled {
+                    println!("Clicked a checkbox");
+
+                    self.room.disabled = !room.disabled;
+
+                    let path = Path::new("rooms").join(file_name);
+                    self.room.save_json(path);
+                    reload_rooms = true;
                 }
-                if room_index as u32 == stage.current_editor_room_index {
-                    if ui.add(egui::Button::new("Save")).clicked() {
-                        self.room.resize_shrink();
-                        let path = Path::new("rooms").join(file_name);
-                        self.room.save_json(path);
-                        println!("Button clicked!");
-                        reload_rooms = true;
+
+                // Change room link
+                ui.horizontal(|ui| {
+                    if ui.add(egui::Link::new(file_name.clone())).clicked() {
+                        println!("Clicked a link");
+                        self.room = Room::clone(room);
+                        stage.current_editor_room_index = room_index as u32;
+                        self.player_mut().bb.x = self.room.get_center().0;
+                        self.player_mut().bb.y = self.room.get_center().1;
                     }
-                    if ui.add(egui::Button::new("Del")).clicked() && stage.all_rooms.len() > 2 {
-                        remove_current = true;
-                    }
+                });
+
+                // Room information (has enemies, has starting room etc.)
+                if room.has_start_door() {
+                    ui.add(egui::Label::new("\u{1F6AA}"));
                 }
-            });
-        }
+                if room.has_enemies() {
+                    ui.add(egui::Label::new("\u{1F432}"));
+                }
+
+                if is_current_room {
+                    // Save / Delete buttons
+                    ui.horizontal(|ui| {
+                        if ui.add(egui::Button::new("Save")).clicked() {
+                            println!("Button clicked!");
+
+                            self.room.resize_shrink();
+
+                            let path = Path::new("rooms").join(file_name);
+                            self.room.save_json(path);
+                            reload_rooms = true;
+                        }
+                        if ui.add(egui::Button::new("Del")).clicked() && stage.all_rooms.len() > 2 {
+                            remove_current = true;
+                        }
+                    });
+
+                    // Room information
+                    ui.end_row();
+                    ui.add(egui::Label::new(""));
+                    ui.add(egui::Label::new(format!(
+                        "Size: ({} {})",
+                        room.get_pos().0 - room.w as i32,
+                        room.get_pos().1 - room.h as i32
+                    )));
+                }
+                ui.end_row();
+            }
+        });
         if remove_current {
             let file_name_to_remove = stage.all_rooms[stage.current_editor_room_index as usize]
                 .0

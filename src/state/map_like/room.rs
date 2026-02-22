@@ -16,6 +16,8 @@ pub struct Room {
     pub w: u32,
     doors: Vec<RoomDoor>,
     pub object_templates: Vec<ObjectTemplate>,
+    #[serde(default = "std::default::Default::default")]
+    pub disabled: bool,
 
     #[serde(skip, default)]
     all_overlays: Vec<OverlayInfo>,
@@ -56,6 +58,7 @@ impl Room {
             doors: Vec::new(),
             object_templates: Vec::new(),
             all_overlays: Vec::new(),
+            disabled: false,
         }
     }
 
@@ -397,6 +400,18 @@ impl Room {
         }
 
         self.all_overlays = all_overlays;
+    }
+
+    pub fn has_enemies(&self) -> bool {
+        !self.object_templates.is_empty()
+    }
+
+    pub fn has_start_door(&self) -> bool {
+        self.all_overlays
+            .iter()
+            .filter(|o| matches!(o.tile, OverlayTile::StartDoor))
+            .count()
+            > 0
     }
 }
 

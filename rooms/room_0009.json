@@ -294,5 +294,6 @@
       "y": 9.3749,
       "object_type": "Burrower"
     }
-  ]
+  ],
+  "disabled": true
 }

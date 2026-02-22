@@ -481,5 +481,6 @@
       "y": 1.1795218,
       "object_type": "Slime"
     }
-  ]
+  ],
+  "disabled": true
 }
