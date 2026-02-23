@@ -3,7 +3,7 @@ use super::game_state::InputState;
 use super::map_like::MapLike;
 use crate::camera::Camera;
 use crate::physics::{EPS, check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
-use crate::render::Renderer;
+use crate::render::{Renderer, TILE_SIZE};
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::item::{Item, ItemType};
@@ -320,14 +320,15 @@ impl Player {
                     // Throw item
                     sound_handler.play(Sound::Throw);
                     item.set_xyv(
-                        self.bb.x,
-                        self.bb.y,
+                        // TODO: Should set the projectiles center and not the corner here?
+                        self.bb.x + 5.0 / TILE_SIZE - item.bb().w / 2.0,
+                        self.bb.y + 5.0 / TILE_SIZE - item.bb().h / 2.0,
                         self.bb.vx
                             + match self.dir {
-                                Dir::Left => -0.1,
-                                Dir::Right => 0.1,
-                            },
-                        self.bb.vy + if input.up { -0.2 } else { -0.1 },
+                                Dir::Left => -1.0,
+                                Dir::Right => 1.0,
+                            } * if input.up { 0.1 } else { 0.15 },
+                        self.bb.vy + if input.up { -0.2 } else { -0.05 },
                     );
                 }
                 update_results.push(PlayerUpdateResult::AddItem { item });

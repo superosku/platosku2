@@ -28,6 +28,9 @@ pub trait GameState {
     fn player_mut(&mut self) -> &mut Player;
     fn map_mut(&mut self) -> &mut dyn MapLike;
     fn map(&self) -> &dyn MapLike;
+    /// Returns (center_x, center_y, view_width, view_height) in tile coords for minimap centering.
+    fn minimap_center(&self) -> (f32, f32);
+    fn current_room_index(&self) -> Option<usize>;
 }
 
 pub struct Editor {
@@ -76,6 +79,17 @@ impl GameState for Editor {
     fn map_mut(&mut self) -> &mut dyn MapLike {
         &mut self.room
     }
+
+    fn minimap_center(&self) -> (f32, f32) {
+        let (x, y) = self.room.get_pos();
+        let cx = x as f32 + self.room.w as f32 / 2.0;
+        let cy = y as f32 + self.room.h as f32 / 2.0;
+        (cx, cy)
+    }
+
+    fn current_room_index(&self) -> Option<usize> {
+        Some(0)
+    }
 }
 
 pub struct Game {
@@ -104,8 +118,8 @@ impl Game {
         for _ in 0..10000 {
             let (min_x, min_y, width, height) = map.get_bounds();
             let mut rng = rand::rng();
-            let x = rng.random_range(min_x..min_x + width);
-            let y = rng.random_range(min_y..min_y + height);
+            let x = rng.random_range(min_x..min_x + width as i32);
+            let y = rng.random_range(min_y..min_y + height as i32);
 
             if !map.is_solid_at_tile(x, y) {
                 items.push(Item::new_random(x as f32 + 0.5, y as f32 + 0.5));
@@ -413,9 +427,9 @@ impl GameState for Game {
             let room_has_enemies = !list_of_bools.is_empty();
 
             for door in &mut self.map.doors {
-                door.update(!room_has_enemies);
+                // door.update(!room_has_enemies);
                 // TODO: TEMP DOORS ALWAYS OPEN
-                // door.update(true);
+                door.update(true);
             }
         } else {
             for door in &mut self.map.doors {
@@ -466,5 +480,20 @@ impl GameState for Game {
 
     fn map_mut(&mut self) -> &mut dyn MapLike {
         &mut self.map
+    }
+
+    fn minimap_center(&self) -> (f32, f32) {
+        if let Some(index) = self.cur_room_index {
+            let room = &self.map.rooms[index];
+            let (x, y) = room.get_pos();
+            let cx = x as f32 + room.w as f32 / 2.0;
+            let cy = y as f32 + room.h as f32 / 2.0;
+            return (cx, cy)
+        }
+        (0.0, 0.0)
+    }
+
+    fn current_room_index(&self) -> Option<usize> {
+        self.cur_room_index
     }
 }

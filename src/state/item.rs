@@ -176,19 +176,20 @@ impl Item {
             return vec![ItemInteractionResult::RemoveItem];
         }
 
+        let old_vy = self.bb.vy;
         self.bb = res.new_bb;
 
         if res.on_left || res.on_right {
             self.bb.vx = 0.0; // On right/left hits stop x movenment
         }
         if res.on_top || res.on_bottom {
-            self.bb.vy = -self.bb.vy * 0.95;
-            if self.bb.vy.abs() < 0.001 {
+            self.bb.vy = -old_vy * 0.4;
+            if self.bb.vy.abs() < 0.04 {
                 // Bouncing stops if almost stopped
                 self.bb.vy = 0.0;
             }
-            self.bb.vx *= 0.95; // Slows down on bottom
-            if self.bb.vx.abs() < 0.001 {
+            self.bb.vx *= 0.90; // Slows down on bottom
+            if self.bb.vx.abs() < 0.03 {
                 self.bb.vx = 0.0;
             }
         }

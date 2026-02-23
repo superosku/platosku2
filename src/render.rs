@@ -54,6 +54,9 @@ pub struct Renderer {
 
     dualgrid_vertices: Vec<Vec<Vertex>>,
     dualgrid_indices: Vec<Vec<u16>>,
+
+    /// Smoothed minimap center (tile coords) for transition when player changes room.
+    minimap_smooth_center: Option<(f32, f32)>,
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -62,6 +65,7 @@ pub enum TextureIndexes {
     Tile,
     TileBackground,
     Atlas,
+    Minimap,
 }
 
 struct TextureInfo {
@@ -418,6 +422,19 @@ impl Renderer {
                 texture: white_texture,
             },
         );
+        // Placeholder 1x1 transparent texture; replaced when minimap is built from map
+        let minimap_placeholder: [u8; 4] = [0, 0, 0, 0];
+        let minimap_tex = ctx.new_texture_from_rgba8(1, 1, &minimap_placeholder);
+        ctx.texture_set_filter(minimap_tex, FilterMode::Nearest, MipmapFilterMode::None);
+        ctx.texture_set_wrap(minimap_tex, TextureWrap::Clamp, TextureWrap::Clamp);
+        textures.insert(
+            TextureIndexes::Minimap,
+            TextureInfo {
+                w: 1.0,
+                h: 1.0,
+                texture: minimap_tex,
+            },
+        );
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
@@ -486,6 +503,7 @@ impl Renderer {
             dualgrid_vb_cap,
             dualgrid_indices,
             dualgrid_vertices,
+            minimap_smooth_center: None,
         }
     }
 
@@ -558,8 +576,161 @@ impl Renderer {
 
     pub fn draw_hud(&mut self, state: &dyn GameState, camera: &Camera) {
         self.draw_player_health_bar(state, camera);
+        self.update_and_draw_minimap(camera, state.map(), state.minimap_center(), state.current_room_index());
+    }
 
-        // currently only hp bar. possibility to add other things.
+    fn update_and_draw_minimap(
+        &mut self,
+        camera: &Camera,
+        map: &dyn MapLike,
+        minimap_center: (f32, f32),
+        current_room_index: Option<usize>,
+    ) {
+        let (start_x, start_y, map_width, map_height) = map.get_bounds();
+
+        let map_width = map_width.min(1024);
+        let map_height = map_height.min(1024);
+
+        // One pixel transparent padding around the map so clamped UVs show transparent at edges
+        const PAD: u32 = 1;
+        let tex_w_pad = map_width + 2 * PAD;
+        let tex_h_pad = map_height + 2 * PAD;
+
+        const MINIMAP_BORDER_COLOR: [u8; 4] = [255, 255, 255, 255]; // white (room outlines only)
+        const MINIMAP_CURRENT_ROOM_COLOR: [u8; 4] = [173, 216, 230, 255]; // light blue (current room interior)
+        const MINIMAP_OTHER_ROOM_COLOR: [u8; 4] = [200, 200, 205, 255]; // light gray (other room interior)
+        const MINIMAP_DOOR_COLOR: [u8; 4] = [230, 230, 230, 255]; // light gray (other room interior)
+        const TRANSPARENT: [u8; 4] = [0, 0, 0, 0];
+
+        let mut pixels: Vec<u8> = Vec::with_capacity((tex_w_pad * tex_h_pad * 4) as usize);
+
+        for py_pad in 0..tex_h_pad {
+            for px_pad in 0..tex_w_pad {
+                if px_pad < PAD || px_pad >= map_width + PAD || py_pad < PAD || py_pad >= map_height + PAD {
+                    pixels.extend_from_slice(&TRANSPARENT);
+                    continue
+                }
+
+                let tx = (px_pad - PAD) as i32 + start_x;
+                let ty = (py_pad - PAD) as i32 + start_y;
+
+                if map.is_room_border(tx, ty) {
+                    if map.is_door_at_i(tx, ty) {
+                        pixels.extend_from_slice(&MINIMAP_DOOR_COLOR);
+                    } else {
+                        pixels.extend_from_slice(&MINIMAP_BORDER_COLOR);
+                    }
+                } else if let Some((index, _room)) = map.get_room_at_i(tx, ty) {
+                    pixels.extend_from_slice(if let Some(current_room_index) = current_room_index
+                        && current_room_index == index
+                    {
+                        &MINIMAP_CURRENT_ROOM_COLOR
+                    } else {
+                        &MINIMAP_OTHER_ROOM_COLOR
+                    });
+                } else {
+                    pixels.extend_from_slice(&TRANSPARENT);
+                }
+            }
+        }
+
+        let minimap_info = self.textures.get(&TextureIndexes::Minimap).unwrap();
+        let current_size = self.ctx.texture_size(minimap_info.texture);
+
+        let need_new_texture =
+            current_size.0 != tex_w_pad || current_size.1 != tex_h_pad;
+
+        if need_new_texture {
+            let new_tex = self.ctx.new_texture_from_rgba8(
+                tex_w_pad as u16,
+                tex_h_pad as u16,
+                &pixels,
+            );
+            self.ctx.texture_set_filter(new_tex, FilterMode::Nearest, MipmapFilterMode::None);
+            self.ctx.texture_set_wrap(new_tex, TextureWrap::Clamp, TextureWrap::Clamp);
+            self.textures.insert(
+                TextureIndexes::Minimap,
+                TextureInfo {
+                    w: tex_w_pad as f32,
+                    h: tex_h_pad as f32,
+                    texture: new_tex,
+                },
+            );
+        } else {
+            self.ctx.texture_update(minimap_info.texture, &pixels);
+        }
+
+        let minimap_info = self.textures.get(&TextureIndexes::Minimap).unwrap();
+        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
+
+        const MINIMAP_VIEW_TILES: i32 = 30;
+        const MINIMAP_VIEW_HALF: i32 = MINIMAP_VIEW_TILES / 2; // 15
+        /// Lerp factor per frame for smooth center transition (0 = no move, 1 = instant)
+        const MINIMAP_CENTER_LERP: f32 = 0.13;
+
+        let smooth_center = match self.minimap_smooth_center {
+            None => minimap_center,
+            Some(sc) => (
+                sc.0 + (minimap_center.0 - sc.0) * MINIMAP_CENTER_LERP,
+                sc.1 + (minimap_center.1 - sc.1) * MINIMAP_CENTER_LERP,
+            ),
+        };
+        self.minimap_smooth_center = Some(smooth_center);
+
+        self.bindings.images[0] = minimap_info.texture;
+        self.bindings.images[1] = background.texture;
+        self.ctx.apply_bindings(&self.bindings);
+
+        let w = camera.screen_w;
+        let h = camera.screen_h;
+
+        let draw_w = 200.0;
+        let draw_h = 200.0;
+
+        let x = camera.screen_w - draw_w - 20.0;
+        let y = 40.0;
+
+        let proj = Self::ortho_mvp(camera);
+        let model = Self::mat4_mul(Self::mat4_translation(x, y), Self::mat4_scale(draw_w, draw_h));
+        let mvp = Self::mat4_mul(proj, model);
+
+        let minimap_show_size = 15;
+
+        let uv_base = [
+            (smooth_center.0 - start_x as f32 - minimap_show_size as f32) / tex_w_pad as f32,
+            (smooth_center.1 - start_y as f32 - minimap_show_size as f32) / tex_h_pad as f32,
+            0.0,
+            0.0
+        ];
+        let uv_scale = [
+            minimap_show_size as f32 * 2.0 / tex_w_pad as f32,
+            minimap_show_size as f32 * 2.0 / tex_h_pad as f32,
+            0.0,
+            0.0
+        ];
+
+        let world_base = [x, y, 0.0, 0.0];
+        let world_scale = [200.0, 200.0, 0.0, 0.0];
+
+        let uniforms = Uniforms {
+            mvp,
+            color: [1.0, 1.0, 1.0, 1.0],
+            // uv_base: [0.0, 0.0, 0.0, 0.0],
+            // uv_scale: [1.0, 1.0, 0.0, 0.0],
+            // world_base: [x, y, 0.0, 0.0],
+            // world_scale: [w, h, 0.0, 0.0],
+            uv_base,
+            uv_scale,
+            world_base,
+            world_scale,
+            color_key: [1.0, 0.0, 1.0, 0.01],
+            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
+            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+            bg_tex_size: [background.w, background.h, 0.0, 0.0],
+        };
+
+        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+        self.ctx.draw(0, 6, 1);
     }
 
     fn draw_player_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {
