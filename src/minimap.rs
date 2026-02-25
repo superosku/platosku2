@@ -7,6 +7,9 @@ use crate::state::game_map::{GameMap, MapLike};
 pub struct Minimap {
     minimap_smooth_center: Option<(f32, f32)>,
     visited_rooms: HashSet<usize>,
+
+    // Used for defining when to recreate the minimap texture
+    previous_room_index: Option<usize>,
 }
 
 const MINIMAP_CENTER_LERP: f32 = 0.13;
@@ -16,6 +19,7 @@ impl Minimap {
         Minimap {
             minimap_smooth_center: None,
             visited_rooms: HashSet::new(),
+            previous_room_index: None,
         }
     }
 
@@ -29,10 +33,17 @@ impl Minimap {
         self.visited_rooms.insert(current_room_index);
 
         let smooth_center = self.update_and_get_minimap_smooth_center(map, current_room_index);
-        let (pixels, texture_width, texture_height) = self.construct_minimap_image(map, current_room_index);
-        self.update_minimap_texture_with_pixels(renderer, pixels, texture_width, texture_height);
 
-        self.draw_minimap(renderer, camera, map, smooth_center, texture_width, texture_height);
+        // Redraw texture only when the current room changes
+        if self.previous_room_index.is_none() || self.previous_room_index.unwrap() != current_room_index {
+            let (pixels, texture_width, texture_height) = self.construct_minimap_image(map, current_room_index);
+            self.update_minimap_texture_with_pixels(renderer, pixels, texture_width, texture_height);
+        }
+
+        let minimap_info = renderer.textures.get(&TextureIndexes::Minimap).unwrap();
+        let current_size = renderer.ctx.texture_size(minimap_info.texture);
+
+        self.draw_minimap(renderer, camera, map, smooth_center, current_size.0, current_size.1);
     }
 
     pub fn update_and_get_minimap_smooth_center(
@@ -77,7 +88,8 @@ impl Minimap {
         const MINIMAP_BORDER_COLOR: [u8; 4] = [255, 255, 255, 255]; // white (room outlines only)
         const MINIMAP_CURRENT_ROOM_COLOR: [u8; 4] = [173, 216, 230, 255]; // light blue (current room interior)
         const MINIMAP_OTHER_ROOM_COLOR: [u8; 4] = [200, 200, 205, 255]; // light gray (other room interior)
-        const MINIMAP_DOOR_COLOR: [u8; 4] = [230, 230, 230, 255]; // light gray (other room interior)
+        // const MINIMAP_DOOR_COLOR: [u8; 4] = [230, 230, 230, 255]; // light gray (other room interior)
+        const MINIMAP_DOOR_COLOR: [u8; 4] = [200, 200, 205, 255]; // light gray (other room interior)
         const TRANSPARENT: [u8; 4] = [0, 0, 0, 0];
 
         let mut pixels: Vec<u8> = Vec::with_capacity((tex_w_pad * tex_h_pad * 4) as usize);
