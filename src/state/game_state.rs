@@ -7,6 +7,8 @@ use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::item::{Item, ItemInteractionResult};
 use rand::Rng;
+use crate::minimap::Minimap;
+use crate::render::Renderer;
 
 #[derive(Default, Debug)]
 pub struct InputState {
@@ -29,8 +31,12 @@ pub trait GameState {
     fn map_mut(&mut self) -> &mut dyn MapLike;
     fn map(&self) -> &dyn MapLike;
     /// Returns (center_x, center_y, view_width, view_height) in tile coords for minimap centering.
-    fn minimap_center(&self) -> (f32, f32);
     fn current_room_index(&self) -> Option<usize>;
+    fn update_and_draw_minimap(
+        &mut self,
+        renderer: &mut Renderer,
+        camera: &Camera,
+    );
 }
 
 pub struct Editor {
@@ -80,15 +86,16 @@ impl GameState for Editor {
         &mut self.room
     }
 
-    fn minimap_center(&self) -> (f32, f32) {
-        let (x, y) = self.room.get_pos();
-        let cx = x as f32 + self.room.w as f32 / 2.0;
-        let cy = y as f32 + self.room.h as f32 / 2.0;
-        (cx, cy)
-    }
-
     fn current_room_index(&self) -> Option<usize> {
         Some(0)
+    }
+
+    fn update_and_draw_minimap(
+        &mut self,
+        _renderer: &mut Renderer,
+        _camera: &Camera,
+    ) {
+
     }
 }
 
@@ -102,6 +109,8 @@ pub struct Game {
     prev_room_index: Option<usize>,
     prev_room_show_frames: i32,
     room_change_position: (i32, i32),
+
+    minimap: Minimap,
 }
 
 const ROOM_TRANSITION_FRAMES: i32 = 30;
@@ -138,6 +147,7 @@ impl Game {
             prev_room_index: None,
             prev_room_show_frames: 0,
             room_change_position: (0, 0),
+            minimap: Minimap::new(),
         }
     }
 
@@ -482,18 +492,22 @@ impl GameState for Game {
         &mut self.map
     }
 
-    fn minimap_center(&self) -> (f32, f32) {
-        if let Some(index) = self.cur_room_index {
-            let room = &self.map.rooms[index];
-            let (x, y) = room.get_pos();
-            let cx = x as f32 + room.w as f32 / 2.0;
-            let cy = y as f32 + room.h as f32 / 2.0;
-            return (cx, cy)
-        }
-        (0.0, 0.0)
-    }
-
     fn current_room_index(&self) -> Option<usize> {
         self.cur_room_index
+    }
+
+    fn update_and_draw_minimap(
+        &mut self,
+        renderer: &mut Renderer,
+        camera: &Camera,
+    ) {
+        if let Some(cur_room_index) = self.cur_room_index {
+            self.minimap.update_and_draw_minimap(
+                renderer,
+                camera,
+                &self.map,
+                cur_room_index,
+            )
+        }
     }
 }

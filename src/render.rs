@@ -9,19 +9,20 @@ use crate::state::{BaseTile, OverlayTile};
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
+use crate::minimap::Minimap;
 
 #[repr(C)]
-struct Uniforms {
-    mvp: [f32; 16],
-    color: [f32; 4],
-    uv_base: [f32; 4],          // xy used
-    uv_scale: [f32; 4],         // xy used
-    world_base: [f32; 4],       // xy used (world pixel origin of this quad)
-    world_scale: [f32; 4],      // xy used (world pixel size of this quad)
-    color_key: [f32; 4],        // rgb = key color, a = threshold
-    bg_tile_size: [f32; 4],     // xy used (repeat period in pixels)
-    bg_region_origin: [f32; 4], // xy used (top-left of 64x64 region in bg texture, in pixels)
-    bg_tex_size: [f32; 4],      // xy used (bg texture size in pixels)
+pub struct Uniforms {
+    pub mvp: [f32; 16],
+    pub color: [f32; 4],
+    pub uv_base: [f32; 4],          // xy used
+    pub uv_scale: [f32; 4],         // xy used
+    pub world_base: [f32; 4],       // xy used (world pixel origin of this quad)
+    pub world_scale: [f32; 4],      // xy used (world pixel size of this quad)
+    pub color_key: [f32; 4],        // rgb = key color, a = threshold
+    pub bg_tile_size: [f32; 4],     // xy used (repeat period in pixels)
+    pub bg_region_origin: [f32; 4], // xy used (top-left of 64x64 region in bg texture, in pixels)
+    pub bg_tex_size: [f32; 4],      // xy used (bg texture size in pixels)
 }
 
 #[repr(C)]
@@ -35,8 +36,8 @@ pub struct Renderer {
     pipeline: Pipeline,
     pipeline_tiles: Pipeline,
     pipeline_hud: Pipeline,
-    bindings: Bindings,
-    textures: HashMap<TextureIndexes, TextureInfo>,
+    pub bindings: Bindings, // pub as MiniMap is using it
+    pub textures: HashMap<TextureIndexes, TextureInfo>, // pub as MiniMap is using it
     atlas_info: AtlasInfo,
     // Batched sprite data for atlas-rendered quads (positions in world pixels, precomputed UVs)
     atlas_batch_vertices: Vec<Vertex>,
@@ -54,9 +55,8 @@ pub struct Renderer {
 
     dualgrid_vertices: Vec<Vec<Vertex>>,
     dualgrid_indices: Vec<Vec<u16>>,
-
-    /// Smoothed minimap center (tile coords) for transition when player changes room.
-    minimap_smooth_center: Option<(f32, f32)>,
+    
+    minimap: Minimap,
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -68,10 +68,16 @@ pub enum TextureIndexes {
     Minimap,
 }
 
-struct TextureInfo {
-    w: f32,
-    h: f32,
-    texture: TextureId,
+pub struct TextureInfo {
+    pub w: f32,
+    pub h: f32,
+    pub texture: TextureId,
+}
+
+impl TextureInfo {
+    pub fn new(w: f32, h: f32, texture: TextureId) -> Self {
+        Self { w, h, texture }
+    }
 }
 
 fn load_texture(ctx: &mut Box<dyn RenderingBackend>, path: &str) -> TextureInfo {
@@ -503,7 +509,7 @@ impl Renderer {
             dualgrid_vb_cap,
             dualgrid_indices,
             dualgrid_vertices,
-            minimap_smooth_center: None,
+            minimap: Minimap::new(),
         }
     }
 
@@ -511,7 +517,7 @@ impl Renderer {
         // Nothing to do yet
     }
 
-    pub fn draw(&mut self, state: &dyn DrawableGameState, camera: &Camera, show_dark: bool) {
+    pub fn draw(&mut self, state: &mut dyn DrawableGameState, camera: &Camera, show_dark: bool) {
         let clear = PassAction::Clear {
             color: Some((0.08, 0.09, 0.10, 1.0)),
             depth: Some(1.0),
@@ -574,163 +580,9 @@ impl Renderer {
         self.ctx.end_render_pass();
     }
 
-    pub fn draw_hud(&mut self, state: &dyn GameState, camera: &Camera) {
+    pub fn draw_hud(&mut self, state: &mut dyn GameState, camera: &Camera) {
         self.draw_player_health_bar(state, camera);
-        self.update_and_draw_minimap(camera, state.map(), state.minimap_center(), state.current_room_index());
-    }
-
-    fn update_and_draw_minimap(
-        &mut self,
-        camera: &Camera,
-        map: &dyn MapLike,
-        minimap_center: (f32, f32),
-        current_room_index: Option<usize>,
-    ) {
-        let (start_x, start_y, map_width, map_height) = map.get_bounds();
-
-        let map_width = map_width.min(1024);
-        let map_height = map_height.min(1024);
-
-        // One pixel transparent padding around the map so clamped UVs show transparent at edges
-        const PAD: u32 = 1;
-        let tex_w_pad = map_width + 2 * PAD;
-        let tex_h_pad = map_height + 2 * PAD;
-
-        const MINIMAP_BORDER_COLOR: [u8; 4] = [255, 255, 255, 255]; // white (room outlines only)
-        const MINIMAP_CURRENT_ROOM_COLOR: [u8; 4] = [173, 216, 230, 255]; // light blue (current room interior)
-        const MINIMAP_OTHER_ROOM_COLOR: [u8; 4] = [200, 200, 205, 255]; // light gray (other room interior)
-        const MINIMAP_DOOR_COLOR: [u8; 4] = [230, 230, 230, 255]; // light gray (other room interior)
-        const TRANSPARENT: [u8; 4] = [0, 0, 0, 0];
-
-        let mut pixels: Vec<u8> = Vec::with_capacity((tex_w_pad * tex_h_pad * 4) as usize);
-
-        for py_pad in 0..tex_h_pad {
-            for px_pad in 0..tex_w_pad {
-                if px_pad < PAD || px_pad >= map_width + PAD || py_pad < PAD || py_pad >= map_height + PAD {
-                    pixels.extend_from_slice(&TRANSPARENT);
-                    continue
-                }
-
-                let tx = (px_pad - PAD) as i32 + start_x;
-                let ty = (py_pad - PAD) as i32 + start_y;
-
-                if map.is_room_border(tx, ty) {
-                    if map.is_door_at_i(tx, ty) {
-                        pixels.extend_from_slice(&MINIMAP_DOOR_COLOR);
-                    } else {
-                        pixels.extend_from_slice(&MINIMAP_BORDER_COLOR);
-                    }
-                } else if let Some((index, _room)) = map.get_room_at_i(tx, ty) {
-                    pixels.extend_from_slice(if let Some(current_room_index) = current_room_index
-                        && current_room_index == index
-                    {
-                        &MINIMAP_CURRENT_ROOM_COLOR
-                    } else {
-                        &MINIMAP_OTHER_ROOM_COLOR
-                    });
-                } else {
-                    pixels.extend_from_slice(&TRANSPARENT);
-                }
-            }
-        }
-
-        let minimap_info = self.textures.get(&TextureIndexes::Minimap).unwrap();
-        let current_size = self.ctx.texture_size(minimap_info.texture);
-
-        let need_new_texture =
-            current_size.0 != tex_w_pad || current_size.1 != tex_h_pad;
-
-        if need_new_texture {
-            let new_tex = self.ctx.new_texture_from_rgba8(
-                tex_w_pad as u16,
-                tex_h_pad as u16,
-                &pixels,
-            );
-            self.ctx.texture_set_filter(new_tex, FilterMode::Nearest, MipmapFilterMode::None);
-            self.ctx.texture_set_wrap(new_tex, TextureWrap::Clamp, TextureWrap::Clamp);
-            self.textures.insert(
-                TextureIndexes::Minimap,
-                TextureInfo {
-                    w: tex_w_pad as f32,
-                    h: tex_h_pad as f32,
-                    texture: new_tex,
-                },
-            );
-        } else {
-            self.ctx.texture_update(minimap_info.texture, &pixels);
-        }
-
-        let minimap_info = self.textures.get(&TextureIndexes::Minimap).unwrap();
-        let background = self.textures.get(&TextureIndexes::TileBackground).unwrap();
-
-        const MINIMAP_VIEW_TILES: i32 = 30;
-        const MINIMAP_VIEW_HALF: i32 = MINIMAP_VIEW_TILES / 2; // 15
-        /// Lerp factor per frame for smooth center transition (0 = no move, 1 = instant)
-        const MINIMAP_CENTER_LERP: f32 = 0.13;
-
-        let smooth_center = match self.minimap_smooth_center {
-            None => minimap_center,
-            Some(sc) => (
-                sc.0 + (minimap_center.0 - sc.0) * MINIMAP_CENTER_LERP,
-                sc.1 + (minimap_center.1 - sc.1) * MINIMAP_CENTER_LERP,
-            ),
-        };
-        self.minimap_smooth_center = Some(smooth_center);
-
-        self.bindings.images[0] = minimap_info.texture;
-        self.bindings.images[1] = background.texture;
-        self.ctx.apply_bindings(&self.bindings);
-
-        let w = camera.screen_w;
-        let h = camera.screen_h;
-
-        let draw_w = 200.0;
-        let draw_h = 200.0;
-
-        let x = camera.screen_w - draw_w - 20.0;
-        let y = 40.0;
-
-        let proj = Self::ortho_mvp(camera);
-        let model = Self::mat4_mul(Self::mat4_translation(x, y), Self::mat4_scale(draw_w, draw_h));
-        let mvp = Self::mat4_mul(proj, model);
-
-        let minimap_show_size = 15;
-
-        let uv_base = [
-            (smooth_center.0 - start_x as f32 - minimap_show_size as f32) / tex_w_pad as f32,
-            (smooth_center.1 - start_y as f32 - minimap_show_size as f32) / tex_h_pad as f32,
-            0.0,
-            0.0
-        ];
-        let uv_scale = [
-            minimap_show_size as f32 * 2.0 / tex_w_pad as f32,
-            minimap_show_size as f32 * 2.0 / tex_h_pad as f32,
-            0.0,
-            0.0
-        ];
-
-        let world_base = [x, y, 0.0, 0.0];
-        let world_scale = [200.0, 200.0, 0.0, 0.0];
-
-        let uniforms = Uniforms {
-            mvp,
-            color: [1.0, 1.0, 1.0, 1.0],
-            // uv_base: [0.0, 0.0, 0.0, 0.0],
-            // uv_scale: [1.0, 1.0, 0.0, 0.0],
-            // world_base: [x, y, 0.0, 0.0],
-            // world_scale: [w, h, 0.0, 0.0],
-            uv_base,
-            uv_scale,
-            world_base,
-            world_scale,
-            color_key: [1.0, 0.0, 1.0, 0.01],
-            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
-            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
-            bg_tex_size: [background.w, background.h, 0.0, 0.0],
-        };
-
-        self.ctx.apply_uniforms(UniformsSource::table(&uniforms));
-        self.ctx.draw(0, 6, 1);
+        state.update_and_draw_minimap( self, camera );
     }
 
     fn draw_player_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {
@@ -1283,7 +1135,7 @@ impl Renderer {
         self.ctx.draw(0, self.atlas_batch_indices.len() as i32, 1);
     }
 
-    fn ortho_mvp(camera: &Camera) -> [f32; 16] {
+    pub fn ortho_mvp(camera: &Camera) -> [f32; 16] {
         let l = 0.0;
         let r = camera.screen_w;
         let t = 0.0;
@@ -1331,7 +1183,7 @@ impl Renderer {
         ]
     }
 
-    fn mat4_mul(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
+    pub fn mat4_mul(a: [f32; 16], b: [f32; 16]) -> [f32; 16] {
         let mut out = [0.0f32; 16];
         for row in 0..4 {
             for col in 0..4 {
@@ -1345,13 +1197,13 @@ impl Renderer {
         out
     }
 
-    fn mat4_translation(tx: f32, ty: f32) -> [f32; 16] {
+    pub fn mat4_translation(tx: f32, ty: f32) -> [f32; 16] {
         [
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, tx, ty, 0.0, 1.0,
         ]
     }
 
-    fn mat4_scale(sx: f32, sy: f32) -> [f32; 16] {
+    pub fn mat4_scale(sx: f32, sy: f32) -> [f32; 16] {
         [
             sx, 0.0, 0.0, 0.0, 0.0, sy, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ]

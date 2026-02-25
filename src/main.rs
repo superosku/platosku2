@@ -8,6 +8,7 @@ mod atlas_info;
 mod debug_menu;
 mod render;
 mod sound_handler;
+mod minimap;
 
 use crate::camera::Camera;
 use crate::debug_menu::{DebugMenu, EditorSelection, GameStateDebugMenu, TileSelection};
@@ -129,7 +130,7 @@ impl EventHandler for Stage {
         let draw_start = date::now();
 
         self.renderer
-            .draw(self.state.as_ref(), &self.camera, self.debug_menu.show_dark);
+            .draw(self.state.as_mut(), &self.camera, self.debug_menu.show_dark);
         self.frames += 1;
         let draw_total = date::now() - draw_start;
         self.time_spent_drawing += draw_total;
