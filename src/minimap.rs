@@ -1,20 +1,21 @@
+use std::collections::HashSet;
 use miniquad::{FilterMode, MipmapFilterMode, TextureWrap, UniformsSource};
 use crate::camera::Camera;
 use crate::render::{Renderer, TextureIndexes, TextureInfo, Uniforms};
 use crate::state::game_map::{GameMap, MapLike};
 
 pub struct Minimap {
-    /// Smoothed minimap center (tile coords) for transition when player changes room.
     minimap_smooth_center: Option<(f32, f32)>,
+    visited_rooms: HashSet<usize>,
 }
 
-/// Lerp factor per frame for smooth center transition (0 = no move, 1 = instant)
 const MINIMAP_CENTER_LERP: f32 = 0.13;
 
 impl Minimap {
     pub fn new() -> Minimap {
         Minimap {
             minimap_smooth_center: None,
+            visited_rooms: HashSet::new(),
         }
     }
 
@@ -25,6 +26,8 @@ impl Minimap {
         map: &GameMap,
         current_room_index: usize,
     ) {
+        self.visited_rooms.insert(current_room_index);
+
         let smooth_center = self.update_and_get_minimap_smooth_center(map, current_room_index);
         let (pixels, texture_width, texture_height) = self.construct_minimap_image(map, current_room_index);
         self.update_minimap_texture_with_pixels(renderer, pixels, texture_width, texture_height);
@@ -89,19 +92,21 @@ impl Minimap {
                 let tx = (px_pad - PAD) as i32 + start_x;
                 let ty = (py_pad - PAD) as i32 + start_y;
 
-                if map.is_room_border(tx, ty) {
+                if map.is_room_border_for_some_room(tx, ty, &self.visited_rooms) {
                     if map.is_door_at_i(tx, ty) {
                         pixels.extend_from_slice(&MINIMAP_DOOR_COLOR);
                     } else {
                         pixels.extend_from_slice(&MINIMAP_BORDER_COLOR);
                     }
                 } else if let Some((index, _room)) = map.get_room_at_i(tx, ty) {
-                    pixels.extend_from_slice(if current_room_index == index
-                    {
+                    let color = if !self.visited_rooms.contains(&index) {
+                        &TRANSPARENT
+                    } else if current_room_index == index {
                         &MINIMAP_CURRENT_ROOM_COLOR
                     } else {
                         &MINIMAP_OTHER_ROOM_COLOR
-                    });
+                    };
+                    pixels.extend_from_slice(color);
                 } else {
                     pixels.extend_from_slice(&TRANSPARENT);
                 }
