@@ -4,23 +4,124 @@ use crate::camera::Camera;
 use crate::render::{Renderer, TextureIndexes, TextureInfo, Uniforms};
 use crate::state::game_map::{GameMap, MapLike};
 
-pub struct Minimap {
-    minimap_smooth_center: Option<(f32, f32)>,
-    visited_rooms: HashSet<usize>,
-
-    // Used for defining when to recreate the minimap texture
-    previous_room_index: Option<usize>,
+struct MinimapLocation {
+    // top left in pixels
+    x: f32,
+    y: f32,
+    // h and w in pixels
+    size: f32,
+    // What to show from the map
+    uv_base: [f32; 4],
+    uv_scale: [f32; 4],
 }
 
+fn minimap_location_mix(first: &MinimapLocation, second: &MinimapLocation, mix: f32) -> MinimapLocation {
+    MinimapLocation {
+        x: (first.x as f32 * mix + second.x as f32 * (1.0 - mix)),
+        y: (first.y as f32 * mix + second.y as f32 * (1.0 - mix)),
+        size: (first.size as f32 * mix + second.size as f32 * (1.0 - mix)),
+        uv_base: [
+            first.uv_base[0] * mix + second.uv_base[0] * (1.0 - mix),
+            first.uv_base[1] * mix + second.uv_base[1] * (1.0 - mix),
+            first.uv_base[2] * mix + second.uv_base[2] * (1.0 - mix),
+            first.uv_base[3] * mix + second.uv_base[3] * (1.0 - mix),
+        ],
+        uv_scale: [
+            first.uv_scale[0] * mix + second.uv_scale[0] * (1.0 - mix),
+            first.uv_scale[1] * mix + second.uv_scale[1] * (1.0 - mix),
+            first.uv_scale[2] * mix + second.uv_scale[2] * (1.0 - mix),
+            first.uv_scale[3] * mix + second.uv_scale[3] * (1.0 - mix),
+        ]
+    }
+}
+
+pub struct Minimap {
+    minimap_smooth_center: Option<(f32, f32)>, // Smooth the transition of the centered room
+    visited_rooms: HashSet<usize>, // Define what rooms to show
+    previous_room_index: Option<usize>, // Used for defining when to recreate the minimap texture
+    location: Option<MinimapLocation>,
+}
+
+const MINIMAP_LOCATION_LERP: f32 = 0.13;
 const MINIMAP_CENTER_LERP: f32 = 0.13;
 
 impl Minimap {
     pub fn new() -> Minimap {
+        let mut visited_rooms = HashSet::new();
+        // for i in 0..100 {
+        //     visited_rooms.insert(i);
+        // }
         Minimap {
             minimap_smooth_center: None,
-            visited_rooms: HashSet::new(),
+            // visited_rooms: HashSet::new(),
+            visited_rooms,
             previous_room_index: None,
+            location: None,
         }
+    }
+
+    fn update_minimap_size_and_location(&mut self, map: &GameMap,  camera: &Camera, draw_big: bool, smooth_center: (f32, f32), texture_width: u32, texture_height: u32) {
+        let (start_x, start_y, map_width, map_height) = map.get_bounds();
+
+        let desired_location = if draw_big {
+            let max_dim = texture_width.max(texture_height);
+            let scale_x = max_dim as f32 / texture_width as f32;
+            let scale_y = max_dim as f32/ texture_height as f32;
+            let uv_base = [
+                (1.0 - scale_x) * 0.5,
+                (1.0 - scale_y) * 0.5,
+                0.0,
+                0.0
+            ];
+            let uv_scale = [
+                scale_x,
+                scale_y,
+                0.0,
+                0.0
+            ];
+
+            let size = camera.screen_h * 0.6;
+            MinimapLocation {
+                y: (camera.screen_h - size) * 0.5,
+                x: (camera.screen_w - size) * 0.5,
+                size,
+                uv_base,
+                uv_scale,
+            }
+        } else {
+            let minimap_show_size = 15; // How many tiles to show in each direction
+            let uv_base = [
+                (smooth_center.0 - start_x as f32 - minimap_show_size as f32) / texture_width as f32,
+                (smooth_center.1 - start_y as f32 - minimap_show_size as f32) / texture_height as f32,
+                0.0,
+                0.0
+            ];
+            let uv_scale = [
+                minimap_show_size as f32 * 2.0 / texture_width as f32,
+                minimap_show_size as f32 * 2.0 / texture_height as f32,
+                0.0,
+                0.0
+            ];
+
+            let size = (camera.screen_h * 0.2) ;
+            MinimapLocation {
+                y: 40.0,
+                x: camera.screen_w - size - 20.0,
+                size,
+                uv_base,
+                uv_scale,
+            }
+        };
+
+        self.location = Some(if let Some(location) = &self.location {
+            minimap_location_mix(
+                location,
+                &desired_location,
+                1.0 - MINIMAP_LOCATION_LERP
+            )
+        } else {
+            desired_location
+        })
     }
 
     pub fn update_and_draw_minimap(
@@ -29,6 +130,7 @@ impl Minimap {
         camera: &Camera,
         map: &GameMap,
         current_room_index: usize,
+        draw_big: bool, // Controls if is drawn into the corner of as big one on the center of the screen
     ) {
         self.visited_rooms.insert(current_room_index);
 
@@ -36,12 +138,15 @@ impl Minimap {
 
         // Redraw texture only when the current room changes
         if self.previous_room_index.is_none() || self.previous_room_index.unwrap() != current_room_index {
+            self.previous_room_index = Some(current_room_index);
             let (pixels, texture_width, texture_height) = self.construct_minimap_image(map, current_room_index);
             self.update_minimap_texture_with_pixels(renderer, pixels, texture_width, texture_height);
         }
 
         let minimap_info = renderer.textures.get(&TextureIndexes::Minimap).unwrap();
         let current_size = renderer.ctx.texture_size(minimap_info.texture);
+
+        self.update_minimap_size_and_location(map, camera, draw_big, smooth_center, current_size.0, current_size.1);
 
         self.draw_minimap(renderer, camera, map, smooth_center, current_size.0, current_size.1);
     }
@@ -97,6 +202,8 @@ impl Minimap {
         for py_pad in 0..tex_h_pad {
             for px_pad in 0..tex_w_pad {
                 if px_pad < PAD || px_pad >= map_width + PAD || py_pad < PAD || py_pad >= map_height + PAD {
+                    // pixels.extend_from_slice(&[255, 0, 0, 0]);
+                    // pixels.extend_from_slice(&[255, 128, 0, 255]);
                     pixels.extend_from_slice(&TRANSPARENT);
                     continue
                 }
@@ -177,55 +284,40 @@ impl Minimap {
         const MINIMAP_VIEW_TILES: i32 = 30;
         const MINIMAP_VIEW_HALF: i32 = MINIMAP_VIEW_TILES / 2; // 15
 
-
         renderer.bindings.images[0] = minimap_info.texture;
         renderer.bindings.images[1] = background.texture;
         renderer.ctx.apply_bindings(&renderer.bindings);
 
-        let draw_w = 200.0;
-        let draw_h = 200.0;
 
-        let x = camera.screen_w - draw_w - 20.0;
-        let y = 40.0;
+        if let Some(location) = &self.location {
+            // TODO: These into a function. Make them non pub and two functions for getting the mvp depending on if game or hud.
+            let proj = Renderer::ortho_mvp(camera);
+            let model = Renderer::mat4_mul(
+                Renderer::mat4_translation(location.x as f32, location.y as f32),
+                Renderer::mat4_scale(location.size, location.size)
+            );
+            let mvp = Renderer::mat4_mul(proj, model);
 
-        // TODO: These into a function. Make them non pub and two functions for getting the mvp depending on if game or hud.
-        let proj = Renderer::ortho_mvp(camera);
-        let model = Renderer::mat4_mul(Renderer::mat4_translation(x, y), Renderer::mat4_scale(draw_w, draw_h));
-        let mvp = Renderer::mat4_mul(proj, model);
+            // Where on the screen to draw the minimap
+            let world_base = [location.x as f32, location.y as f32, 0.0, 0.0];
+            let world_scale = [location.size as f32, location.size as f32, 0.0, 0.0];
 
-        let minimap_show_size = 15;
+            let uniforms = Uniforms {
+                mvp,
+                color: [1.0, 1.0, 1.0, 1.0],
+                uv_base: location.uv_base,
+                uv_scale: location.uv_scale,
+                world_base,
+                world_scale,
+                color_key: [1.0, 0.0, 1.0, 0.01],
+                bg_tile_size: [64.0, 64.0, 0.0, 0.0],
+                bg_region_origin: [0.0, 0.0, 0.0, 0.0],
+                bg_tex_size: [background.w, background.h, 0.0, 0.0],
+            };
 
-        let uv_base = [
-            (smooth_center.0 - start_x as f32 - minimap_show_size as f32) / texture_width as f32,
-            (smooth_center.1 - start_y as f32 - minimap_show_size as f32) / texture_height as f32,
-            0.0,
-            0.0
-        ];
-        let uv_scale = [
-            minimap_show_size as f32 * 2.0 / texture_width as f32,
-            minimap_show_size as f32 * 2.0 / texture_height as f32,
-            0.0,
-            0.0
-        ];
-
-        let world_base = [x, y, 0.0, 0.0];
-        let world_scale = [200.0, 200.0, 0.0, 0.0];
-
-        let uniforms = Uniforms {
-            mvp,
-            color: [1.0, 1.0, 1.0, 1.0],
-            uv_base,
-            uv_scale,
-            world_base,
-            world_scale,
-            color_key: [1.0, 0.0, 1.0, 0.01],
-            bg_tile_size: [64.0, 64.0, 0.0, 0.0],
-            bg_region_origin: [0.0, 0.0, 0.0, 0.0],
-            bg_tex_size: [background.w, background.h, 0.0, 0.0],
-        };
-
-        renderer.ctx.apply_uniforms(UniformsSource::table(&uniforms));
-        renderer.ctx.draw(0, 6, 1);
+            renderer.ctx.apply_uniforms(UniformsSource::table(&uniforms));
+            renderer.ctx.draw(0, 6, 1);
+        }
     }
 }
 

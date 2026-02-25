@@ -130,7 +130,7 @@ impl EventHandler for Stage {
         let draw_start = date::now();
 
         self.renderer
-            .draw(self.state.as_mut(), &self.camera, self.debug_menu.show_dark);
+            .draw(self.state.as_mut(), &self.camera, self.debug_menu.show_dark, self.input.show_map);
         self.frames += 1;
         let draw_total = date::now() - draw_start;
         self.time_spent_drawing += draw_total;
@@ -183,6 +183,7 @@ impl EventHandler for Stage {
             KeyCode::Left => self.input.left = true,
             KeyCode::Right => self.input.right = true,
             KeyCode::Up => self.input.up = true,
+            KeyCode::M => self.input.show_map = true,
             KeyCode::X => {
                 if !repeat && !self.input.swing_held {
                     self.input.swing_pressed = true
@@ -206,6 +207,7 @@ impl EventHandler for Stage {
             KeyCode::Left => self.input.left = false,
             KeyCode::Right => self.input.right = false,
             KeyCode::Up => self.input.up = false,
+            KeyCode::M => self.input.show_map = false,
             KeyCode::X => self.input.swing_held = false,
             KeyCode::Z => self.input.jump_held = false,
             KeyCode::Down => self.input.down = false,

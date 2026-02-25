@@ -17,6 +17,8 @@ pub struct InputState {
     pub up: bool,
     pub down: bool,
 
+    pub show_map: bool,
+
     pub swing_pressed: bool,
     pub jump_pressed: bool,
     pub swing_held: bool,
@@ -36,6 +38,7 @@ pub trait GameState {
         &mut self,
         renderer: &mut Renderer,
         camera: &Camera,
+        draw_big: bool,
     );
 }
 
@@ -94,6 +97,7 @@ impl GameState for Editor {
         &mut self,
         _renderer: &mut Renderer,
         _camera: &Camera,
+        _draw_big: bool,
     ) {
 
     }
@@ -500,6 +504,7 @@ impl GameState for Game {
         &mut self,
         renderer: &mut Renderer,
         camera: &Camera,
+        draw_big: bool,
     ) {
         if let Some(cur_room_index) = self.cur_room_index {
             self.minimap.update_and_draw_minimap(
@@ -507,6 +512,7 @@ impl GameState for Game {
                 camera,
                 &self.map,
                 cur_room_index,
+                draw_big,
             )
         }
     }

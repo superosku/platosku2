@@ -55,7 +55,7 @@ pub struct Renderer {
 
     dualgrid_vertices: Vec<Vec<Vertex>>,
     dualgrid_indices: Vec<Vec<u16>>,
-    
+
     minimap: Minimap,
 }
 
@@ -517,7 +517,7 @@ impl Renderer {
         // Nothing to do yet
     }
 
-    pub fn draw(&mut self, state: &mut dyn DrawableGameState, camera: &Camera, show_dark: bool) {
+    pub fn draw(&mut self, state: &mut dyn DrawableGameState, camera: &Camera, show_dark: bool, draw_big_map: bool) {
         let clear = PassAction::Clear {
             color: Some((0.08, 0.09, 0.10, 1.0)),
             depth: Some(1.0),
@@ -575,14 +575,14 @@ impl Renderer {
 
         state.draw_extra_last(camera, self, show_dark);
 
-        self.draw_hud(state, camera);
+        self.draw_hud(state, camera, draw_big_map);
 
         self.ctx.end_render_pass();
     }
 
-    pub fn draw_hud(&mut self, state: &mut dyn GameState, camera: &Camera) {
+    pub fn draw_hud(&mut self, state: &mut dyn GameState, camera: &Camera, draw_big_map: bool) {
         self.draw_player_health_bar(state, camera);
-        state.update_and_draw_minimap( self, camera );
+        state.update_and_draw_minimap( self, camera, draw_big_map);
     }
 
     fn draw_player_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {
