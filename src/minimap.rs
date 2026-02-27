@@ -53,7 +53,6 @@ impl Minimap {
         // }
         Minimap {
             minimap_smooth_center: None,
-            // visited_rooms: HashSet::new(),
             visited_rooms,
             previous_room_index: None,
             location: None,
@@ -62,14 +61,25 @@ impl Minimap {
 
     fn update_minimap_size_and_location(&mut self, map: &GameMap,  camera: &Camera, draw_big: bool, smooth_center: (f32, f32), texture_width: u32, texture_height: u32) {
         let (start_x, start_y, map_width, map_height) = map.get_bounds();
-
         let desired_location = if draw_big {
-            let max_dim = texture_width.max(texture_height);
+            let (view_start_x, view_start_y, view_width, view_height) = map.get_bounds_for_rooms(&self.visited_rooms);
+
+            // Scale the map so that the currently visible part fits the screen
+            let max_dim = view_width.max(view_height);
             let scale_x = max_dim as f32 / texture_width as f32;
             let scale_y = max_dim as f32/ texture_height as f32;
+
+            // Make the map start at the currently visible parts top left
+            let base_view_x = (view_start_x - start_x + 1) as f32 / texture_width as f32;
+            let base_view_y = (view_start_y - start_y + 1) as f32 / texture_height as f32;
+
+            // Offset a bit so that the visible map area is at the center of the screen
+            let base_offset_x = (view_width as f32 / texture_width as f32 - scale_x) * 0.5;
+            let base_offset_y = (view_height as f32 / texture_height as f32 - scale_y) * 0.5;
+
             let uv_base = [
-                (1.0 - scale_x) * 0.5,
-                (1.0 - scale_y) * 0.5,
+                base_view_x + base_offset_x,
+                base_view_y + base_offset_y,
                 0.0,
                 0.0
             ];
@@ -148,7 +158,7 @@ impl Minimap {
 
         self.update_minimap_size_and_location(map, camera, draw_big, smooth_center, current_size.0, current_size.1);
 
-        self.draw_minimap(renderer, camera, map, smooth_center, current_size.0, current_size.1);
+        self.draw_minimap(renderer, camera);
     }
 
     pub fn update_and_get_minimap_smooth_center(
@@ -202,8 +212,6 @@ impl Minimap {
         for py_pad in 0..tex_h_pad {
             for px_pad in 0..tex_w_pad {
                 if px_pad < PAD || px_pad >= map_width + PAD || py_pad < PAD || py_pad >= map_height + PAD {
-                    // pixels.extend_from_slice(&[255, 0, 0, 0]);
-                    // pixels.extend_from_slice(&[255, 128, 0, 255]);
                     pixels.extend_from_slice(&TRANSPARENT);
                     continue
                 }
@@ -270,19 +278,9 @@ impl Minimap {
         &mut self,
         renderer: &mut Renderer,
         camera: &Camera,
-        map: &GameMap,
-        smooth_center: (f32, f32),
-        texture_width: u32,
-        texture_height: u32,
     ) {
-        // Draw the minimap
-        let (start_x, start_y, map_width, map_height) = map.get_bounds();
-
         let minimap_info = renderer.textures.get(&TextureIndexes::Minimap).unwrap();
         let background = renderer.textures.get(&TextureIndexes::TileBackground).unwrap();
-
-        const MINIMAP_VIEW_TILES: i32 = 30;
-        const MINIMAP_VIEW_HALF: i32 = MINIMAP_VIEW_TILES / 2; // 15
 
         renderer.bindings.images[0] = minimap_info.texture;
         renderer.bindings.images[1] = background.texture;

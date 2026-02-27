@@ -789,6 +789,28 @@ impl GameMap {
 
         enemies
     }
+    
+    pub fn get_bounds_for_rooms(&self, rooms: &HashSet<usize>) -> (i32, i32, u32, u32) {
+        let mut min_x = i32::MAX;
+        let mut min_y = i32::MAX;
+        let mut max_x = i32::MIN;
+        let mut max_y = i32::MIN;
+
+        for (index, room) in self.rooms.iter().enumerate() {
+            if !rooms.contains(&index) {
+                continue;
+            }
+            min_x = room.x.min(min_x);
+            min_y = room.y.min(min_y);
+            max_x = (room.x + room.w as i32).max(max_x);
+            max_y = (room.y + room.h as i32).max(max_y);
+        }
+        let w = max_x - min_x;
+        let h = max_y - min_y;
+        assert!(w > 0 && h > 0);
+
+        (min_x, min_y, w as u32, h as u32)
+    }
 
     pub fn new_random() -> GameMap {
         let room_candidates = Room::load_rooms_from_folder();
@@ -1015,6 +1037,7 @@ impl GameMap {
 }
 
 impl MapLike for GameMap {
+    
     fn get_bounds(&self) -> (i32, i32, u32, u32) {
         let mut min_x = i32::MAX;
         let mut min_y = i32::MAX;
