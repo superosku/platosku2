@@ -9,7 +9,6 @@ use crate::state::{BaseTile, OverlayTile};
 use image::GenericImageView;
 use miniquad::*;
 use std::collections::HashMap;
-use crate::minimap::Minimap;
 
 #[repr(C)]
 pub struct Uniforms {
@@ -55,8 +54,6 @@ pub struct Renderer {
 
     dualgrid_vertices: Vec<Vec<Vertex>>,
     dualgrid_indices: Vec<Vec<u16>>,
-
-    minimap: Minimap,
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -509,7 +506,6 @@ impl Renderer {
             dualgrid_vb_cap,
             dualgrid_indices,
             dualgrid_vertices,
-            minimap: Minimap::new(),
         }
     }
 
@@ -517,7 +513,13 @@ impl Renderer {
         // Nothing to do yet
     }
 
-    pub fn draw(&mut self, state: &mut dyn DrawableGameState, camera: &Camera, show_dark: bool, draw_big_map: bool) {
+    pub fn draw(
+        &mut self,
+        state: &mut dyn DrawableGameState,
+        camera: &Camera,
+        show_dark: bool,
+        draw_big_map: bool,
+    ) {
         let clear = PassAction::Clear {
             color: Some((0.08, 0.09, 0.10, 1.0)),
             depth: Some(1.0),
@@ -582,7 +584,7 @@ impl Renderer {
 
     pub fn draw_hud(&mut self, state: &mut dyn GameState, camera: &Camera, draw_big_map: bool) {
         self.draw_player_health_bar(state, camera);
-        state.update_and_draw_minimap( self, camera, draw_big_map);
+        state.update_and_draw_minimap(self, camera, draw_big_map);
     }
 
     fn draw_player_health_bar(&mut self, state: &dyn GameState, camera: &Camera) {

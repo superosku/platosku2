@@ -1,14 +1,14 @@
 use super::map_like::{GameMap, MapLike, Room};
 use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
+use crate::minimap::Minimap;
+use crate::render::Renderer;
 use crate::sound_handler::{Sound, SoundHandler};
 use crate::state::BoundingBox;
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::item::{Item, ItemInteractionResult};
 use rand::Rng;
-use crate::minimap::Minimap;
-use crate::render::Renderer;
 
 #[derive(Default, Debug)]
 pub struct InputState {
@@ -33,13 +33,7 @@ pub trait GameState {
     fn map_mut(&mut self) -> &mut dyn MapLike;
     fn map(&self) -> &dyn MapLike;
     /// Returns (center_x, center_y, view_width, view_height) in tile coords for minimap centering.
-    fn current_room_index(&self) -> Option<usize>;
-    fn update_and_draw_minimap(
-        &mut self,
-        renderer: &mut Renderer,
-        camera: &Camera,
-        draw_big: bool,
-    );
+    fn update_and_draw_minimap(&mut self, renderer: &mut Renderer, camera: &Camera, draw_big: bool);
 }
 
 pub struct Editor {
@@ -89,17 +83,12 @@ impl GameState for Editor {
         &mut self.room
     }
 
-    fn current_room_index(&self) -> Option<usize> {
-        Some(0)
-    }
-
     fn update_and_draw_minimap(
         &mut self,
         _renderer: &mut Renderer,
         _camera: &Camera,
         _draw_big: bool,
     ) {
-
     }
 }
 
@@ -438,7 +427,7 @@ impl GameState for Game {
                 })
                 .collect();
             list_of_bools.retain(|b| *b);
-            let room_has_enemies = !list_of_bools.is_empty();
+            let _room_has_enemies = !list_of_bools.is_empty();
 
             for door in &mut self.map.doors {
                 // door.update(!room_has_enemies);
@@ -460,8 +449,8 @@ impl GameState for Game {
             let camera_y = y as f32 + h as f32 * 0.5;
 
             let camera_zoom = camera
-                .zoom_to_fit_horizontal_tiles(w as u32)
-                .min(camera.zoom_to_fit_vertical_tiles(h as u32));
+                .zoom_to_fit_horizontal_tiles(w)
+                .min(camera.zoom_to_fit_vertical_tiles(h));
 
             camera.slowly_follow(camera_x, camera_y, camera_zoom);
         } else {
@@ -494,10 +483,6 @@ impl GameState for Game {
 
     fn map_mut(&mut self) -> &mut dyn MapLike {
         &mut self.map
-    }
-
-    fn current_room_index(&self) -> Option<usize> {
-        self.cur_room_index
     }
 
     fn update_and_draw_minimap(

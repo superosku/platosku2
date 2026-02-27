@@ -4,9 +4,9 @@ use crate::state::{Bat, BoundingBox};
 use rand::Rng;
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs::DirEntry;
 use std::{fs, io, path::Path};
-use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
 pub enum BaseTile {
@@ -606,11 +606,11 @@ impl MapLike for Room {
             || self.get_at(tx - 1, ty - 1).0 == not_part
     }
 
-    fn get_room_at_i(&self, x: i32, y: i32) -> Option<(usize, &Room)> {
-        Some((0 as usize, self))
+    fn get_room_at_i(&self, _x: i32, _y: i32) -> Option<(usize, &Room)> {
+        Some((0_usize, self))
     }
 
-    fn is_door_at_i(&self, x: i32, y: i32) -> bool {
+    fn is_door_at_i(&self, _x: i32, _y: i32) -> bool {
         false
     }
 }
@@ -789,7 +789,7 @@ impl GameMap {
 
         enemies
     }
-    
+
     pub fn get_bounds_for_rooms(&self, rooms: &HashSet<usize>) -> (i32, i32, u32, u32) {
         let mut min_x = i32::MAX;
         let mut min_y = i32::MAX;
@@ -982,8 +982,8 @@ impl GameMap {
 
         game_map.x = x;
         game_map.y = y;
-        game_map.w = w as u32;
-        game_map.h = h as u32;
+        game_map.w = w;
+        game_map.h = h;
 
         game_map.overlay.resize((w * h) as usize, OverlayTile::None);
         game_map.base.resize((w * h) as usize, BaseTile::Stone);
@@ -1018,18 +1018,22 @@ impl GameMap {
         (BaseTile::Stone, OverlayTile::None)
     }
 
-    pub fn is_room_border_for_some_room(&self, x: i32, y: i32, room_indexes: &HashSet<usize>) -> bool {
+    pub fn is_room_border_for_some_room(
+        &self,
+        x: i32,
+        y: i32,
+        room_indexes: &HashSet<usize>,
+    ) -> bool {
         for room_index in 0..self.rooms.len() {
             if !room_indexes.contains(&room_index) {
                 continue;
             }
             let room = &self.rooms[room_index];
-            if let Some((base, _)) = room.get_relative(x, y) {
-                if base != BaseTile::NotPartOfRoom {
-                    if let Some(room) = self.get_room_at_i(x, y) {
-                        return room.1.is_room_border(x, y);
-                    }
-                }
+            if let Some((base, _)) = room.get_relative(x, y)
+                && base != BaseTile::NotPartOfRoom
+                && let Some(room) = self.get_room_at_i(x, y)
+            {
+                return room.1.is_room_border(x, y);
             }
         }
         false
@@ -1037,7 +1041,6 @@ impl GameMap {
 }
 
 impl MapLike for GameMap {
-    
     fn get_bounds(&self) -> (i32, i32, u32, u32) {
         let mut min_x = i32::MAX;
         let mut min_y = i32::MAX;
@@ -1112,10 +1115,10 @@ impl MapLike for GameMap {
     fn get_room_at_i(&self, x: i32, y: i32) -> Option<(usize, &Room)> {
         for room_index in 0..self.rooms.len() {
             let room = &self.rooms[room_index];
-            if let Some((base, _)) = room.get_relative(x, y) {
-                if base != BaseTile::NotPartOfRoom {
-                    return Some((room_index, room));
-                }
+            if let Some((base, _)) = room.get_relative(x, y)
+                && base != BaseTile::NotPartOfRoom
+            {
+                return Some((room_index, room));
             }
         }
         None
