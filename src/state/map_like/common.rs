@@ -1,5 +1,6 @@
 use crate::state::common::BoundingBox;
 use crate::state::enemies::{Bat, Burrower, Enemy, Slime, Worm};
+use crate::state::map_like::Room;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
@@ -27,6 +28,8 @@ pub struct OverlayInfo {
 }
 
 pub trait MapLike {
+    /// Returns (origin_x, origin_y, width, height) in tile coordinates for the map bounds.
+    fn get_bounds(&self) -> (i32, i32, u32, u32);
     fn get_at(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile);
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
@@ -64,6 +67,10 @@ pub trait MapLike {
     fn _is_solid_at_f_tile(&self, tx: f32, ty: f32) -> bool {
         self.is_solid_at_tile(tx.floor() as i32, ty.floor() as i32)
     }
+
+    fn is_room_border(&self, tx: i32, ty: i32) -> bool;
+    fn get_room_at_i(&self, x: i32, y: i32) -> Option<(usize, &Room)>;
+    fn is_door_at_i(&self, x: i32, y: i32) -> bool;
 }
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]

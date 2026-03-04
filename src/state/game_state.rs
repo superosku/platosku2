@@ -120,8 +120,8 @@ impl Game {
         for _ in 0..10000 {
             let (min_x, min_y, width, height) = map.get_bounds();
             let mut rng = rand::rng();
-            let x = rng.random_range(min_x..min_x + width as i32);
-            let y = rng.random_range(min_y..min_y + height as i32);
+            let x = rng.random_range(min_x..min_x + width);
+            let y = rng.random_range(min_y..min_y + height);
 
             if !map.is_solid_at_tile(x, y) {
                 items.push(Item::new_random(x as f32 + 0.5, y as f32 + 0.5));
@@ -449,8 +449,8 @@ impl GameState for Game {
             let camera_y = y as f32 + h as f32 * 0.5;
 
             let camera_zoom = camera
-                .zoom_to_fit_horizontal_tiles(w)
-                .min(camera.zoom_to_fit_vertical_tiles(h));
+                .zoom_to_fit_horizontal_tiles(w as u32)
+                .min(camera.zoom_to_fit_vertical_tiles(h as u32));
 
             camera.slowly_follow(camera_x, camera_y, camera_zoom);
         } else {

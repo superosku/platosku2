@@ -5,6 +5,7 @@ use crate::state::common::BoundingBox;
 use crate::state::enemies::Enemy;
 use rand::Rng;
 use rand::seq::IndexedRandom;
+use std::collections::HashSet;
 
 #[derive(PartialEq)]
 enum DoorAnimationState {
@@ -384,9 +385,73 @@ impl GameMap {
 
         (BaseTile::Stone, OverlayTile::None)
     }
+
+    pub fn is_room_border_for_some_room(
+        &self,
+        x: i32,
+        y: i32,
+        room_indexes: &HashSet<usize>,
+    ) -> bool {
+        for room_index in 0..self.rooms.len() {
+            if !room_indexes.contains(&room_index) {
+                continue;
+            }
+            let room = &self.rooms[room_index];
+            if let Some((base, _)) = room.get_relative(x, y)
+                && base != BaseTile::NotPartOfRoom
+                && let Some(room) = self.get_room_at_i(x, y)
+            {
+                return room.1.is_room_border(x, y);
+            }
+        }
+        false
+    }
+
+    pub fn get_bounds_for_rooms(&self, rooms: &HashSet<usize>) -> (i32, i32, u32, u32) {
+        let mut min_x = i32::MAX;
+        let mut min_y = i32::MAX;
+        let mut max_x = i32::MIN;
+        let mut max_y = i32::MIN;
+
+        for (index, room) in self.rooms.iter().enumerate() {
+            if !rooms.contains(&index) {
+                continue;
+            }
+            let (room_x, room_y, room_w, room_h) = room.get_bounds();
+            min_x = room_x.min(min_x);
+            min_y = room_y.min(min_y);
+            max_x = (room_x + room_w as i32).max(max_x);
+            max_y = (room_y + room_h as i32).max(max_y);
+        }
+        let w = max_x - min_x;
+        let h = max_y - min_y;
+        assert!(w > 0 && h > 0);
+
+        (min_x, min_y, w as u32, h as u32)
+    }
 }
 
 impl MapLike for GameMap {
+    fn get_bounds(&self) -> (i32, i32, u32, u32) {
+        let mut min_x = i32::MAX;
+        let mut min_y = i32::MAX;
+        let mut max_x = i32::MIN;
+        let mut max_y = i32::MIN;
+
+        for room in &self.rooms {
+            let (room_x, room_y, room_w, room_h) = room.get_bounds();
+            min_x = room_x.min(min_x);
+            min_y = room_y.min(min_y);
+            max_x = (room_x + room_w as i32).max(max_x);
+            max_y = (room_y + room_h as i32).max(max_y);
+        }
+        let w = max_x - min_x;
+        let h = max_y - min_y;
+        assert!(w > 0 && h > 0);
+
+        (min_x, min_y, w as u32, h as u32)
+    }
+
     fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool {
         if self._overlaps_solid_tile(x, y, w, h) {
             return true;
@@ -430,5 +495,33 @@ impl MapLike for GameMap {
 
     fn set_overlay(&mut self, _x: i32, _y: i32, _tile: OverlayTile) {
         todo!()
+    }
+
+    fn is_room_border(&self, tx: i32, ty: i32) -> bool {
+        if let Some(room) = self.get_room_at_i(tx, ty) {
+            return room.1.is_room_border(tx, ty);
+        }
+        false
+    }
+
+    fn get_room_at_i(&self, x: i32, y: i32) -> Option<(usize, &Room)> {
+        for room_index in 0..self.rooms.len() {
+            let room = &self.rooms[room_index];
+            if let Some((base, _)) = room.get_relative(x, y)
+                && base != BaseTile::NotPartOfRoom
+            {
+                return Some((room_index, room));
+            }
+        }
+        None
+    }
+
+    fn is_door_at_i(&self, x: i32, y: i32) -> bool {
+        for door in &self.doors {
+            if door.x == x && door.y == y {
+                return true;
+            }
+        }
+        false
     }
 }

@@ -48,8 +48,8 @@ impl Stage {
         println!("Stage new");
 
         let mut renderer = Renderer::new();
-        // let state = Box::new(Game::new());
-        let state = Box::new(Editor::new());
+        let state = Box::new(Game::new());
+        // let state = Box::new(Editor::new());
 
         let egui_mq = egui_mq::EguiMq::new(&mut *renderer.ctx);
         egui_extras::install_image_loaders(egui_mq.egui_ctx());
