@@ -416,6 +416,11 @@ impl Room {
 }
 
 impl MapLike for Room {
+    fn get_bounds(&self) -> (i32, i32, u32, u32) {
+        let (x, y) = self.get_pos();
+        (x, y, self.w, self.h)
+    }
+
     fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool {
         self._overlaps_solid_tile(x, y, w, h)
     }
@@ -453,6 +458,30 @@ impl MapLike for Room {
         }
         self.resize_shrink();
         self.update_overlays_cache();
+    }
+
+    fn is_room_border(&self, tx: i32, ty: i32) -> bool {
+        let (base, _) = self.get_at(tx, ty);
+        if matches!(base, BaseTile::NotPartOfRoom) {
+            return false;
+        }
+        let not_part = BaseTile::NotPartOfRoom;
+        self.get_at(tx - 1, ty).0 == not_part
+            || self.get_at(tx + 1, ty).0 == not_part
+            || self.get_at(tx, ty - 1).0 == not_part
+            || self.get_at(tx, ty + 1).0 == not_part
+            || self.get_at(tx + 1, ty + 1).0 == not_part
+            || self.get_at(tx - 1, ty + 1).0 == not_part
+            || self.get_at(tx + 1, ty - 1).0 == not_part
+            || self.get_at(tx - 1, ty - 1).0 == not_part
+    }
+
+    fn get_room_at_i(&self, _x: i32, _y: i32) -> Option<(usize, &Room)> {
+        Some((0_usize, self))
+    }
+
+    fn is_door_at_i(&self, _x: i32, _y: i32) -> bool {
+        false
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::camera::Camera;
 use crate::render::{Renderer, TextureIndexes, TextureInfo, Uniforms};
-use crate::state::game_map::{GameMap, MapLike};
+use crate::state::map_like::{GameMap, MapLike};
 use miniquad::{FilterMode, MipmapFilterMode, TextureWrap, UniformsSource};
 use std::collections::HashSet;
 
@@ -217,7 +217,7 @@ impl Minimap {
         let map_height = map_height.min(1024);
 
         // One pixel transparent padding around the map so clamped UVs show transparent at edges
-        const PAD: u32 = 1;
+        const PAD: i32 = 1;
         let tex_w_pad = map_width + 2 * PAD;
         let tex_h_pad = map_height + 2 * PAD;
 
@@ -241,8 +241,8 @@ impl Minimap {
                     continue;
                 }
 
-                let tx = (px_pad - PAD) as i32 + start_x;
-                let ty = (py_pad - PAD) as i32 + start_y;
+                let tx = (px_pad - PAD) + start_x;
+                let ty = (py_pad - PAD) + start_y;
 
                 if map.is_room_border_for_some_room(tx, ty, &self.visited_rooms) {
                     if map.is_door_at_i(tx, ty) {
@@ -265,7 +265,7 @@ impl Minimap {
             }
         }
 
-        (pixels, tex_w_pad, tex_h_pad)
+        (pixels, tex_w_pad as u32, tex_h_pad as u32)
     }
 
     pub fn update_minimap_texture_with_pixels(
