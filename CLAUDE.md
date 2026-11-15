@@ -13,7 +13,9 @@ cargo clippy --all-targets -- -D warnings   # CI fails on ANY clippy warning
 
 CI (`.github/workflows/`) runs check, fmt, clippy (with `-D warnings`) and test on Ubuntu. Before you finish a change, run fmt, clippy and test the same way CI does.
 
-The game prints FPS and UPS to stdout every second, and the map generator logs a lot (`Iterating for adding a room ...`). That output is normal.
+The game prints `Game seed: N` at startup, FPS and UPS every second, and a lot of map generator output (`Iterating for adding a room ...`). That output is normal. Use `Game::new_with_seed(N)` to reproduce a run.
+
+Put temporary files (logs, screenshots, scripts) in `target/claude/`, which is gitignored.
 
 ## Architecture
 
@@ -25,8 +27,10 @@ The game prints FPS and UPS to stdout every second, and the map generator logs a
 - The egui "Debug" window switches between Game and Editor. Switching to Game calls `Game::new()`, which regenerates the map.
 
 ### State (`src/state/`)
-- `GameState` trait (`game_state.rs`): `update`, `update_camera`, accessors for player and map, and `update_and_draw_minimap`. `FullGameState` = `GameState + DrawableGameState (render.rs) + GameStateDebugMenu (debug_menu/)`.
-- `Game`: player, `GameMap`, `items: Vec<Item>`, `enemies: Vec<Box<dyn Enemy>>`, current and previous room index (for camera and room-transition "dark" effect), `Minimap`. `Game::update` does all the interactions: door push-out, player update, items (physics, pickup, swing hits, projectile hits on enemies), enemies (only those in the current room are updated), stomp and contact damage, room change detection, doors.
+- `GameState` trait (`game_state.rs`): `update(input, &dyn SoundPlayer)`, `update_camera`, accessors for player and map. It has no rendering dependencies. `FullGameState` = `GameState + DrawableGameState (render.rs, including the minimap) + GameStateDebugMenu (debug_menu/)`.
+- **`UpdateCtx`** (`update_ctx.rs`): `{ sound: &dyn SoundPlayer, rng: &mut GameRng }`, passed to every entity update (player, enemies, item interactions). Add new cross-cutting services here instead of new parameters.
+- **Constructing games:** `Game::new()` (random seed, printed), `Game::new_with_seed(seed)`, or `Game::builder().seed(..).single_room(room).player_pos(x, y).random_items(false).build()`. `MapSetup` = `RandomFromFolder` | `Random(Vec<Room>)` | `SingleRoom(..)`.
+- `Game`: player, `GameMap`, `items: Vec<Item>`, `enemies: Vec<Box<dyn Enemy>>`, current and previous room index (for camera and room-transition "dark" effect), `visited_rooms`, `Minimap` (presentation state only, no GPU resources), and the `GameRng`. `Game::update` does all the interactions: door push-out, player update, items (physics, pickup, swing hits, projectile hits on enemies), enemies (only those in the current room are updated), stomp and contact damage, room change detection, doors.
 - `Editor`: a single `Room` plus a player for testing the room.
 - **Result-enum pattern:** entities don't mutate the world directly. They return `Vec<...Result>` (`PlayerUpdateResult`, `EnemyUpdateResult`, `ItemInteractionResult`) and `Game::update` applies them. Follow this pattern for new interactions.
 - `player.rs`: `PlayerState` state machine (`Normal`, `Swinging`, `Hanging`, `OnLadder`, `Dead`). It includes coyote time (`safe_edge_frames`), variable jump hold (`max_jump_frames`), ledge hang, ladders and drop-through platforms (down+jump). `Health` + `immunity_frames`.
@@ -39,8 +43,9 @@ The game prints FPS and UPS to stdout every second, and the map generator logs a
 ### Map (`src/state/map_like/`)
 - `MapLike` trait: tile queries (`get_at`, `is_solid_at_tile`, `is_ladder_at`, `is_platform_at`, `overlaps_solid`, …). It is implemented by `Room` and `GameMap`.
 - Tiles: `BaseTile` (NotPartOfRoom, Empty, Stone, Wood; everything except Empty is solid) + `OverlayTile` (Ladder, Platform, LadderPlatform, StartDoor).
-- `Room` (`room.rs`): serde JSON in `rooms/room_XXXX.json`. It holds base and overlay tiles, its position, `doors: Vec<RoomDoor>`, `object_templates` (enemy spawns) and `disabled`. `Room::load_rooms_from_folder()` reads `rooms/`. The editor saves here too.
-- `GameMap::new_random()` (`game_map.rs`): starts from the **first** room that has a StartDoor, then randomly attaches rooms door to door (max 1000 attempts, stops at 10 rooms), rejecting overlaps. It then flattens everything into one tile grid. `MapDoor` is a door between rooms, with animation and temporary closing. Doors are currently **always open** (see the `TODO: TEMP` in `Game::update`).
+- `Room` (`room.rs`): serde JSON in `rooms/room_XXXX.json`. It holds base and overlay tiles, its position, `doors: Vec<RoomDoor>`, `object_templates` (enemy spawns) and `disabled`. `Room::load_rooms_from_folder()` reads `rooms/`. The editor saves here too. **`disabled` is currently only used by the editor; the map generator ignores it.**
+- `Room::from_ascii(x, y, &[rows])` builds a room from ASCII art (see its doc comment for the characters). Use it in tests.
+- `GameMap::new_random(&rooms, rng)` (`game_map.rs`): starts from the **first** room that has a StartDoor, then randomly attaches rooms door to door (max 1000 attempts, stops at 10 rooms), rejecting overlaps. It then flattens everything into one tile grid (`rebuild_tile_cache`). `GameMap::from_single_room(room)` makes a one-room map. `MapDoor` is a door between rooms, with animation and temporary closing. Doors are currently **always open** (see the `TODO: TEMP` in `Game::update`).
 - Coordinates: world units are **tiles** (1.0 = one tile = 16 px, `render::TILE_SIZE`). Positions are f32, tile indices i32, and y grows downward.
 
 ### Physics (`src/physics.rs`)
@@ -56,6 +61,7 @@ The game prints FPS and UPS to stdout every second, and the map generator logs a
 - Entity `draw` methods live on the entities themselves and take `&mut Renderer`.
 
 ### Sound (`src/sound_handler.rs`)
+- `SoundPlayer` trait: `SoundHandler` (real audio), `NullSound` and `RecordingSound` (for tests; `played()` returns the requested sounds in order).
 - The `define_sounds!` macro maps the `Sound` enum to file names. `play()` picks a random **variant** from `assets/sounds/dest/<name>__vNN.wav`.
 - `assets/sounds/dest/` is gitignored and generated by `make_sound_variants.sh` (needs `ffmpeg` with rubberband). **If it's missing, the game is silent.** No error is shown, because non-variant files are looked up without the `.wav` extension, so they never load.
 - Sound files are third-party, used with permission and must not be redistributed (`assets/sounds/README.md`).
@@ -65,15 +71,17 @@ The game prints FPS and UPS to stdout every second, and the map generator logs a
 - `ui_sprite_creator.py` (PIL) cuts editor icons from the atlas into `assets/ui_sprites/`.
 - aseprite and ffmpeg are not necessarily installed on the dev machine. Check before relying on them.
 
-## Testability notes (current state)
-- There are only 4 unit tests (room resize, in `room.rs`).
-- Good for testing: fixed timestep, plain-data `InputState`, pure `physics.rs` functions and `MapLike` (a `Room` can be built in code with `Room::new_boxed`/`new_empty`).
-- Obstacles to headless and deterministic tests:
-  - `SoundHandler` is passed into `update()` everywhere and creates a real `AudioContext`.
-  - Randomness uses global `rand::rng()` in map generation, items, bat, slime and burrower. It isn't seeded.
-  - `Game::new()` reads `rooms/` from disk and always generates a random map.
-  - `Game` owns `Minimap`, and the minimap draw is part of the `GameState` trait. `Renderer::new()` needs a window.
-  - `Enemy::update` takes a concrete `&GameMap`, not `&dyn MapLike`.
+## Determinism (important)
+Game logic must give identical results for the same seed and inputs, on every platform (macOS on ARM locally, Linux on x86 in CI).
+- **Randomness:** only through `ctx.rng` / a `&mut GameRng` (ChaCha8). Never `rand::rng()` in game logic. Sound variant selection is the one exception, because it doesn't affect state.
+- **Float math:** `+ - * /` and `sqrt` are fine. `sin`, `cos`, `atan2`, `powf`, `exp` and similar are platform-dependent and **banned by `clippy.toml`** (`disallowed-methods`). Use `libm::sinf` and friends, or avoid them (see `random_unit_vector` in `state/common.rs`). `render.rs` is exempt.
+- **No iterating `HashMap`/`HashSet`** in game logic; the order is random per run. Use `Vec` or `BTreeMap`/`BTreeSet`. Lookups and inserts are fine.
+- **No wall-clock time** in game logic. Count ticks.
+
+## Testing
+- Unit tests live next to the code (`#[cfg(test)] mod tests`). Game-level tests in `state/game_state.rs` show the pattern: build a `Game` with the builder and `Room::from_ascii`, call `game.update(&input, &NullSound)` in a loop, and assert on state.
+- The game logic runs headless. Only `Renderer::new()` needs a window.
+- Still to come: a `Sim` harness for e2e tests, simple input scripts, and a screenshot capture mode.
 
 ## Conventions
 - Small, focused changes. Keep the game behaving the same unless the change is meant to alter it.
