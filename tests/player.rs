@@ -92,7 +92,6 @@ fn jump_plays_sound_and_lands_again() {
 }
 
 #[test]
-#[ignore = "known bug: holding jump keeps re-jumping silently after landing (max_jump_frames is reset on the ground)"]
 fn holding_jump_does_not_jump_again_after_landing() {
     let mut sim = standing_in_flat_room();
     sim.press(Key::Jump).run(120);
@@ -125,6 +124,17 @@ fn just_walked_off_ledge() -> Sim {
     assert!(ticks.is_some(), "player never left the ledge");
     sim.release(Key::Right);
     sim
+}
+
+#[test]
+fn holding_jump_while_walking_off_a_ledge_does_not_launch_upwards() {
+    let mut sim = sim_in(LEDGE);
+    sim.run(30).press(Key::Jump).run(60);
+    sim.press(Key::Right);
+    sim.run_until(200, |g| !g.player.is_on_ground())
+        .expect("player never left the ledge");
+    sim.run(1);
+    assert!(sim.player().bb.vy > 0.0, "should fall, not rise");
 }
 
 #[test]

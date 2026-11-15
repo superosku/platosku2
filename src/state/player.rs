@@ -289,7 +289,6 @@ impl Player {
 
         if self.on_ground {
             self.safe_edge_frames = 4;
-            self.max_jump_frames = 10;
         } else if self.safe_edge_frames > 0 {
             self.safe_edge_frames -= 1;
         }
@@ -298,6 +297,9 @@ impl Player {
         if input.jump_pressed && !input.down && (self.on_ground || self.safe_edge_frames > 0) {
             ctx.sound.play(Sound::Jump);
             self.safe_edge_frames = 0;
+            // Holding jump keeps rising for up to this many more frames. It is only
+            // granted when a jump starts, so holding jump never re-jumps on landing.
+            self.max_jump_frames = 10;
             self.bb.vy = -0.125;
         } else if input.jump_held && !input.down && self.max_jump_frames > 0 {
             self.max_jump_frames -= 1;
