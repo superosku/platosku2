@@ -1,0 +1,14 @@
+// Walk around the start room (room_0008) with the normal random items.
+seed 3
+map room rooms/room_0008.json
+
+60
+snap start
+60 right
+snap walked_right
+1 right jump
+30 right jump
+60
+snap after_jump
+120 left
+snap walked_left

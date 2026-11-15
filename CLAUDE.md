@@ -93,8 +93,17 @@ Game logic must give identical results for the same seed and inputs, on every pl
   - `tests/interactions.rs`: enemies, items, doors and rooms.
 - Measure before asserting: write a throwaway probe test that prints values (`cargo test --test probe -- --nocapture`), then pick thresholds from real numbers. Delete the probe afterwards.
 - A test for a known, not-yet-fixed bug gets `#[ignore = "known bug: ..."]`. Run them with `cargo test -- --ignored`.
+- `tests/scripts.rs` runs every script in `scripts/`.
 - The game logic runs headless. Only `Renderer::new()` needs a window.
-- Still to come: simple input scripts and a screenshot capture mode.
+
+### Input scripts (`src/script.rs`, `scripts/*.txt`)
+Text files that set up a game (`seed`, `items on|off`, `map random | room <file> | ascii … end`, `player x y`) and play input: each line `<ticks> [keys…]` holds exactly those keys (`left right up down jump swing`). `snap <name>` marks a point. The format is documented at the top of `src/script.rs`.
+```sh
+cargo run --example run_script -- scripts/jump_demo.txt   # headless; prints player state at each snap
+```
+Use it to check a scenario quickly or reproduce a bug. In code: `Script::load(path)?.build_game()?`, then `sim.run_script(&script, |sim, snap_name| ...)`.
+
+- Still to come: a screenshot capture mode (it will use the same scripts; `snap` takes a screenshot).
 
 ## Conventions
 - Small, focused changes. Keep the game behaving the same unless the change is meant to alter it.

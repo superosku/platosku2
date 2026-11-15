@@ -1,0 +1,28 @@
+// Walk right, do a short and a long jump, then drop the box.
+seed 1
+items off
+map ascii
+####################
+#..................#
+#..................#
+#..................#
+#..................#
+#S.................#
+####################
+end
+
+30                  // settle on the floor
+snap start
+20 right
+1 right jump        // short jump: tap
+30 right
+snap after_short_jump
+30                  // land before the next jump
+1 jump              // long jump: hold for 15 ticks
+14 jump
+20
+snap long_jump_falling
+40
+1 down swing        // drop the box
+10
+snap dropped_box
