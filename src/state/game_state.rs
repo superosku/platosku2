@@ -11,7 +11,7 @@ use crate::state::update_ctx::{GameRng, UpdateCtx};
 use rand::{Rng, SeedableRng};
 use std::collections::HashSet;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct InputState {
     pub left: bool,
     pub right: bool,
@@ -113,6 +113,7 @@ pub struct Game {
 const ROOM_TRANSITION_FRAMES: i32 = 30;
 
 /// How the map of a [`Game`] is created.
+#[derive(Clone)]
 pub enum MapSetup {
     /// Random map from the rooms in the `rooms/` folder (the normal game).
     RandomFromFolder,
@@ -123,6 +124,7 @@ pub enum MapSetup {
 }
 
 /// See [`Game::builder`].
+#[derive(Clone)]
 pub struct GameBuilder {
     seed: u64,
     map: MapSetup,

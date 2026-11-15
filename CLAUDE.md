@@ -79,21 +79,30 @@ Game logic must give identical results for the same seed and inputs, on every pl
 - **No wall-clock time** in game logic. Count ticks.
 
 ## Testing
+Four kinds of tests, all headless and run in CI by `cargo test --all-targets`:
+
 - **Unit tests** live next to the code (`#[cfg(test)] mod tests`).
-- **E2E tests** live in `tests/` and use the headless `Sim` harness (`src/sim.rs`):
+- **Gameplay tests** (`tests/gameplay/`): the whole game simulated tick by tick with scripted input through `Sim` (`src/sim.rs`).
   ```rust
-  let mut sim = sim_in(&["#####", "#S..#", "#####"]);   // tests/common/mod.rs
+  let mut sim = sim_in(&["#####", "#S..#", "#####"]);   // tests/gameplay/common.rs
   sim.press(Key::Right).run(30);            // 1 tick = 1/60 s
   sim.tap(Key::Jump);                       // press for exactly one tick
   sim.run_until(120, |g| g.player.is_on_ground());
   assert!(sim.sounds().contains(&Sound::Jump));
   ```
-  - `tests/content.rs`: every room in `rooms/` is valid, and map generation works for 200 seeds. Run it after editing rooms.
-  - `tests/player.rs`: movement (walk, jump heights, coyote time, ladders, platforms, ledge hang).
-  - `tests/interactions.rs`: enemies, items, doors and rooms.
-- Measure before asserting: write a throwaway probe test that prints values (`cargo test --test probe -- --nocapture`), then pick thresholds from real numbers. Delete the probe afterwards.
-- A test for a known, not-yet-fixed bug gets `#[ignore = "known bug: ..."]`. Run them with `cargo test -- --ignored`.
-- `tests/scripts.rs` runs every script in `scripts/`.
+  - `player.rs`: movement (walk, jump heights, coyote time, ladders, platforms, ledge hang). `interactions.rs`: enemies, items, doors and rooms.
+  - **Custom harness** (`harness = false`, `tests/gameplay/main.rs`, using `libtest-mimic`). Tests are plain `fn`s with no `#[test]`; **register each new test in its module's `tests()` list** (an unlisted one is dead code and fails clippy). New modules go in `all_tests()` in `main.rs`.
+  - Create sims with `Sim::from_builder(..)` (as `sim_in` does) and change the game **only through input**. Every sim is recorded and replayed after the test; if the replay ends elsewhere, the test fails. That keeps the game deterministic and makes `--watch` exact.
+  - `#[ignore]` doesn't apply here. For a known, not-yet-fixed gameplay bug, leave the test out of `tests()` with a `// known bug: ...` comment and `#[allow(dead_code)]`.
+  - Filter by name: `cargo test --test gameplay -- ledge`.
+  - **Watch them:** `cargo test --test gameplay -- --watch [filter] [--speed N]` runs the tests, then replays them in a window (default 4x; Space pause, `.` step, `+`/`-` speed, R restart, N/P next/previous, Esc quit). Failed tests stop at the failure and show the message. This is for the user; it needs a display.
+  - Test output isn't captured by this harness, so map-generation `println!`s show up in the output.
+- **Content tests** (`tests/content.rs`): every room in `rooms/` is valid, and map generation works for 200 seeds. Run them after editing rooms.
+- **Script tests** (`tests/scripts.rs`): every script in `scripts/` parses and runs.
+
+Tips:
+- Measure before asserting: write a throwaway probe test that prints values, then pick thresholds from real numbers. Delete the probe afterwards.
+- For unit tests, a known, not-yet-fixed bug gets `#[ignore = "known bug: ..."]` (run them with `cargo test -- --ignored`).
 - The game logic runs headless. Only `Renderer::new()` needs a window.
 
 ### Input scripts (`src/script.rs`, `scripts/*.txt`)

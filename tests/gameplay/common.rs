@@ -1,5 +1,5 @@
-//! Shared helpers for the e2e tests.
-#![allow(dead_code)] // Not every test file uses every helper.
+//! Shared helpers for the gameplay tests.
+#![allow(dead_code)] // Not every helper is used.
 
 use platosku2::sim::Sim;
 use platosku2::state::game_state::Game;
@@ -13,12 +13,11 @@ pub fn sim_in(rows: &[&str]) -> Sim {
 
 pub fn sim_in_seeded(rows: &[&str], seed: u64) -> Sim {
     let room = Room::from_ascii(0, 0, rows);
-    Sim::new(
+    Sim::from_builder(
         Game::builder()
             .seed(seed)
             .single_room(room)
-            .random_items(false)
-            .build(),
+            .random_items(false),
     )
 }
 

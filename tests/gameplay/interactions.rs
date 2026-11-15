@@ -1,7 +1,6 @@
 //! End-to-end tests for interactions between the player, enemies, items and rooms.
 
-mod common;
-use common::*;
+use crate::common::*;
 use platosku2::sim::{Key, Sim};
 use platosku2::sound_handler::Sound;
 use platosku2::state::game_state::{Game, MapSetup};
@@ -13,7 +12,6 @@ fn slime_health(sim: &Sim) -> u32 {
     sim.game.enemies[0].get_health().current
 }
 
-#[test]
 fn touching_a_slime_hurts_and_gives_immunity_frames() {
     let mut sim = sim_in(&["##########", "#........#", "#S....s..#", "##########"]);
     assert_eq!(sim.player().health.current, 4);
@@ -34,7 +32,6 @@ fn touching_a_slime_hurts_and_gives_immunity_frames() {
     assert_eq!(sim.player().health.current, 3);
 }
 
-#[test]
 fn stomping_a_slime_damages_it_and_bounces_the_player() {
     let mut sim = sim_in(&[
         "#######", //
@@ -55,7 +52,6 @@ fn stomping_a_slime_damages_it_and_bounces_the_player() {
     assert!(sounds.contains(&Sound::EnemyHit) && sounds.contains(&Sound::Clink));
 }
 
-#[test]
 fn stomping_a_slime_twice_kills_it() {
     let mut sim = sim_in(&[
         "#######", //
@@ -78,7 +74,6 @@ const BOX_ROOM: &[&str] = &[
     "##########", //
 ];
 
-#[test]
 fn the_player_starts_with_a_box_and_can_throw_it() {
     let mut sim = sim_in(BOX_ROOM);
     sim.run(30);
@@ -104,7 +99,6 @@ fn the_player_starts_with_a_box_and_can_throw_it() {
     );
 }
 
-#[test]
 fn dropping_and_picking_up_the_box() {
     let mut sim = sim_in(BOX_ROOM);
     sim.run(30);
@@ -124,7 +118,6 @@ fn dropping_and_picking_up_the_box() {
     assert!(sim.game.items.is_empty());
 }
 
-#[test]
 fn swinging_at_a_box_breaks_it_into_coins_that_can_be_collected() {
     let mut sim = sim_in(BOX_ROOM);
     sim.run(30);
@@ -184,15 +177,15 @@ fn two_room_game(room_b: &[&str]) -> Sim {
         ],
     );
     let b = Room::from_ascii(0, 0, room_b);
-    let game = Game::builder()
-        .map(MapSetup::Random(vec![a, b]))
-        .random_items(false)
-        .build();
-    assert_eq!(game.map.rooms.len(), 2, "the two rooms should connect");
-    Sim::new(game)
+    let sim = Sim::from_builder(
+        Game::builder()
+            .map(MapSetup::Random(vec![a, b]))
+            .random_items(false),
+    );
+    assert_eq!(sim.game.map.rooms.len(), 2, "the two rooms should connect");
+    sim
 }
 
-#[test]
 fn walking_through_a_door_changes_the_room() {
     let mut sim = two_room_game(&[
         "########", //
@@ -213,7 +206,6 @@ fn walking_through_a_door_changes_the_room() {
     assert!(sim.game.visited_rooms.contains(&0) && sim.game.visited_rooms.contains(&1));
 }
 
-#[test]
 fn enemies_in_other_rooms_are_frozen() {
     let mut sim = two_room_game(&[
         "########", //
@@ -233,4 +225,18 @@ fn enemies_in_other_rooms_are_frozen() {
     sim.release(Key::Right).run(30);
     let bat_later = *sim.game.enemies[0].bb();
     assert_ne!((bat_start.x, bat_start.y), (bat_later.x, bat_later.y));
+}
+
+/// The tests in this file, registered with the harness in main.rs.
+pub fn tests() -> Vec<(&'static str, fn())> {
+    crate::tests![
+        touching_a_slime_hurts_and_gives_immunity_frames,
+        stomping_a_slime_damages_it_and_bounces_the_player,
+        stomping_a_slime_twice_kills_it,
+        the_player_starts_with_a_box_and_can_throw_it,
+        dropping_and_picking_up_the_box,
+        swinging_at_a_box_breaks_it_into_coins_that_can_be_collected,
+        walking_through_a_door_changes_the_room,
+        enemies_in_other_rooms_are_frozen,
+    ]
 }

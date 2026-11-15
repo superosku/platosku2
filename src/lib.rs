@@ -12,3 +12,4 @@ pub mod script;
 pub mod sim;
 pub mod sound_handler;
 pub mod state;
+pub mod watch;

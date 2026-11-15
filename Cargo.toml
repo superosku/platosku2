@@ -15,3 +15,13 @@ quad-snd = "0.2.8"
 egui_extras = { version = "0.31.1", features = ["all_loaders"] }
 rand_chacha = "0.9"
 libm = "0.2"
+
+[dev-dependencies]
+libtest-mimic = "0.8.2"
+
+# Gameplay tests have their own main so `-- --watch` can open a window
+# (see tests/gameplay/main.rs).
+[[test]]
+name = "gameplay"
+path = "tests/gameplay/main.rs"
+harness = false

@@ -19,7 +19,7 @@
 //! ```
 
 use crate::sound_handler::{RecordingSound, Sound};
-use crate::state::game_state::Game;
+use crate::state::game_state::{Game, GameBuilder};
 use crate::state::player::Player;
 use crate::state::{GameState, InputState};
 
@@ -36,21 +36,75 @@ pub enum Key {
     Swing,
 }
 
+/// Everything needed to replay a simulation exactly: the game setup and the
+/// input of every tick. The game is deterministic, so replaying gives the same
+/// run, frame for frame.
+#[derive(Clone)]
+pub struct Recording {
+    pub setup: GameBuilder,
+    /// The input for each tick, in order.
+    pub inputs: Vec<InputState>,
+    /// The player's position at the end, to check that a replay matched.
+    pub final_player_pos: (f32, f32),
+}
+
+thread_local! {
+    static RECORDING_ENABLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FINISHED_RECORDINGS: std::cell::RefCell<Vec<Recording>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Turns recording on or off for sims created on this thread from now on. A
+/// recorded sim keeps its setup and inputs, and hands them over when it is
+/// dropped (also when a test panics), see [`take_recordings`].
+pub fn set_recording(enabled: bool) {
+    RECORDING_ENABLED.with(|r| r.set(enabled));
+}
+
+/// Returns (and clears) the recordings of sims dropped on this thread.
+pub fn take_recordings() -> Vec<Recording> {
+    FINISHED_RECORDINGS.with(|r| std::mem::take(&mut *r.borrow_mut()))
+}
+
 pub struct Sim {
     pub game: Game,
     input: InputState,
     sound: RecordingSound,
     tick: u64,
+    recording: Option<Recording>,
 }
 
 impl Sim {
+    /// A sim for an already built game. It can't be recorded, because the setup
+    /// is unknown; prefer [`Sim::from_builder`].
     pub fn new(game: Game) -> Sim {
         Sim {
             game,
             input: InputState::default(),
             sound: RecordingSound::default(),
             tick: 0,
+            recording: None,
         }
+    }
+
+    /// A sim for the game described by `setup`. Recorded if recording is
+    /// enabled on this thread (see [`set_recording`]).
+    pub fn from_builder(setup: GameBuilder) -> Sim {
+        let mut sim = Sim::new(setup.clone().build());
+        if RECORDING_ENABLED.with(|r| r.get()) {
+            sim.recording = Some(Recording {
+                setup,
+                inputs: Vec::new(),
+                final_player_pos: (0.0, 0.0),
+            });
+        }
+        sim
+    }
+
+    /// Sets the whole input state for the next tick (used for replays).
+    pub fn set_input(&mut self, input: InputState) -> &mut Self {
+        self.input = input;
+        self
     }
 
     /// Key down. Jump and Swing also register a "pressed" edge for the next tick,
@@ -138,6 +192,9 @@ impl Sim {
     }
 
     fn step(&mut self) {
+        if let Some(recording) = &mut self.recording {
+            recording.inputs.push(self.input.clone());
+        }
         self.game.update(&self.input, &self.sound);
         // Same as the game loop in main.rs: "pressed" edges last a single tick.
         self.input.jump_pressed = false;
@@ -162,5 +219,27 @@ impl Sim {
     pub fn clear_sounds(&mut self) -> &mut Self {
         self.sound.clear();
         self
+    }
+}
+
+impl Drop for Sim {
+    fn drop(&mut self) {
+        if let Some(mut recording) = self.recording.take() {
+            recording.final_player_pos = (self.game.player.bb.x, self.game.player.bb.y);
+            FINISHED_RECORDINGS.with(|r| r.borrow_mut().push(recording));
+        }
+    }
+}
+
+impl Recording {
+    /// Replays the recording in a new sim; `on_tick` is called after every tick.
+    /// Returns the sim at the end.
+    pub fn replay(&self, mut on_tick: impl FnMut(&Sim)) -> Sim {
+        let mut sim = Sim::new(self.setup.clone().build());
+        for input in &self.inputs {
+            sim.set_input(input.clone()).step();
+            on_tick(&sim);
+        }
+        sim
     }
 }

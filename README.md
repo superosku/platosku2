@@ -37,13 +37,16 @@ This is my platformer game (prototype) written in rust.
 ## Testing and tools
 
 ```
-cargo test --all-targets                                     # unit + e2e tests (headless, run in CI)
+cargo test --all-targets                                     # all tests (headless, run in CI)
+cargo test --test gameplay -- --watch [filter] [--speed N]   # watch the gameplay tests in a window
 cargo run --example run_script -- scripts/jump_demo.txt      # run an input script, print game state
 cargo run --example capture -- scripts/jump_demo.txt         # run an input script, save screenshots
 cargo run --example sprite_sheet -- character                # enlarged sprite frames as a PNG
 ```
 
-E2E tests drive the game headlessly with a `Sim` (`src/sim.rs`), and input scripts
+There are unit tests (in `src/`), gameplay tests (`tests/gameplay/`, the whole game simulated
+tick by tick with scripted input through a `Sim`, see `src/sim.rs`), content tests for the rooms
+(`tests/content.rs`) and script tests (`tests/scripts.rs`). Input scripts
 (`scripts/*.txt`, format in `src/script.rs`) can be played back both headlessly and with
 screenshots. Output goes to `target/claude/`. The game prints its random seed at startup
 (`Game seed: N`), and `Game::new_with_seed(N)` reproduces that run. See `CLAUDE.md` for details.

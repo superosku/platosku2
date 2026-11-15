@@ -1,8 +1,7 @@
 //! End-to-end tests for player movement: walking, jumping, coyote time,
 //! ladders, one-way platforms and ledge hanging.
 
-mod common;
-use common::*;
+use crate::common::*;
 use platosku2::sim::{Key, Sim};
 use platosku2::sound_handler::Sound;
 use platosku2::state::player::PlayerState;
@@ -37,14 +36,12 @@ fn jump_height(sim: &mut Sim, hold_ticks: u32) -> f32 {
     start - min_y
 }
 
-#[test]
 fn player_settles_on_floor() {
     let sim = standing_in_flat_room();
     assert!((feet(&sim) - 6.0).abs() < 0.001, "feet at {}", feet(&sim));
     assert_eq!(sim.player().bb.vy, 0.0);
 }
 
-#[test]
 fn walking_accelerates_to_max_speed_and_stops_with_friction() {
     let mut sim = standing_in_flat_room();
     let x0 = sim.player().bb.x;
@@ -60,7 +57,6 @@ fn walking_accelerates_to_max_speed_and_stops_with_friction() {
     assert_eq!(sim.player().bb.vx, 0.0, "friction should stop the player");
 }
 
-#[test]
 fn walking_into_a_wall_stops_at_the_wall() {
     let mut sim = standing_in_flat_room();
     sim.press(Key::Left).run(60);
@@ -69,7 +65,6 @@ fn walking_into_a_wall_stops_at_the_wall() {
     assert!((1.0..1.01).contains(&x), "x = {x}");
 }
 
-#[test]
 fn tapping_jump_gives_a_low_jump_and_holding_a_high_one() {
     let mut sim = standing_in_flat_room();
     let tap = jump_height(&mut sim, 1);
@@ -79,7 +74,6 @@ fn tapping_jump_gives_a_low_jump_and_holding_a_high_one() {
     assert!((2.1..2.4).contains(&held), "held jump height {held}");
 }
 
-#[test]
 fn jump_plays_sound_and_lands_again() {
     let mut sim = standing_in_flat_room();
     sim.clear_sounds();
@@ -91,7 +85,6 @@ fn jump_plays_sound_and_lands_again() {
     assert!(landed.is_some(), "player should land");
 }
 
-#[test]
 fn holding_jump_does_not_jump_again_after_landing() {
     let mut sim = standing_in_flat_room();
     sim.press(Key::Jump).run(120);
@@ -126,7 +119,6 @@ fn just_walked_off_ledge() -> Sim {
     sim
 }
 
-#[test]
 fn holding_jump_while_walking_off_a_ledge_does_not_launch_upwards() {
     let mut sim = sim_in(LEDGE);
     sim.run(30).press(Key::Jump).run(60);
@@ -137,7 +129,6 @@ fn holding_jump_while_walking_off_a_ledge_does_not_launch_upwards() {
     assert!(sim.player().bb.vy > 0.0, "should fall, not rise");
 }
 
-#[test]
 fn coyote_time_allows_jumping_just_after_leaving_a_ledge() {
     let mut sim = just_walked_off_ledge();
     sim.run(2).tap(Key::Jump);
@@ -145,7 +136,6 @@ fn coyote_time_allows_jumping_just_after_leaving_a_ledge() {
     assert!(sim.sounds().contains(&Sound::Jump));
 }
 
-#[test]
 fn no_jump_long_after_leaving_a_ledge() {
     let mut sim = just_walked_off_ledge();
     sim.run(8).clear_sounds().tap(Key::Jump);
@@ -170,7 +160,6 @@ fn at_ladder_bottom() -> Sim {
     sim
 }
 
-#[test]
 fn climbing_a_ladder_up_and_down() {
     let mut sim = at_ladder_bottom();
     let start_y = sim.player().bb.y;
@@ -203,7 +192,6 @@ fn climbing_a_ladder_up_and_down() {
     );
 }
 
-#[test]
 fn jumping_off_a_ladder() {
     let mut sim = at_ladder_bottom();
     sim.press(Key::Up).run(30).release(Key::Up);
@@ -216,7 +204,6 @@ const PLATFORM: &[&str] = &[
     "#######", "#.....#", "#..S..#", "#-----#", "#.....#", "#######",
 ];
 
-#[test]
 fn standing_on_a_one_way_platform() {
     let mut sim = sim_in(PLATFORM);
     sim.run(60);
@@ -224,7 +211,6 @@ fn standing_on_a_one_way_platform() {
     assert!((feet(&sim) - 3.0).abs() < 0.01, "feet {}", feet(&sim));
 }
 
-#[test]
 fn jumping_up_through_a_platform_from_below() {
     let mut sim = sim_in(PLATFORM);
     sim.run(30)
@@ -244,7 +230,6 @@ fn jumping_up_through_a_platform_from_below() {
     );
 }
 
-#[test]
 fn down_and_jump_drops_through_a_platform() {
     let mut sim = sim_in(PLATFORM);
     sim.run(30).clear_sounds();
@@ -269,7 +254,6 @@ const LEDGE_WALL: &[&str] = &[
     "#########",
 ];
 
-#[test]
 fn grabbing_a_ledge_and_jumping_up_from_it() {
     let mut sim = sim_in(LEDGE_WALL);
     sim.run(30).press(Key::Right);
@@ -292,4 +276,25 @@ fn grabbing_a_ledge_and_jumping_up_from_it() {
     sim.clear_sounds().tap(Key::Jump);
     assert!(matches!(sim.player().state(), PlayerState::Normal));
     assert!(sim.sounds().contains(&Sound::Jump));
+}
+
+/// The tests in this file, registered with the harness in main.rs.
+pub fn tests() -> Vec<(&'static str, fn())> {
+    crate::tests![
+        player_settles_on_floor,
+        walking_accelerates_to_max_speed_and_stops_with_friction,
+        walking_into_a_wall_stops_at_the_wall,
+        tapping_jump_gives_a_low_jump_and_holding_a_high_one,
+        jump_plays_sound_and_lands_again,
+        holding_jump_does_not_jump_again_after_landing,
+        holding_jump_while_walking_off_a_ledge_does_not_launch_upwards,
+        coyote_time_allows_jumping_just_after_leaving_a_ledge,
+        no_jump_long_after_leaving_a_ledge,
+        climbing_a_ladder_up_and_down,
+        jumping_off_a_ladder,
+        standing_on_a_one_way_platform,
+        jumping_up_through_a_platform_from_below,
+        down_and_jump_drops_through_a_platform,
+        grabbing_a_ledge_and_jumping_up_from_it,
+    ]
 }
