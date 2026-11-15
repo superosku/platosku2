@@ -1254,6 +1254,7 @@ dependencies = [
  "egui-miniquad",
  "egui_extras",
  "glam",
+ "hound",
  "image",
  "libm",
  "libtest-mimic",

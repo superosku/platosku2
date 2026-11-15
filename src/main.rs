@@ -86,6 +86,7 @@ impl EventHandler for Stage {
 
         while self.accumulator >= dt {
             self.state.update(&self.input, &self.sound_handler); // HERE is the actual game call
+            self.sound_handler.end_tick();
             self.state
                 .update_camera(&mut self.camera, !self.debug_menu.zoom_show_full); // HERE is the actual game call
             self.updates += 1;

@@ -90,4 +90,7 @@ aseprite assets/sprites/*.aseprite --sheet-pack --sheet assets/atlas.png --data 
 
 ## Sounds
 
-Run `sh make_sound_variants.sh` to generate different pitch and DB versions of the sounds.
+Sounds are loaded from `assets/sounds/src/*.wav` at startup. Each one is resampled into a few
+slightly different pitches in memory (no build step or ffmpeg needed) and played at a slightly
+random volume. The pitch and volume ranges per sound are in `Sound::variation` (`src/sound_handler.rs`).
+If the same sound is requested more than once in a tick, the extra ones are delayed a few ticks.

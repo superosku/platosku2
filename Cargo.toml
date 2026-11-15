@@ -16,6 +16,7 @@ egui_extras = { version = "0.31.1", features = ["all_loaders"] }
 rand_chacha = "0.9"
 libm = "0.2"
 glam = "0.30"
+hound = "3.5"
 
 [dev-dependencies]
 libtest-mimic = "0.8.2"
