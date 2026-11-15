@@ -129,11 +129,22 @@ fn holding_jump_while_walking_off_a_ledge_does_not_launch_upwards() {
     assert!(sim.player().bb.vy > 0.0, "should fall, not rise");
 }
 
+/// Coyote time: jumping still works this many ticks after the first tick in
+/// the air (`safe_edge_frames` in player.rs).
+const COYOTE_TICKS: u32 = 2;
+
 fn coyote_time_allows_jumping_just_after_leaving_a_ledge() {
     let mut sim = just_walked_off_ledge();
-    sim.run(2).tap(Key::Jump);
+    sim.run(COYOTE_TICKS).tap(Key::Jump);
     assert!(sim.player().bb.vy < 0.0, "late jump should still work");
     assert!(sim.sounds().contains(&Sound::Jump));
+}
+
+fn coyote_time_ends_exactly_one_tick_later() {
+    let mut sim = just_walked_off_ledge();
+    sim.run(COYOTE_TICKS + 1).clear_sounds().tap(Key::Jump);
+    assert!(sim.player().bb.vy > 0.0, "coyote time is over, should fall");
+    assert!(!sim.sounds().contains(&Sound::Jump));
 }
 
 fn no_jump_long_after_leaving_a_ledge() {
@@ -196,8 +207,89 @@ fn jumping_off_a_ladder() {
     let mut sim = at_ladder_bottom();
     sim.press(Key::Up).run(30).release(Key::Up);
     assert!(matches!(sim.player().state(), PlayerState::OnLadder));
-    sim.tap(Key::Jump);
+    sim.clear_sounds().tap(Key::Jump);
     assert!(matches!(sim.player().state(), PlayerState::Normal));
+    assert!(sim.sounds().contains(&Sound::Jump));
+    sim.run(1);
+    assert!(sim.player().bb.vy < 0.0, "should move up after jumping");
+}
+
+const TALL_LADDER: &[&str] = &[
+    "######################",
+    "#....................#",
+    "#..H.................#",
+    "#..H.................#",
+    "#..H.................#",
+    "#..H.................#",
+    "#..H.................#",
+    "#..H.................#",
+    "#.SH.................#",
+    "######################",
+];
+
+/// Climbs the tall ladder for a while and returns the sim, on the ladder.
+fn on_tall_ladder() -> Sim {
+    let mut sim = sim_in(TALL_LADDER);
+    sim.run(30).press(Key::Right);
+    sim.run_until(60, |g| {
+        let center = g.player.bb.x + g.player.bb.w * 0.5;
+        (3.2..3.8).contains(&center)
+    })
+    .expect("never reached the ladder");
+    sim.release(Key::Right)
+        .run(5)
+        .press(Key::Up)
+        .run(50)
+        .release(Key::Up);
+    assert!(matches!(sim.player().state(), PlayerState::OnLadder));
+    sim
+}
+
+/// Jumps off the ladder (holding `direction` if given) and returns
+/// (height risen, horizontal distance when back at the starting height).
+fn ladder_jump(direction: Option<Key>) -> (f32, f32) {
+    let mut sim = on_tall_ladder();
+    let (x0, y0) = (sim.player().bb.x, sim.player().bb.y);
+    if let Some(key) = direction {
+        sim.press(key);
+    }
+    let mut min_y = y0;
+    let mut reach = None;
+    let mut prev_y = y0;
+    sim.tap(Key::Jump).run_observing(120, |g| {
+        let y = g.player.bb.y;
+        min_y = min_y.min(y);
+        if reach.is_none() && prev_y < y0 && y >= y0 {
+            reach = Some(g.player.bb.x - x0);
+        }
+        prev_y = y;
+    });
+    (
+        y0 - min_y,
+        reach.expect("never came back down to the starting height"),
+    )
+}
+
+fn jumping_off_a_ladder_height_and_reach() {
+    let (rise, reach) = ladder_jump(None);
+    assert!(
+        (0.95..1.05).contains(&rise),
+        "ladder jump rose {rise} tiles"
+    );
+    assert!(
+        reach.abs() < 0.01,
+        "a straight jump comes down where it started, moved {reach}"
+    );
+
+    let (rise, reach) = ladder_jump(Some(Key::Right));
+    assert!(
+        (0.95..1.05).contains(&rise),
+        "ladder jump rose {rise} tiles"
+    );
+    assert!(
+        (1.9..2.2).contains(&reach),
+        "ladder jump reached {reach} tiles to the right"
+    );
 }
 
 const PLATFORM: &[&str] = &[
@@ -278,6 +370,169 @@ fn grabbing_a_ledge_and_jumping_up_from_it() {
     assert!(sim.sounds().contains(&Sound::Jump));
 }
 
+/// Walks to the right wall of `LEDGE_WALL` and jumps up along it holding
+/// right, until the player hangs on the ledge. Right is still held.
+fn hang_on_ledge() -> Sim {
+    let mut sim = sim_in(LEDGE_WALL);
+    sim.run(30).press(Key::Right);
+    sim.run_until(120, |g| g.player.bb.x + g.player.bb.w > 5.99)
+        .expect("never reached the wall");
+    sim.press(Key::Jump).run(15).release(Key::Jump);
+    sim.run_until(120, |g| {
+        matches!(g.player.state(), PlayerState::Hanging { .. })
+    })
+    .expect("never grabbed the ledge");
+    sim.run(1);
+    sim
+}
+
+const LEDGE_WALL_LEFT: &[&str] = &[
+    "#########",
+    "#.......#",
+    "#.......#",
+    "###.....#",
+    "###.....#",
+    "###....S#",
+    "#########",
+];
+
+fn grabbing_a_ledge_on_the_left() {
+    let mut sim = sim_in(LEDGE_WALL_LEFT);
+    sim.run(30).press(Key::Left);
+    sim.run_until(120, |g| g.player.bb.x < 3.01)
+        .expect("never reached the wall");
+    sim.press(Key::Jump).run(15).release(Key::Jump);
+    sim.run_until(120, |g| {
+        matches!(g.player.state(), PlayerState::Hanging { .. })
+    })
+    .expect("never grabbed the ledge");
+    sim.run(1);
+    assert_eq!(sim.player().bb.y, 3.0);
+    // Snapped against the wall face at x = 3.
+    assert!(
+        (sim.player().bb.x - 3.0).abs() < 0.001,
+        "x = {}",
+        sim.player().bb.x
+    );
+}
+
+/// The player walks off a high platform holding right, falls, hits the wall
+/// below the ledge's top edge and slides down past it.
+const FALL_TO_LEDGE: &[&str] = &[
+    "##########",
+    "#........#",
+    "#S.......#",
+    "###......#",
+    "#........#",
+    "#........#",
+    "#........#",
+    "#........#",
+    "#.....####",
+    "#.....####",
+    "##########",
+];
+
+fn grabbing_a_ledge_while_falling_from_above() {
+    let mut sim = sim_in(FALL_TO_LEDGE);
+    sim.run(30).press(Key::Right);
+    sim.run_until(200, |g| {
+        matches!(g.player.state(), PlayerState::Hanging { .. })
+    })
+    .expect("never grabbed the ledge");
+    sim.run(1);
+    assert_eq!(sim.player().bb.y, 8.0);
+    let front = sim.player().bb.x + sim.player().bb.w;
+    assert!((front - 6.0).abs() < 0.001, "front at {front}");
+}
+
+/// Jumps up along the wall of `LEDGE_WALL` holding right, lets go of right at
+/// the top of the jump, and returns the sim just before the head passes the
+/// ledge's top edge (y = 3) on the way down.
+fn falling_along_the_wall_without_pressing() -> Sim {
+    let mut sim = sim_in(LEDGE_WALL);
+    sim.run(30).press(Key::Right);
+    sim.run_until(120, |g| g.player.bb.x + g.player.bb.w > 5.99)
+        .expect("never reached the wall");
+    sim.press(Key::Jump).run(15).release(Key::Jump);
+    sim.run_until(60, |g| g.player.bb.vy >= 0.0)
+        .expect("never reached the top of the jump");
+    sim.release(Key::Right);
+    sim.run_until(30, |g| g.player.bb.y > 2.97)
+        .expect("never came down to the ledge");
+    assert!(sim.player().bb.y < 3.0, "already past the ledge");
+    sim
+}
+
+fn grabbing_a_ledge_by_pressing_towards_the_wall_at_the_last_moment() {
+    let mut sim = falling_along_the_wall_without_pressing();
+    sim.press(Key::Right);
+    sim.run_until(5, |g| {
+        matches!(g.player.state(), PlayerState::Hanging { .. })
+    })
+    .expect("a last-moment press should still grab the ledge");
+}
+
+fn falling_past_a_ledge_without_pressing_towards_it_does_not_grab() {
+    let mut sim = falling_along_the_wall_without_pressing();
+    let hung = sim.run_until(120, |g| {
+        matches!(g.player.state(), PlayerState::Hanging { .. })
+    });
+    assert!(
+        hung.is_none(),
+        "grabbed the ledge without pressing towards it"
+    );
+    assert!(sim.player().is_on_ground());
+    assert!((feet(&sim) - 6.0).abs() < 0.01, "should land on the floor");
+}
+
+fn jumping_from_a_ledge_rises_about_one_tile() {
+    let mut sim = hang_on_ledge();
+    sim.release(Key::Right).run(5);
+    let y0 = sim.player().bb.y;
+    let mut min_y = y0;
+    sim.tap(Key::Jump)
+        .run_observing(90, |g| min_y = min_y.min(g.player.bb.y));
+    let rise = y0 - min_y;
+    assert!((0.9..1.05).contains(&rise), "ledge jump rose {rise} tiles");
+    // Without pressing towards the wall, the player falls back down to the floor.
+    assert!((feet(&sim) - 6.0).abs() < 0.01, "feet {}", feet(&sim));
+}
+
+fn jumping_from_a_ledge_towards_the_wall_climbs_onto_it() {
+    let mut sim = hang_on_ledge();
+    // Right is still held from grabbing the ledge.
+    sim.tap(Key::Jump).run(90);
+    assert!(sim.player().is_on_ground());
+    assert!(
+        (feet(&sim) - 3.0).abs() < 0.01,
+        "should stand on the ledge, feet {}",
+        feet(&sim)
+    );
+    assert!(
+        sim.player().bb.x > 6.0,
+        "should be on top of the wall, x {}",
+        sim.player().bb.x
+    );
+}
+
+fn down_and_jump_lets_go_of_a_ledge() {
+    let mut sim = hang_on_ledge();
+    sim.release(Key::Right).run(5).clear_sounds();
+    sim.press(Key::Down).tap(Key::Jump).release(Key::Down);
+    assert!(matches!(sim.player().state(), PlayerState::Normal));
+    assert!(sim.player().bb.vy >= 0.0, "letting go is not a jump");
+    sim.run(60);
+    assert!(
+        (feet(&sim) - 6.0).abs() < 0.01,
+        "should drop to the floor, feet {}",
+        feet(&sim)
+    );
+    assert!(
+        !sim.sounds().contains(&Sound::Jump),
+        "letting go makes no jump sound"
+    );
+}
+
 /// The tests in this file, registered with the harness in main.rs.
 pub fn tests() -> Vec<(&'static str, fn())> {
     crate::tests![
@@ -289,12 +544,21 @@ pub fn tests() -> Vec<(&'static str, fn())> {
         holding_jump_does_not_jump_again_after_landing,
         holding_jump_while_walking_off_a_ledge_does_not_launch_upwards,
         coyote_time_allows_jumping_just_after_leaving_a_ledge,
+        coyote_time_ends_exactly_one_tick_later,
         no_jump_long_after_leaving_a_ledge,
         climbing_a_ladder_up_and_down,
         jumping_off_a_ladder,
+        jumping_off_a_ladder_height_and_reach,
         standing_on_a_one_way_platform,
         jumping_up_through_a_platform_from_below,
         down_and_jump_drops_through_a_platform,
         grabbing_a_ledge_and_jumping_up_from_it,
+        grabbing_a_ledge_on_the_left,
+        grabbing_a_ledge_while_falling_from_above,
+        grabbing_a_ledge_by_pressing_towards_the_wall_at_the_last_moment,
+        falling_past_a_ledge_without_pressing_towards_it_does_not_grab,
+        jumping_from_a_ledge_rises_about_one_tile,
+        jumping_from_a_ledge_towards_the_wall_climbs_onto_it,
+        down_and_jump_lets_go_of_a_ledge,
     ]
 }
