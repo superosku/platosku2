@@ -13,7 +13,7 @@ This is my platformer game (prototype) written in rust.
    * [x] Hitpoints and taking damage (health bar, immunity frames)
    * [ ] Dying properly (the player falls over, but there is no game over / restart yet)
  * Boxes/Crates that are breakable
-   * [x] Break by swinging, drop coins
+   * [x] Break by swinging, drop coins (they pop out; quick pickups play rising notes)
    * [ ] Drop other loot
  * [x] Throwing things (carried items can be thrown, dropped and picked up)
  * [ ] Push blocks
