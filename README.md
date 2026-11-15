@@ -33,6 +33,11 @@ This is my platformer game (prototype) written in rust.
  * Optimizations
    * [x] All sprites use just one draw call
    * [ ] Less looping over things multiple times
+ * Rendering
+   * [ ] Pixel-perfect output: the camera zoom is a free, animated value, so pixel-art pixels are
+     rarely an integer scale and shimmer while moving or zooming. Render the world into a low-res
+     target (1 texel = 1 art pixel) and upscale it by an integer factor, maybe with a smooth
+     sub-pixel offset.
 
 ## Testing and tools
 
