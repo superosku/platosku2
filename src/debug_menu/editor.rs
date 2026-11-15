@@ -344,19 +344,13 @@ impl GameStateDebugMenu for Editor {
                 stage.all_rooms.sort_by(|a, b| a.0.cmp(&b.0));
             }
             if ui.add(egui::Button::new("Enemies")).clicked() {
-                stage
-                    .all_rooms
-                    .sort_by(|a, b| a.1.has_enemies().cmp(&b.1.has_enemies()));
+                stage.all_rooms.sort_by_key(|a| a.1.has_enemies());
             }
             if ui.add(egui::Button::new("InDoor")).clicked() {
-                stage
-                    .all_rooms
-                    .sort_by(|a, b| a.1.has_start_door().cmp(&b.1.has_start_door()));
+                stage.all_rooms.sort_by_key(|a| a.1.has_start_door());
             }
             if ui.add(egui::Button::new("Active")).clicked() {
-                stage
-                    .all_rooms
-                    .sort_by(|a, b| a.1.disabled.cmp(&b.1.disabled));
+                stage.all_rooms.sort_by_key(|a| a.1.disabled);
             }
         });
 

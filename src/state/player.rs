@@ -178,10 +178,7 @@ impl Player {
     }
 
     pub fn check_if_could_stomp(&mut self, other_bb: &BoundingBox) -> bool {
-        if self.bb.vy > 0.0 && (self.bb.y + self.bb.h) - other_bb.y < self.bb.vy * 2.0 {
-            return true;
-        }
-        false
+        self.bb.vy > 0.0 && (self.bb.y + self.bb.h) - other_bb.y < self.bb.vy * 2.0
     }
 
     pub fn apply_stomping(&mut self, other_top_y: f32) {

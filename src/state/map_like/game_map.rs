@@ -149,9 +149,7 @@ impl GameMap {
     }
 
     pub fn get_room_at(&self, x: f32, y: f32) -> Option<(usize, &Room)> {
-        for room_index in 0..self.rooms.len() {
-            let room = &self.rooms[room_index];
-
+        for (room_index, room) in self.rooms.iter().enumerate() {
             let cent = room.get_relative(x.floor() as i32, y.floor() as i32);
             let a = room.get_relative((x - 0.5).floor() as i32, y.floor() as i32);
             let b = room.get_relative((x + 0.5).floor() as i32, y.floor() as i32);
@@ -505,8 +503,7 @@ impl MapLike for GameMap {
     }
 
     fn get_room_at_i(&self, x: i32, y: i32) -> Option<(usize, &Room)> {
-        for room_index in 0..self.rooms.len() {
-            let room = &self.rooms[room_index];
+        for (room_index, room) in self.rooms.iter().enumerate() {
             if let Some((base, _)) = room.get_relative(x, y)
                 && base != BaseTile::NotPartOfRoom
             {
