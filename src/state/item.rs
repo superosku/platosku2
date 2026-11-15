@@ -21,7 +21,7 @@ pub enum ItemType {
 
 /// The first coin from a broken box can be collected this many ticks after it
 /// spawns (not before), so the coins visibly pop out first.
-pub const SPAWNED_COIN_PICKUP_DELAY: u32 = 20;
+pub const SPAWNED_COIN_PICKUP_DELAY: u32 = 8;
 
 /// Each further coin from the same box becomes collectable this many ticks
 /// after the previous one, so coins that land on the player are collected one

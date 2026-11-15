@@ -243,26 +243,30 @@ fn coins_collected_quickly_play_rising_notes() {
 }
 
 fn the_coin_streak_starts_over_after_a_pause() {
-    // With this seed, some coins are collected right away (a streak) and one
-    // lands out of reach.
-    let mut sim = sim_in_seeded(BOX_ROOM, 0);
-    let collected = break_box_and_record_collections(&mut sim, 120);
-    let streak: Vec<u32> = collected.iter().map(|c| c.1).collect();
-    assert!(streak.len() >= 2, "a streak first: {streak:?}");
-    assert_eq!(sim.game.items.len(), 1, "one coin left");
+    // Find a box where some coins are collected right away (a streak) and some
+    // land out of reach. Which seed does that depends on the tuning.
+    let (mut sim, streak, left) = (0..20)
+        .find_map(|seed| {
+            let mut sim = sim_in_seeded(BOX_ROOM, seed);
+            let collected = break_box_and_record_collections(&mut sim, 120);
+            let streak: Vec<u32> = collected.iter().map(|c| c.1).collect();
+            let left = sim.game.items.len();
+            (streak.len() >= 2 && left >= 1).then_some((sim, streak, left))
+        })
+        .expect("some seed should leave coins out of reach");
 
-    // Walk to the last coin, long after the streak ended.
+    // Walk to the nearest remaining coin, long after the streak ended.
     let key = if sim.game.items[0].bb().x > sim.player().bb.x {
         Key::Right
     } else {
         Key::Left
     };
     sim.press(key);
-    sim.run_until(120, |g| g.items.is_empty())
-        .expect("should reach the last coin");
-    let mut expected = streak;
-    expected.push(0);
-    assert_eq!(sim.notes(Sound::CollectCoin), expected);
+    sim.run_until(120, |g| g.items.len() < left)
+        .expect("should reach a remaining coin");
+    let notes = sim.notes(Sound::CollectCoin);
+    assert_eq!(notes[..streak.len()], streak[..]);
+    assert_eq!(notes[streak.len()], 0, "a new streak starts: {notes:?}");
 }
 
 fn coins_from_a_broken_box_pop_up_about_half_a_tile() {
