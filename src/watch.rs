@@ -137,6 +137,10 @@ impl Viewer {
         self.tick_accumulator = 0.0;
         self.end_reached_at = None;
         self.replay_mismatch = false;
+        // Play the first tick right away. Before it the game has no current room,
+        // so a frame drawn at tick 0 is all dark (and the camera isn't in place
+        // yet), which flickers between tests.
+        self.step();
     }
 
     fn step(&mut self) {
