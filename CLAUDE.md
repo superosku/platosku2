@@ -17,6 +17,14 @@ The game prints `Game seed: N` at startup, FPS and UPS every second, and a lot o
 
 Put temporary files (logs, screenshots, scripts) in `target/claude/`, which is gitignored.
 
+## Project layout
+- `src/main.rs`: the game binary (window, input, debug UI). Everything else is in the library (`src/lib.rs`), so tests and tools can use it.
+- `src/state/`: game logic (player, enemies, items, map, rooms). Must stay deterministic and free of rendering (see Determinism).
+- `src/physics.rs`, `src/render.rs`, `src/minimap.rs`, `src/camera.rs`, `src/sound_handler.rs`, `src/atlas_info.rs`, `src/debug_menu/` (egui editor and debug UI).
+- `src/sim.rs` (headless simulation for tests), `src/script.rs` (input scripts), `src/watch.rs` (replay window for gameplay tests).
+- `tests/`: gameplay, content and script tests (see Testing). `examples/`: `run_script`, `capture`, `sprite_sheet` (see Tools).
+- `rooms/*.json`: room content (made with the in-game editor). `scripts/*.txt`: example input scripts. `assets/`: sprites, atlas, sounds.
+
 ## Architecture
 
 ### Main loop (`src/main.rs`)
@@ -35,10 +43,9 @@ Put temporary files (logs, screenshots, scripts) in `target/claude/`, which is g
 - **Result-enum pattern:** entities don't mutate the world directly. They return `Vec<...Result>` (`PlayerUpdateResult`, `EnemyUpdateResult`, `ItemInteractionResult`) and `Game::update` applies them. Follow this pattern for new interactions.
 - `player.rs`: `PlayerState` state machine (`Normal`, `Swinging`, `Hanging`, `OnLadder`, `Dead`). It includes coyote time (`safe_edge_frames`), variable jump hold (`max_jump_frames`), ledge hang, ladders and drop-through platforms (down+jump). `Health` + `immunity_frames`.
 - `enemies/`: the `Enemy` trait (`common.rs`) and `Bat`, `Slime`, `Worm`, `Burrower`. Each has its own state enum and an `AnimationHandler`. To add an enemy: implement `Enemy`, add a variant to `ObjectTemplateType` and `ObjectTemplate::as_object/get_texture_index` (`map_like/common.rs`), add it to the editor's `EnemySelection`, and add a sprite plus a UI icon.
-- `item.rs`: `Item` + `ItemType` (Coin, stones, Box, GreenProjectile). Boxes break into coins when swung. GreenProjectile is the bat's attack.
+- `item.rs`: `Item` + `ItemType` (Coin, stones, Box, GreenProjectile). Boxes break into coins when swung. GreenProjectile is the burrower's attack (it spits one towards the player).
 - `animation_handler.rs`: generic `AnimationHandler<T: AnimationConfig>`. A state maps to (start frame, end frame, ticks per frame, loop, reverse) in the atlas.
 - `common.rs`: `BoundingBox` (position, size **and velocity** `vx/vy`), `Pos`, `Dir`, `Health`.
-- `coin.rs` is **dead code**. It isn't declared in `state/mod.rs`, so it isn't compiled.
 
 ### Map (`src/state/map_like/`)
 - `MapLike` trait: tile queries (`get_at`, `is_solid_at_tile`, `is_ladder_at`, `is_platform_at`, `overlaps_solid`, …). It is implemented by `Room` and `GameMap`.
@@ -105,6 +112,8 @@ Tips:
 - For unit tests, a known, not-yet-fixed bug gets `#[ignore = "known bug: ..."]` (run them with `cargo test -- --ignored`).
 - The game logic runs headless. Only `Renderer::new()` needs a window.
 
+## Tools
+
 ### Input scripts (`src/script.rs`, `scripts/*.txt`)
 Text files that set up a game (`seed`, `items on|off`, `map random | room <file> | ascii … end`, `player x y`) and play input: each line `<ticks> [keys…]` holds exactly those keys (`left right up down jump swing`). `snap <name>` marks a point. The format is documented at the top of `src/script.rs`.
 ```sh
@@ -125,7 +134,38 @@ cargo run --example sprite_sheet -- character 0-7               # enlarged frame
 - To check a scene, write a small script (ASCII map + inputs + `snap`) in `target/claude/`, capture it and look at the PNGs.
 - Sprite edits: edit `assets/sprites/*.aseprite`, re-export the atlas with the aseprite CLI (README.md; `aseprite` is on PATH), then use `sprite_sheet` and a capture to review.
 
+## How to develop a feature
+1. **Agree on the plan first.** The user likes to discuss and agree before work starts: describe the approach, open questions and trade-offs, then wait for a go-ahead. Ask when a change would alter existing game behaviour.
+2. **Understand the current behaviour.** Read the code. Measure with a throwaway probe test (prints values, deleted afterwards) or `run_script`, rather than guessing numbers.
+3. **Write or extend tests.** Where tests go:
+   | Change | Test |
+   |---|---|
+   | Player movement, physics, controls | gameplay test in `tests/gameplay/player.rs` |
+   | Enemies, items, combat, doors, rooms | gameplay test in `tests/gameplay/interactions.rs` (or a new module) |
+   | New room content, map generation | content tests (`tests/content.rs`) cover it; extend them for new rules |
+   | Pure logic (parsing, geometry, helpers) | unit test next to the code |
+   | Rendering, UI, sprites, animations | no automated test; check visually with `capture` / `sprite_sheet` and look at the PNGs |
+   - Test the edges, not just the happy path: the last tick something works and the first tick it doesn't, both directions (left/right), and the negative case (what must *not* happen).
+   - Use `Room::from_ascii` scenes that isolate the behaviour. Pick thresholds from measured values, with a small tolerance.
+4. **For a bug fix,** first write a test that reproduces the bug and confirm it **fails** on the old code, then fix it and confirm it passes.
+5. **Implement.** Keep game logic deterministic (see Determinism) and follow the existing patterns (result enums, `UpdateCtx`, the "add an enemy" checklist).
+6. **Check:** `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`. For anything visible, capture screenshots and look at them. Smoke-run the game when touching the main loop or rendering (`cargo run`, check the log for panics).
+7. **Update docs:** the README TODO list, and this file when architecture, tools or conventions change. Record new quirks or design decisions under "Known issues and design decisions".
+8. **Commit** (see Conventions). The user can watch the new gameplay tests with `cargo test --test gameplay -- --watch <filter>`.
+
+## Known issues and design decisions
+Found while writing tests; keep this list current.
+- **Ladder and ledge jumps always rise ~1 tile**; holding jump doesn't make them higher (only ground jumps get the extra rise frames). Intended.
+- **Pressing jump while holding up on a ladder is ignored** (the jump-off needs up released). Not pinned by a test.
+- **Ladder climbing ignores collisions**, so the head can end up to one climb step (0.06 tiles, under a pixel) inside the ceiling. Harmless; the test allows it.
+- **Room `disabled` flag** is ignored by the map generator (the user wants to keep it that way for now).
+- **Doors are always open** (`TODO: TEMP` in `Game::update`); the "closed until enemies are dead" logic is disabled.
+- **Collected coins aren't counted** (`ItemInteractionResult::IncreaseScore` does nothing). **Dying** has an animation but no game over or restart.
+- **Character sprite frame 21** isn't used by any animation.
+- The game's very first frame is drawn before the first tick, so it's all dark. One frame at startup; left as is.
+- `coin.rs` is dead code (not in `state/mod.rs`).
+
 ## Conventions
 - Small, focused changes. Keep the game behaving the same unless the change is meant to alter it.
-- Don't commit unless asked.
+- Commit each finished step as its own small commit once the checks above pass. **Push only when the user asks.** The remote uses SSH.
 - Keep the README TODO list up to date when features land.
