@@ -57,6 +57,10 @@ pub struct Renderer {
 
     dualgrid_vertices: Vec<Vec<Vertex>>,
     dualgrid_indices: Vec<Vec<u16>>,
+
+    /// Offscreen target for the game rendering (used by screenshot capture).
+    /// `None` renders to the window.
+    render_target: Option<RenderPass>,
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -536,7 +540,38 @@ impl Renderer {
             dualgrid_vb_cap,
             dualgrid_indices,
             dualgrid_vertices,
+            render_target: None,
         }
+    }
+
+    /// Renders into `pass` instead of the window (see [`Renderer::new_capture_target`]).
+    pub fn set_render_target(&mut self, pass: Option<RenderPass>) {
+        self.render_target = pass;
+    }
+
+    /// Creates an offscreen RGBA8 render target of the given size, for screenshots.
+    pub fn new_capture_target(&mut self, width: u32, height: u32) -> (RenderPass, TextureId) {
+        let texture = self.ctx.new_render_texture(TextureParams {
+            width,
+            height,
+            format: TextureFormat::RGBA8,
+            ..Default::default()
+        });
+        let pass = self.ctx.new_render_pass(texture, None);
+        (pass, texture)
+    }
+
+    /// Reads an RGBA8 render texture back to the CPU, with the first row at the top.
+    pub fn read_capture_pixels(&mut self, texture: TextureId, width: u32, height: u32) -> Vec<u8> {
+        let mut pixels = vec![0u8; (width * height * 4) as usize];
+        self.ctx.texture_read_pixels(texture, &mut pixels);
+        // OpenGL returns the bottom row first; flip so the image is upright.
+        let row = (width * 4) as usize;
+        let mut flipped = Vec::with_capacity(pixels.len());
+        for y in (0..height as usize).rev() {
+            flipped.extend_from_slice(&pixels[y * row..(y + 1) * row]);
+        }
+        flipped
     }
 
     pub fn resize(&mut self, _w: f32, _h: f32) {
@@ -556,7 +591,7 @@ impl Renderer {
             stencil: Some(0),
         };
 
-        self.ctx.begin_default_pass(clear);
+        self.ctx.begin_pass(self.render_target, clear);
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
 
@@ -601,7 +636,7 @@ impl Renderer {
 
         // Draw hud new HUD pipeline
         let no_clear = PassAction::Nothing;
-        self.ctx.begin_default_pass(no_clear);
+        self.ctx.begin_pass(self.render_target, no_clear);
         self.ctx.apply_pipeline(&self.pipeline_hud);
         self.ctx.apply_bindings(&self.bindings);
 

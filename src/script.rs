@@ -223,12 +223,67 @@ impl Sim {
 
     /// Plays the script's steps. `on_snap` is called at every `snap` marker.
     pub fn run_script(&mut self, script: &Script, mut on_snap: impl FnMut(&Sim, &str)) {
-        for step in &script.steps {
+        let mut player = ScriptPlayer::new(script);
+        loop {
+            match player.advance(self) {
+                ScriptEvent::Ticked => {}
+                ScriptEvent::Snap(name) => on_snap(self, &name),
+                ScriptEvent::Done => break,
+            }
+        }
+    }
+}
+
+/// What [`ScriptPlayer::advance`] did.
+#[derive(Debug, PartialEq)]
+pub enum ScriptEvent {
+    /// Simulated one tick.
+    Ticked,
+    /// Reached a `snap` marker (no tick was simulated).
+    Snap(String),
+    /// The script is finished.
+    Done,
+}
+
+/// Plays a script one tick at a time, e.g. so that every tick can be rendered.
+pub struct ScriptPlayer {
+    steps: Vec<Step>,
+    index: usize,
+    ticks_done: u32,
+}
+
+impl ScriptPlayer {
+    pub fn new(script: &Script) -> ScriptPlayer {
+        ScriptPlayer {
+            steps: script.steps.clone(),
+            index: 0,
+            ticks_done: 0,
+        }
+    }
+
+    pub fn advance(&mut self, sim: &mut Sim) -> ScriptEvent {
+        loop {
+            let Some(step) = self.steps.get(self.index) else {
+                return ScriptEvent::Done;
+            };
             match step {
-                Step::Hold { ticks, keys } => {
-                    self.set_keys(keys).run(*ticks);
+                Step::Snap(name) => {
+                    self.index += 1;
+                    return ScriptEvent::Snap(name.clone());
                 }
-                Step::Snap(name) => on_snap(self, name),
+                Step::Hold { ticks, keys } => {
+                    if self.ticks_done >= *ticks {
+                        self.index += 1;
+                        self.ticks_done = 0;
+                        continue;
+                    }
+                    if self.ticks_done == 0 {
+                        sim.set_keys(keys);
+                    }
+                    sim.run(1);
+                    self.ticks_done += 1;
+                    return ScriptEvent::Ticked;
+                }
             }
         }
     }
