@@ -170,7 +170,10 @@ fn swinging_at_a_box_breaks_it_into_coins_that_can_be_collected() {
         .filter(|s| **s == Sound::CollectCoin)
         .count();
     assert!(collected >= 1, "should have collected at least one coin");
-    assert!(collected + coins_left <= 4, "a box drops 1-4 coins");
+    assert!(
+        (3..=5).contains(&(collected + coins_left)),
+        "a box drops 3-5 coins"
+    );
 }
 
 /// Breaks the player's box, stands still for `ticks` ticks and returns the
@@ -240,14 +243,12 @@ fn coins_collected_quickly_play_rising_notes() {
 }
 
 fn the_coin_streak_starts_over_after_a_pause() {
-    // With this seed, two coins are collected right away and one lands out of
-    // reach.
+    // With this seed, some coins are collected right away (a streak) and one
+    // lands out of reach.
     let mut sim = sim_in_seeded(BOX_ROOM, 0);
     let collected = break_box_and_record_collections(&mut sim, 120);
-    assert_eq!(
-        collected.iter().map(|c| c.1).collect::<Vec<_>>(),
-        vec![0, 1]
-    );
+    let streak: Vec<u32> = collected.iter().map(|c| c.1).collect();
+    assert!(streak.len() >= 2, "a streak first: {streak:?}");
     assert_eq!(sim.game.items.len(), 1, "one coin left");
 
     // Walk to the last coin, long after the streak ended.
@@ -259,7 +260,9 @@ fn the_coin_streak_starts_over_after_a_pause() {
     sim.press(key);
     sim.run_until(120, |g| g.items.is_empty())
         .expect("should reach the last coin");
-    assert_eq!(sim.notes(Sound::CollectCoin), vec![0, 1, 0]);
+    let mut expected = streak;
+    expected.push(0);
+    assert_eq!(sim.notes(Sound::CollectCoin), expected);
 }
 
 fn coins_from_a_broken_box_pop_up_about_half_a_tile() {

@@ -232,7 +232,7 @@ impl Item {
         match self.item_type {
             ItemType::Box => {
                 let mut results = vec![ItemInteractionResult::RemoveItem];
-                for i in 0..ctx.rng.random_range(1..5) {
+                for i in 0..ctx.rng.random_range(3..=5) {
                     // Pop the coins up and out (peaking about 0.5 tiles above the floor).
                     let vy = ctx.rng.random_range(-0.08..-0.06);
                     let vx = ctx.rng.random_range(-0.06..0.06);
