@@ -19,9 +19,15 @@ pub enum ItemType {
     GreenProjectile,
 }
 
+/// How long (ticks) coins from a broken box can't be collected, so they
+/// visibly burst out and get collected one by one instead of all at once.
+pub const SPAWNED_COIN_PICKUP_DELAY: u32 = 20;
+
 pub struct Item {
     bb: BoundingBox,
     item_type: ItemType,
+    /// Ticks left until the player can collect this item by touching it.
+    pickup_delay: u32,
 }
 
 pub enum ItemInteractionResult {
@@ -100,6 +106,7 @@ impl Item {
                 vy,
             },
             item_type,
+            pickup_delay: 0,
         }
     }
 
@@ -165,6 +172,8 @@ impl Item {
     }
 
     pub fn update(&mut self, map: &dyn MapLike) -> Vec<ItemInteractionResult> {
+        self.pickup_delay = self.pickup_delay.saturating_sub(1);
+
         let res = integrate_kinematic(map, &self.bb, true);
 
         if res.on_something()
@@ -196,6 +205,7 @@ impl Item {
 
     pub fn handle_player_touch(&mut self, ctx: &mut UpdateCtx) -> Vec<ItemInteractionResult> {
         match self.item_type {
+            ItemType::Coin if self.pickup_delay > 0 => vec![],
             ItemType::Coin => {
                 ctx.sound.play(Sound::CollectCoin);
                 vec![
@@ -218,17 +228,18 @@ impl Item {
             ItemType::Box => {
                 let mut results = vec![ItemInteractionResult::RemoveItem];
                 for _ in 0..ctx.rng.random_range(1..5) {
-                    let vy = ctx.rng.random_range(-0.05..0.05);
-                    let vx = ctx.rng.random_range(-0.05..0.05);
-                    results.push(ItemInteractionResult::SpawnItem {
-                        item: Item::new_with_velocity(
-                            self.bb.x + self.bb.w * 0.5,
-                            self.bb.y + self.bb.h * 0.5,
-                            vx,
-                            vy,
-                            ItemType::Coin,
-                        ),
-                    })
+                    // Pop the coins up and out (rising about 0.7-1.8 tiles).
+                    let vy = ctx.rng.random_range(-0.16..-0.10);
+                    let vx = ctx.rng.random_range(-0.06..0.06);
+                    let mut coin = Item::new_with_velocity(
+                        self.bb.x + self.bb.w * 0.5,
+                        self.bb.y + self.bb.h * 0.5,
+                        vx,
+                        vy,
+                        ItemType::Coin,
+                    );
+                    coin.pickup_delay = SPAWNED_COIN_PICKUP_DELAY;
+                    results.push(ItemInteractionResult::SpawnItem { item: coin })
                 }
                 ctx.sound.play(Sound::Clink);
                 results

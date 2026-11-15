@@ -4,7 +4,7 @@ use crate::common::*;
 use platosku2::sim::{Key, Sim};
 use platosku2::sound_handler::Sound;
 use platosku2::state::game_state::{Game, MapSetup};
-use platosku2::state::item::ItemType;
+use platosku2::state::item::{ItemType, SPAWNED_COIN_PICKUP_DELAY};
 use platosku2::state::map_like::Room;
 
 fn slime_health(sim: &Sim) -> u32 {
@@ -69,6 +69,15 @@ fn stomping_a_slime_twice_kills_it() {
 
 const BOX_ROOM: &[&str] = &[
     "##########", //
+    "#........#", //
+    "#S.......#", //
+    "##########", //
+];
+
+const BOX_ROOM_TALL: &[&str] = &[
+    "##########", //
+    "#........#", //
+    "#........#", //
     "#........#", //
     "#S.......#", //
     "##########", //
@@ -142,8 +151,8 @@ fn swinging_at_a_box_breaks_it_into_coins_that_can_be_collected() {
         "breaking the box makes a clink"
     );
 
-    // Coins spawn at the box, which is where the player stands, so they are
-    // collected right away or after a short walk.
+    // Coins pop out of the box, which is where the player stands, so they are
+    // collected when they fall back down or after a short walk.
     sim.press(Key::Left)
         .run(30)
         .press(Key::Right)
@@ -162,6 +171,73 @@ fn swinging_at_a_box_breaks_it_into_coins_that_can_be_collected() {
         .count();
     assert!(collected >= 1, "should have collected at least one coin");
     assert!(collected + coins_left <= 4, "a box drops 1-4 coins");
+}
+
+/// Ticks after the box breaks at which coins were collected (one entry per
+/// coin), standing still for `ticks` ticks.
+fn break_box_and_record_collections(sim: &mut Sim, ticks: u32) -> Vec<u32> {
+    sim.run(30);
+    sim.press(Key::Down)
+        .tap(Key::Swing)
+        .release(Key::Down)
+        .run(30);
+    sim.clear_sounds().tap(Key::Swing);
+    assert_eq!(sim.sounds(), vec![Sound::Swing, Sound::Clink], "box broke");
+    sim.clear_sounds();
+
+    let mut collected = Vec::new();
+    for t in 1..=ticks {
+        sim.run(1);
+        for sound in sim.sounds() {
+            if sound == Sound::CollectCoin {
+                collected.push(t);
+            }
+        }
+        sim.clear_sounds();
+    }
+    collected
+}
+
+fn coins_from_a_broken_box_pop_up_and_are_collected_one_at_a_time() {
+    for seed in 0..8 {
+        let mut sim = sim_in_seeded(BOX_ROOM, seed);
+        let collected = break_box_and_record_collections(&mut sim, 120);
+        assert!(!collected.is_empty(), "seed {seed}: no coins collected");
+
+        // Nothing is collected while the coins can't be picked up yet.
+        assert!(
+            collected[0] > SPAWNED_COIN_PICKUP_DELAY,
+            "seed {seed}: coin collected too early, at tick {}",
+            collected[0]
+        );
+        // Each coin gets its own tick, so the sounds don't pile up.
+        assert!(
+            collected.windows(2).all(|w| w[0] != w[1]),
+            "seed {seed}: several coins collected on one tick: {collected:?}"
+        );
+    }
+}
+
+fn coins_from_a_broken_box_fly_up() {
+    let mut sim = sim_in(BOX_ROOM_TALL);
+    sim.run(30);
+    sim.press(Key::Down)
+        .tap(Key::Swing)
+        .release(Key::Down)
+        .run(30);
+    let floor_y = sim.game.items[0].bb().y;
+    sim.tap(Key::Swing).run(15);
+
+    let highest = sim
+        .game
+        .items
+        .iter()
+        .map(|i| i.bb().y)
+        .fold(f32::MAX, f32::min);
+    assert!(
+        highest < floor_y - 0.5,
+        "coins should rise at least half a tile, highest y {highest}, box y {floor_y}"
+    );
 }
 
 /// Two rooms connected by a door: A (with the start) on the left, B on the right.
@@ -236,6 +312,8 @@ pub fn tests() -> Vec<(&'static str, fn())> {
         the_player_starts_with_a_box_and_can_throw_it,
         dropping_and_picking_up_the_box,
         swinging_at_a_box_breaks_it_into_coins_that_can_be_collected,
+        coins_from_a_broken_box_pop_up_and_are_collected_one_at_a_time,
+        coins_from_a_broken_box_fly_up,
         walking_through_a_door_changes_the_room,
         enemies_in_other_rooms_are_frozen,
     ]
