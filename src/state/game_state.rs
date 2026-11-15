@@ -119,6 +119,59 @@ pub struct Game {
 
 const ROOM_TRANSITION_FRAMES: i32 = 30;
 
+/// How the map of a [`Game`] is created.
+pub enum MapSetup {
+    /// Random map from the rooms in the `rooms/` folder (the normal game).
+    RandomFromFolder,
+    /// Random map from the given rooms.
+    Random(Vec<Room>),
+    /// Just this one room.
+    SingleRoom(Box<Room>),
+}
+
+/// See [`Game::builder`].
+pub struct GameBuilder {
+    seed: u64,
+    map: MapSetup,
+    player_pos: Option<(f32, f32)>,
+    random_items: bool,
+}
+
+impl GameBuilder {
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    pub fn map(mut self, map: MapSetup) -> Self {
+        self.map = map;
+        self
+    }
+
+    /// Shorthand for `map(MapSetup::SingleRoom(..))`.
+    pub fn single_room(self, room: Room) -> Self {
+        self.map(MapSetup::SingleRoom(Box::new(room)))
+    }
+
+    /// Player start position (top-left of the bounding box). Defaults to the
+    /// start door of the first room.
+    pub fn player_pos(mut self, x: f32, y: f32) -> Self {
+        self.player_pos = Some((x, y));
+        self
+    }
+
+    /// Whether to scatter ~50 random items (coins, stones, boxes) on the map.
+    /// Defaults to true.
+    pub fn random_items(mut self, random_items: bool) -> Self {
+        self.random_items = random_items;
+        self
+    }
+
+    pub fn build(self) -> Game {
+        Game::from_builder(self)
+    }
+}
+
 impl Game {
     /// Creates a new game with a random seed. The seed is printed so that a run
     /// can be reproduced with [`Game::new_with_seed`].
@@ -128,16 +181,42 @@ impl Game {
         Game::new_with_seed(seed)
     }
 
+    /// The normal game (random map from the `rooms/` folder) with a fixed seed.
     pub fn new_with_seed(seed: u64) -> Game {
-        let mut rng = GameRng::seed_from_u64(seed);
-        let map = GameMap::new_random(&mut rng);
-        let pos = map.player_start_pos();
+        Game::builder().seed(seed).build()
+    }
+
+    /// Builder for setting up a specific game, e.g. a single room in a test.
+    pub fn builder() -> GameBuilder {
+        GameBuilder {
+            seed: 0,
+            map: MapSetup::RandomFromFolder,
+            player_pos: None,
+            random_items: true,
+        }
+    }
+
+    fn from_builder(builder: GameBuilder) -> Game {
+        let mut rng = GameRng::seed_from_u64(builder.seed);
+        let map = match builder.map {
+            MapSetup::RandomFromFolder => {
+                let rooms: Vec<Room> = Room::load_rooms_from_folder()
+                    .into_iter()
+                    .map(|(_, room)| room)
+                    .collect();
+                GameMap::new_random(&rooms, &mut rng)
+            }
+            MapSetup::Random(rooms) => GameMap::new_random(&rooms, &mut rng),
+            MapSetup::SingleRoom(room) => GameMap::from_single_room(*room),
+        };
+        let pos = builder.player_pos.unwrap_or_else(|| map.player_start_pos());
         let player = Player::new(pos.0, pos.1);
         let enemies = map.get_enemies_from_templates(&mut rng);
 
         // Add some random items to the map
         let mut items = vec![];
-        for _ in 0..10000 {
+        let item_attempts = if builder.random_items { 10000 } else { 0 };
+        for _ in 0..item_attempts {
             let (min_x, min_y, width, height) = map.get_bounds();
             let x = rng.random_range(min_x..min_x + width);
             let y = rng.random_range(min_y..min_y + height);
@@ -558,6 +637,37 @@ mod tests {
             b.update(&input, &NullSound);
         }
         assert_eq!(snapshot(&a), snapshot(&b));
+    }
+
+    #[test]
+    fn single_room_game_player_lands_on_floor() {
+        let room = Room::from_ascii(
+            0,
+            0,
+            &[
+                "#####", //
+                "#.S.#", //
+                "#...#", //
+                "#...#", //
+                "#####", //
+            ],
+        );
+        let mut game = Game::builder()
+            .single_room(room)
+            .random_items(false)
+            .build();
+        assert_eq!(game.map.rooms.len(), 1);
+        assert!(game.items.is_empty());
+        assert_eq!(game.player.bb.y, 1.0);
+
+        let input = InputState::default();
+        for _ in 0..120 {
+            game.update(&input, &NullSound);
+        }
+        // The floor is the row y = 4, so the player's feet should rest just above it.
+        let feet = game.player.bb.y + game.player.bb.h;
+        assert!((feet - 4.0).abs() < 0.01, "feet at {feet}");
+        assert_eq!(game.player.bb.vy, 0.0);
     }
 
     #[test]

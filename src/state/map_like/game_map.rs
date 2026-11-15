@@ -127,7 +127,9 @@ impl GameMap {
     pub fn player_start_pos(&self) -> (f32, f32) {
         let room = &self.rooms[0];
 
-        let start_pos = room.get_start_pos().unwrap();
+        let start_pos = room
+            .get_start_pos()
+            .expect("first room has no start door ('S'); set GameBuilder::player_pos instead");
 
         (start_pos.0 as f32, start_pos.1 as f32)
     }
@@ -189,19 +191,37 @@ impl GameMap {
         enemies
     }
 
-    pub fn new_random(rng: &mut GameRng) -> GameMap {
-        let room_candidates = Room::load_rooms_from_folder();
+    /// A map that consists of just one room (no doors to other rooms).
+    pub fn from_single_room(mut room: Room) -> GameMap {
+        room.update_overlays_cache();
+        let mut game_map = GameMap {
+            rooms: vec![room],
+            doors: Vec::new(),
+            all_overlays: Vec::new(),
+            x: 0,
+            y: 0,
+            h: 0,
+            w: 0,
+            overlay: Vec::new(),
+            base: Vec::new(),
+        };
+        game_map.rebuild_tile_cache();
+        game_map
+    }
 
+    /// Generates a random map from `room_candidates`. The first candidate with a
+    /// start door becomes the first room; other rooms are attached door to door.
+    pub fn new_random(room_candidates: &[Room], rng: &mut GameRng) -> GameMap {
         let first_room_candidates: Vec<Room> = room_candidates
             .iter()
-            .map(|(_, room)| room.clone())
             .filter(|room| room.get_start_pos().is_some())
+            .cloned()
             .collect();
 
         let non_first_room_candidates: Vec<Room> = room_candidates
             .iter()
-            .map(|(_, room)| room.clone())
             .filter(|room| room.get_start_pos().is_none())
+            .cloned()
             .collect();
 
         let first_room = first_room_candidates[0].clone();
@@ -343,32 +363,36 @@ impl GameMap {
             }
         }
 
-        let (x, y, w, h) = game_map.get_bounds();
+        game_map.rebuild_tile_cache();
+        game_map
+    }
 
-        game_map.x = x;
-        game_map.y = y;
-        game_map.w = w as u32;
-        game_map.h = h as u32;
+    /// Flattens the rooms into one tile grid covering the whole map.
+    fn rebuild_tile_cache(&mut self) {
+        let (x, y, w, h) = self.get_bounds();
 
-        game_map.overlay.resize((w * h) as usize, OverlayTile::None);
-        game_map.base.resize((w * h) as usize, BaseTile::Stone);
+        self.x = x;
+        self.y = y;
+        self.w = w as u32;
+        self.h = h as u32;
+
+        self.overlay = vec![OverlayTile::None; (w * h) as usize];
+        self.base = vec![BaseTile::Stone; (w * h) as usize];
 
         for xx in 0..w {
             for yy in 0..h {
-                let (base, overlay) = game_map.get_at_from_room(x + xx, y + yy);
+                let (base, overlay) = self.get_at_from_room(x + xx, y + yy);
 
-                game_map.overlay[(xx + yy * w) as usize] = overlay;
-                game_map.base[(xx + yy * w) as usize] = base;
+                self.overlay[(xx + yy * w) as usize] = overlay;
+                self.base[(xx + yy * w) as usize] = base;
             }
         }
 
-        game_map.all_overlays = game_map
+        self.all_overlays = self
             .rooms
             .iter()
             .flat_map(|room| room.get_overlays().clone())
             .collect();
-
-        game_map
     }
 
     fn get_at_from_room(&self, tx: i32, ty: i32) -> (BaseTile, OverlayTile) {

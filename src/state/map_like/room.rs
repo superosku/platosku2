@@ -1,5 +1,6 @@
 use super::common::{
-    BaseTile, DoorDir, MapLike, ObjectTemplate, OverlayInfo, OverlayTile, RoomDoor,
+    BaseTile, DoorDir, MapLike, ObjectTemplate, ObjectTemplateType, OverlayInfo, OverlayTile,
+    RoomDoor,
 };
 use crate::state::enemies::Enemy;
 use crate::state::update_ctx::GameRng;
@@ -61,6 +62,78 @@ impl Room {
             all_overlays: Vec::new(),
             disabled: false,
         }
+    }
+
+    /// Builds a room from ASCII art, mainly for tests. `(x, y)` is the world
+    /// position of the top-left character. All rows must be equally long.
+    ///
+    /// | char | tile |
+    /// |------|------|
+    /// | `#` | Stone |
+    /// | `W` | Wood |
+    /// | `.` | Empty |
+    /// | ` ` | NotPartOfRoom |
+    /// | `H` | Ladder |
+    /// | `-` | Platform |
+    /// | `+` | Ladder + platform |
+    /// | `S` | Start door (player start position) |
+    /// | `<` `>` `^` `v` | Door (left/right/up/down) on a stone tile, like the editor makes them |
+    /// | `b` `s` `w` `u` | Empty tile with a bat / slime / worm / burrower spawning at its top-left corner |
+    pub fn from_ascii(x: i32, y: i32, rows: &[&str]) -> Room {
+        let h = rows.len() as u32;
+        let w = rows.first().map_or(0, |r| r.chars().count()) as u32;
+        let mut room = Room::new_empty(x, y, w, h, BaseTile::Empty, OverlayTile::None);
+
+        for (ry, row) in rows.iter().enumerate() {
+            assert_eq!(
+                row.chars().count() as u32,
+                w,
+                "row {ry} has a different length than the first row"
+            );
+            for (rx, c) in row.chars().enumerate() {
+                let (rx, ry) = (rx as u32, ry as u32);
+                let (base, overlay) = match c {
+                    '#' => (BaseTile::Stone, OverlayTile::None),
+                    'W' => (BaseTile::Wood, OverlayTile::None),
+                    '.' => (BaseTile::Empty, OverlayTile::None),
+                    ' ' => (BaseTile::NotPartOfRoom, OverlayTile::None),
+                    'H' => (BaseTile::Empty, OverlayTile::Ladder),
+                    '-' => (BaseTile::Empty, OverlayTile::Platform),
+                    '+' => (BaseTile::Empty, OverlayTile::LadderPlatform),
+                    'S' => (BaseTile::Empty, OverlayTile::StartDoor),
+                    '<' | '>' | '^' | 'v' => {
+                        let dir = match c {
+                            '<' => DoorDir::Left,
+                            '>' => DoorDir::Right,
+                            '^' => DoorDir::Up,
+                            _ => DoorDir::Down,
+                        };
+                        room.doors.push(RoomDoor { x: rx, y: ry, dir });
+                        (BaseTile::Stone, OverlayTile::None)
+                    }
+                    'b' | 's' | 'w' | 'u' => {
+                        let object_type = match c {
+                            'b' => ObjectTemplateType::Bat,
+                            's' => ObjectTemplateType::Slime,
+                            'w' => ObjectTemplateType::Worm,
+                            _ => ObjectTemplateType::Burrower,
+                        };
+                        room.object_templates.push(ObjectTemplate::new(
+                            (x + rx as i32) as f32,
+                            (y + ry as i32) as f32,
+                            object_type,
+                        ));
+                        (BaseTile::Empty, OverlayTile::None)
+                    }
+                    other => panic!("unknown room character {other:?}"),
+                };
+                room.set_base_absolute(rx, ry, base);
+                room.set_overlay_absolute(rx, ry, overlay);
+            }
+        }
+
+        room.update_overlays_cache();
+        room
     }
 
     pub fn get_enemies_from_template(&self, rng: &mut GameRng) -> Vec<Box<dyn Enemy>> {
@@ -490,6 +563,31 @@ impl MapLike for Room {
 mod tests {
     use super::super::common::{BaseTile, DoorDir, OverlayTile, RoomDoor};
     use super::*;
+
+    #[test]
+    fn from_ascii_builds_tiles_doors_and_enemies() {
+        let room = Room::from_ascii(
+            10,
+            20,
+            &[
+                "##^##", //
+                "<.s.>", //
+                "#H-S#", //
+                " #v# ", //
+            ],
+        );
+        assert_eq!((room.w, room.h), (5, 4));
+        assert_eq!(room.get_pos(), (10, 20));
+        assert_eq!(room.get_absolute(0, 0).0, BaseTile::Stone);
+        assert_eq!(room.get_absolute(0, 3).0, BaseTile::NotPartOfRoom);
+        assert!(room.is_ladder_at(11, 22));
+        assert!(room.is_platform_at(12, 22));
+        assert_eq!(room.get_start_pos(), Some((13, 22)));
+        assert_eq!(room.get_doors().len(), 4);
+        assert_eq!(room.object_templates.len(), 1);
+        assert_eq!(room.object_templates[0].get_bb().x, 12.0);
+        assert_eq!(room.object_templates[0].get_bb().y, 21.0);
+    }
 
     #[test]
     fn test_resize_shrink_all() {
