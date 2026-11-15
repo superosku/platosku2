@@ -119,4 +119,4 @@ cargo run --example sprite_sheet -- character 0-7               # enlarged frame
 ## Conventions
 - Small, focused changes. Keep the game behaving the same unless the change is meant to alter it.
 - Don't commit unless asked.
-- The README's TODO list is partly out of date (Worm and Burrower already exist).
+- Keep the README TODO list up to date when features land.
