@@ -39,6 +39,41 @@ fn load_sound(path: &str) -> std::io::Result<Vec<u8>> {
     fs::read(path)
 }
 
+/// Something that can play game sounds. The real game uses [`SoundHandler`];
+/// tests use [`NullSound`] or [`RecordingSound`].
+pub trait SoundPlayer {
+    fn play(&self, sound: Sound);
+}
+
+/// Plays nothing.
+pub struct NullSound;
+
+impl SoundPlayer for NullSound {
+    fn play(&self, _sound: Sound) {}
+}
+
+/// Plays nothing but remembers which sounds were requested, in order.
+#[derive(Default)]
+pub struct RecordingSound {
+    played: std::cell::RefCell<Vec<Sound>>,
+}
+
+impl RecordingSound {
+    pub fn played(&self) -> Vec<Sound> {
+        self.played.borrow().clone()
+    }
+
+    pub fn clear(&self) {
+        self.played.borrow_mut().clear();
+    }
+}
+
+impl SoundPlayer for RecordingSound {
+    fn play(&self, sound: Sound) {
+        self.played.borrow_mut().push(sound);
+    }
+}
+
 pub struct SoundHandler {
     #[allow(dead_code)]
     sounds: HashMap<Sound, SndSound>,
@@ -81,8 +116,10 @@ impl SoundHandler {
             audio_context,
         }
     }
+}
 
-    pub fn play(&self, sound: Sound) {
+impl SoundPlayer for SoundHandler {
+    fn play(&self, sound: Sound) {
         let sound_variants = self.sound_variants.get(&sound).unwrap();
 
         if sound_variants.is_empty() {

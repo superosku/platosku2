@@ -3,11 +3,12 @@ use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
 use crate::minimap::Minimap;
 use crate::render::Renderer;
-use crate::sound_handler::{Sound, SoundHandler};
+use crate::sound_handler::{Sound, SoundPlayer};
 use crate::state::BoundingBox;
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::item::{Item, ItemInteractionResult};
+use crate::state::update_ctx::UpdateCtx;
 use rand::Rng;
 
 #[derive(Default, Debug)]
@@ -26,7 +27,7 @@ pub struct InputState {
 }
 
 pub trait GameState {
-    fn update(&mut self, input: &InputState, sound_handler: &SoundHandler);
+    fn update(&mut self, input: &InputState, sound: &dyn SoundPlayer);
     fn update_camera(&mut self, camera: &mut Camera, zoom_show_all: bool);
     fn player(&self) -> &Player;
     fn player_mut(&mut self) -> &mut Player;
@@ -51,8 +52,9 @@ impl Editor {
 }
 
 impl GameState for Editor {
-    fn update(&mut self, input: &InputState, sound_handler: &SoundHandler) {
-        self.player.update(input, &self.room, sound_handler);
+    fn update(&mut self, input: &InputState, sound: &dyn SoundPlayer) {
+        let mut ctx = UpdateCtx { sound };
+        self.player.update(input, &self.room, &mut ctx);
     }
 
     fn update_camera(&mut self, camera: &mut Camera, _zoom_show_all: bool) {
@@ -160,7 +162,8 @@ impl Game {
 }
 
 impl GameState for Game {
-    fn update(&mut self, input: &InputState, sound_handler: &SoundHandler) {
+    fn update(&mut self, input: &InputState, sound: &dyn SoundPlayer) {
+        let mut ctx = UpdateCtx { sound };
         let door_bbs: Vec<BoundingBox> = self
             .map
             .doors
@@ -222,7 +225,7 @@ impl GameState for Game {
                 println!("No push dir found");
             }
         } else {
-            let update_results = self.player.update(input, &self.map, sound_handler);
+            let update_results = self.player.update(input, &self.map, &mut ctx);
             for result in update_results {
                 match result {
                     PlayerUpdateResult::AddItem { item } => {
@@ -259,7 +262,7 @@ impl GameState for Game {
                         }
                         ItemInteractionResult::PlayerGotHit => {
                             if self.player.can_be_hit() {
-                                sound_handler.play(Sound::PlayerHit);
+                                sound.play(Sound::PlayerHit);
                                 player_damage += 1;
                             }
                         }
@@ -272,7 +275,7 @@ impl GameState for Game {
 
             // Player collecting items
             if item.overlaps(&self.player.bb) {
-                let results = item.handle_player_touch(sound_handler);
+                let results = item.handle_player_touch(&mut ctx);
                 handle_item_results(results);
             }
 
@@ -280,7 +283,7 @@ impl GameState for Game {
             if let Some(swing_info) = self.player.get_swing_info()
                 && item.overlaps_line(&swing_info.pivot, &swing_info.end)
             {
-                let results = item.handle_being_swung(sound_handler);
+                let results = item.handle_being_swung(&mut ctx);
                 handle_item_results(results);
             }
 
@@ -288,9 +291,7 @@ impl GameState for Game {
             if item.can_hit_enemy() {
                 for enemy in &mut self.enemies {
                     if enemy.bb().overlaps(item.bb()) {
-                        match enemy
-                            .maybe_got_hit_with_sound(EnemyHitType::Projectile, sound_handler)
-                        {
+                        match enemy.maybe_got_hit_with_sound(EnemyHitType::Projectile, &mut ctx) {
                             EnemyHitResult::GotHit => {
                                 item.slow_down(0.5);
                                 // Projectile slows down here?
@@ -344,13 +345,13 @@ impl GameState for Game {
             if enemy.bb().overlaps(&self.player.bb) {
                 let mut should_hit_player = false;
                 if self.player.check_if_could_stomp(enemy.bb()) {
-                    match enemy.maybe_got_hit_with_sound(EnemyHitType::Stomp, sound_handler) {
+                    match enemy.maybe_got_hit_with_sound(EnemyHitType::Stomp, &mut ctx) {
                         EnemyHitResult::DidNotHit => {
                             should_hit_player = true;
                         }
                         EnemyHitResult::GotHit => {
                             self.player.apply_stomping(enemy.bb().y);
-                            sound_handler.play(Sound::Clink);
+                            sound.play(Sound::Clink);
                         }
                     }
                 } else {
@@ -360,7 +361,7 @@ impl GameState for Game {
                     && let Some(contact_damage) = enemy.maybe_damage_player()
                     && self.player.can_be_hit()
                 {
-                    sound_handler.play(Sound::PlayerHit);
+                    sound.play(Sound::PlayerHit);
                     self.player.got_hit(contact_damage);
                 }
             }
@@ -369,10 +370,10 @@ impl GameState for Game {
                 // && enemy.can_be_hit()
                 && enemy.bb().overlaps_line(&swing_info.pivot, &swing_info.end)
             {
-                match enemy.maybe_got_hit_with_sound(EnemyHitType::Swing, sound_handler) {
+                match enemy.maybe_got_hit_with_sound(EnemyHitType::Swing, &mut ctx) {
                     EnemyHitResult::DidNotHit => {}
                     EnemyHitResult::GotHit => {
-                        sound_handler.play(Sound::Clink);
+                        sound.play(Sound::Clink);
                         // TODO: Maybe play a different sound here than what the stomp plays?
                     }
                 }

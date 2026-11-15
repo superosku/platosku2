@@ -4,9 +4,10 @@ use super::map_like::MapLike;
 use crate::camera::Camera;
 use crate::physics::{EPS, check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
 use crate::render::{Renderer, TILE_SIZE};
-use crate::sound_handler::{Sound, SoundHandler};
+use crate::sound_handler::Sound;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::item::{Item, ItemType};
+use crate::state::update_ctx::UpdateCtx;
 
 pub enum PlayerState {
     Normal,
@@ -236,7 +237,7 @@ impl Player {
         &mut self,
         input: &InputState,
         map: &dyn MapLike,
-        sound_handler: &SoundHandler,
+        ctx: &mut UpdateCtx,
     ) -> Vec<PlayerUpdateResult> {
         let mut update_results = vec![];
 
@@ -279,7 +280,7 @@ impl Player {
 
         // 1. Want to jump 2. Not trying to go down ledge 3. Can jump
         if input.jump_pressed && !input.down && (self.on_ground || self.safe_edge_frames > 0) {
-            sound_handler.play(Sound::Jump);
+            ctx.sound.play(Sound::Jump);
             self.safe_edge_frames = 0;
             self.bb.vy = -0.125;
         } else if input.jump_held && !input.down && self.max_jump_frames > 0 {
@@ -301,7 +302,7 @@ impl Player {
                         item.set_xyv(self.bb.x, self.bb.y, 0.0, 0.0);
                     } else {
                         // Throw item downwards
-                        sound_handler.play(Sound::Throw);
+                        ctx.sound.play(Sound::Throw);
                         item.set_xyv(
                             self.bb.x,
                             self.bb.y,
@@ -315,7 +316,7 @@ impl Player {
                     }
                 } else {
                     // Throw item
-                    sound_handler.play(Sound::Throw);
+                    ctx.sound.play(Sound::Throw);
                     item.set_xyv(
                         // TODO: Should set the projectiles center and not the corner here?
                         self.bb.x + 5.0 / TILE_SIZE - item.bb().w / 2.0,
@@ -334,7 +335,7 @@ impl Player {
                 update_results.push(PlayerUpdateResult::PickUpItem);
             } else {
                 // Swing
-                sound_handler.play(Sound::Swing);
+                ctx.sound.play(Sound::Swing);
                 self.state = PlayerState::Swinging {
                     total_frames: 20,
                     frames_left: 20,
@@ -408,7 +409,7 @@ impl Player {
         &mut self,
         input: &InputState,
         map: &dyn MapLike,
-        sound_handler: &SoundHandler,
+        ctx: &mut UpdateCtx,
     ) -> Vec<PlayerUpdateResult> {
         let mut update_results = vec![];
 
@@ -428,7 +429,7 @@ impl Player {
                     if input.down {
                         self.bb.vy = 0.0;
                     } else {
-                        sound_handler.play(Sound::Jump);
+                        ctx.sound.play(Sound::Jump);
                         self.bb.vy = -0.12;
                     }
                 }
@@ -448,7 +449,7 @@ impl Player {
                     self.state = PlayerState::Normal;
                 }
 
-                update_results.append(&mut self._handle_normal(input, map, sound_handler));
+                update_results.append(&mut self._handle_normal(input, map, ctx));
             }
             PlayerState::Dead => {
                 let res = integrate_kinematic(map, &self.bb, true);
@@ -460,13 +461,13 @@ impl Player {
             }
 
             PlayerState::Normal => {
-                update_results.append(&mut self._handle_normal(input, map, sound_handler));
+                update_results.append(&mut self._handle_normal(input, map, ctx));
             }
             PlayerState::OnLadder => {
                 self.animation_handler
                     .set_state(PlayerAnimationState::Laddering);
                 if input.jump_pressed && !input.up {
-                    sound_handler.play(Sound::Jump);
+                    ctx.sound.play(Sound::Jump);
                     self.state = PlayerState::Normal;
                     self.bb.vy = -0.125;
                     self.bb.y += 0.05;

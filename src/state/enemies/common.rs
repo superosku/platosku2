@@ -1,7 +1,8 @@
-use crate::sound_handler::{Sound, SoundHandler};
+use crate::sound_handler::Sound;
 use crate::state::common::{BoundingBox, Health};
 use crate::state::item::Item;
 use crate::state::map_like::GameMap;
+use crate::state::update_ctx::UpdateCtx;
 
 pub enum EnemyHitType {
     Swing,
@@ -36,12 +37,12 @@ pub trait Enemy {
     fn maybe_got_hit_with_sound(
         &mut self,
         hit_type: EnemyHitType,
-        sound_handler: &SoundHandler,
+        ctx: &mut UpdateCtx,
     ) -> EnemyHitResult {
         match self.maybe_got_hit(hit_type) {
             EnemyHitResult::DidNotHit => EnemyHitResult::DidNotHit,
             EnemyHitResult::GotHit => {
-                sound_handler.play(Sound::EnemyHit);
+                ctx.sound.play(Sound::EnemyHit);
                 EnemyHitResult::GotHit
             }
         }

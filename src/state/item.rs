@@ -1,7 +1,8 @@
 use crate::physics::integrate_kinematic;
 use crate::render::Renderer;
-use crate::sound_handler::{Sound, SoundHandler};
+use crate::sound_handler::Sound;
 use crate::state::map_like::MapLike;
+use crate::state::update_ctx::UpdateCtx;
 use crate::state::{BoundingBox, Pos};
 use rand::Rng;
 use rand::seq::IndexedRandom;
@@ -197,13 +198,10 @@ impl Item {
         vec![]
     }
 
-    pub fn handle_player_touch(
-        &mut self,
-        sound_handler: &SoundHandler,
-    ) -> Vec<ItemInteractionResult> {
+    pub fn handle_player_touch(&mut self, ctx: &mut UpdateCtx) -> Vec<ItemInteractionResult> {
         match self.item_type {
             ItemType::Coin => {
-                sound_handler.play(Sound::CollectCoin);
+                ctx.sound.play(Sound::CollectCoin);
                 vec![
                     ItemInteractionResult::RemoveItem,
                     ItemInteractionResult::IncreaseScore,
@@ -219,10 +217,7 @@ impl Item {
         }
     }
 
-    pub fn handle_being_swung(
-        &mut self,
-        sound_handler: &SoundHandler,
-    ) -> Vec<ItemInteractionResult> {
+    pub fn handle_being_swung(&mut self, ctx: &mut UpdateCtx) -> Vec<ItemInteractionResult> {
         match self.item_type {
             ItemType::Box => {
                 let mut results = vec![ItemInteractionResult::RemoveItem];
@@ -240,7 +235,7 @@ impl Item {
                         ),
                     })
                 }
-                sound_handler.play(Sound::Clink);
+                ctx.sound.play(Sound::Clink);
                 results
             }
             _ => vec![],
