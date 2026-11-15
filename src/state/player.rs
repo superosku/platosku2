@@ -9,6 +9,7 @@ use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, An
 use crate::state::item::{Item, ItemType};
 use crate::state::update_ctx::UpdateCtx;
 
+#[derive(Debug)]
 pub enum PlayerState {
     Normal,
     // TODO: Swinging should be an optional part of Player struct so swinging can happen while on ladder etc.
@@ -94,6 +95,19 @@ impl Player {
             // item: None,
             item: Some(Item::new(0.0, 0.0, ItemType::Box)),
         }
+    }
+
+    pub fn state(&self) -> &PlayerState {
+        &self.state
+    }
+
+    pub fn is_on_ground(&self) -> bool {
+        self.on_ground
+    }
+
+    /// The item the player is carrying, if any.
+    pub fn item(&self) -> Option<&Item> {
+        self.item.as_ref()
     }
 
     pub fn set_item(&mut self, item: Item) {

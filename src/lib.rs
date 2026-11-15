@@ -8,5 +8,6 @@ pub mod debug_menu;
 pub mod minimap;
 pub mod physics;
 pub mod render;
+pub mod sim;
 pub mod sound_handler;
 pub mod state;

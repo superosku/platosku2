@@ -79,9 +79,22 @@ Game logic must give identical results for the same seed and inputs, on every pl
 - **No wall-clock time** in game logic. Count ticks.
 
 ## Testing
-- Unit tests live next to the code (`#[cfg(test)] mod tests`). Game-level tests in `state/game_state.rs` show the pattern: build a `Game` with the builder and `Room::from_ascii`, call `game.update(&input, &NullSound)` in a loop, and assert on state.
+- **Unit tests** live next to the code (`#[cfg(test)] mod tests`).
+- **E2E tests** live in `tests/` and use the headless `Sim` harness (`src/sim.rs`):
+  ```rust
+  let mut sim = sim_in(&["#####", "#S..#", "#####"]);   // tests/common/mod.rs
+  sim.press(Key::Right).run(30);            // 1 tick = 1/60 s
+  sim.tap(Key::Jump);                       // press for exactly one tick
+  sim.run_until(120, |g| g.player.is_on_ground());
+  assert!(sim.sounds().contains(&Sound::Jump));
+  ```
+  - `tests/content.rs`: every room in `rooms/` is valid, and map generation works for 200 seeds. Run it after editing rooms.
+  - `tests/player.rs`: movement (walk, jump heights, coyote time, ladders, platforms, ledge hang).
+  - `tests/interactions.rs`: enemies, items, doors and rooms.
+- Measure before asserting: write a throwaway probe test that prints values (`cargo test --test probe -- --nocapture`), then pick thresholds from real numbers. Delete the probe afterwards.
+- A test for a known, not-yet-fixed bug gets `#[ignore = "known bug: ..."]`. Run them with `cargo test -- --ignored`.
 - The game logic runs headless. Only `Renderer::new()` needs a window.
-- Still to come: a `Sim` harness for e2e tests, simple input scripts, and a screenshot capture mode.
+- Still to come: simple input scripts and a screenshot capture mode.
 
 ## Conventions
 - Small, focused changes. Keep the game behaving the same unless the change is meant to alter it.

@@ -7,7 +7,7 @@ use crate::state::{BoundingBox, Pos};
 use rand::Rng;
 use rand::seq::IndexedRandom;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum ItemType {
     Coin,
     SmallStone,
@@ -101,6 +101,10 @@ impl Item {
             },
             item_type,
         }
+    }
+
+    pub fn item_type(&self) -> ItemType {
+        self.item_type
     }
 
     pub fn bb(&self) -> &BoundingBox {
