@@ -30,7 +30,7 @@ struct Clip {
 const MIN_SPEED: f32 = 0.25;
 const MAX_SPEED: f32 = 16.0;
 /// Seconds to stay on the last frame of a passed test before moving on.
-const END_PAUSE_SECONDS: f64 = 1.0;
+const END_PAUSE_SECONDS: f64 = 0.4;
 /// Upper bound of ticks per frame, so a slow frame doesn't skip ahead too much.
 const MAX_TICKS_PER_FRAME: u32 = 64;
 

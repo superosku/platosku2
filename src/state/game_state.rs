@@ -506,7 +506,14 @@ impl GameState for Game {
             self.prev_room_index = self.cur_room_index;
             self.cur_room_index = Some(room_index);
             self.visited_rooms.insert(room_index);
-            self.prev_room_show_frames = ROOM_TRANSITION_FRAMES;
+            // Animate the transition only when coming from another room. Entering
+            // the first room at the start of the game has nothing to transition
+            // from (and the renderer would draw no darkness at all meanwhile).
+            self.prev_room_show_frames = if self.prev_room_index.is_some() {
+                ROOM_TRANSITION_FRAMES
+            } else {
+                0
+            };
             self.room_change_position = (
                 player_center.x.floor() as i32,
                 player_center.y.floor() as i32,
@@ -669,6 +676,21 @@ mod tests {
         // Room tracking happens in the game logic, without any rendering.
         assert_eq!(game.current_room_index(), Some(0));
         assert!(game.visited_rooms.contains(&0));
+    }
+
+    #[test]
+    fn entering_the_first_room_has_no_transition() {
+        let room = Room::from_ascii(0, 0, &["#####", "#.S.#", "#####"]);
+        let mut game = Game::builder()
+            .single_room(room)
+            .random_items(false)
+            .build();
+        game.update(&InputState::default(), &NullSound);
+        let (cur, prev, ratio, _) = game.get_rooms_for_display();
+        assert!(cur.is_some());
+        assert!(prev.is_none());
+        // Ratio 0 means "no transition": the renderer darkens around the room.
+        assert_eq!(ratio, 0.0);
     }
 
     #[test]
