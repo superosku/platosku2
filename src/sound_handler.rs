@@ -100,7 +100,7 @@ impl SoundHandler {
             // Variant sounds
             // 1. List file names such as "assets/sounds/dest/{}__v01.wav"
             let mut variant_sounds: Vec<SndSound> = Vec::new();
-            for variant_i in 1..9 {
+            for variant_i in 1..=9 {
                 let full_path = format!("assets/sounds/dest/{}__v{:02}.wav", file_name, variant_i);
                 if let Ok(bytes) = load_sound(&full_path) {
                     let click_sound = SndSound::load(&audio_context, &bytes);
