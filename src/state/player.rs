@@ -218,9 +218,11 @@ impl Player {
 
                 let length = 0.8;
 
-                // Drawing uses angles weirdly. Adding 1/4 circle to the angle here as hacky fix
-                let end_x = pivot_x + (angle_rad + std::f32::consts::PI / 2.0).cos() * length;
-                let end_y = pivot_y + (angle_rad + std::f32::consts::PI / 2.0).sin() * length;
+                // Drawing uses angles weirdly. Adding 1/4 circle to the angle here as hacky fix.
+                // libm gives the same result on every platform, unlike f32::cos/sin.
+                let end_angle = angle_rad + std::f32::consts::PI / 2.0;
+                let end_x = pivot_x + libm::cosf(end_angle) * length;
+                let end_y = pivot_y + libm::sinf(end_angle) * length;
 
                 Some(SwingState {
                     angle_rad,

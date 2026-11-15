@@ -58,8 +58,11 @@ impl Item {
         let min_max_radians = min_max_degrees.to_radians();
         let angle = rng.random_range(-min_max_radians..min_max_radians);
 
-        let cos = angle.cos();
-        let sin = angle.sin();
+        // Taylor series of cos and sin. For |angle| <= 5 degrees the error is below
+        // 1e-7, and unlike f32::cos/sin this is identical on every platform.
+        let angle_sq = angle * angle;
+        let cos = 1.0 - angle_sq / 2.0 + angle_sq * angle_sq / 24.0;
+        let sin = angle - angle * angle_sq / 6.0 + angle * angle_sq * angle_sq / 120.0;
 
         let vx = self.bb.vx;
         let vy = self.bb.vy;

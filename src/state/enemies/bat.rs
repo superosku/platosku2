@@ -1,7 +1,7 @@
 use crate::physics::integrate_kinematic;
 use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
-use crate::state::common::{BoundingBox, Health};
+use crate::state::common::{BoundingBox, Health, random_unit_vector};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::map_like::GameMap;
@@ -26,10 +26,18 @@ impl AnimationConfig for BatAnimationState {
     }
 }
 
+const BAT_SPEED: f32 = 0.01;
+
 enum BatState {
-    Flying { dir_rad: f32 },
+    /// Flying in direction `(dx, dy)`, which is a unit vector.
+    Flying {
+        dx: f32,
+        dy: f32,
+    },
     Standing,
-    Falling { frames_remaining: i32 },
+    Falling {
+        frames_remaining: i32,
+    },
 }
 
 pub struct Bat {
@@ -41,6 +49,7 @@ pub struct Bat {
 
 impl Bat {
     pub fn new(x: f32, y: f32, rng: &mut GameRng) -> Self {
+        let (dx, dy) = random_unit_vector(rng, |_, _| true);
         Bat {
             bb: BoundingBox {
                 x,
@@ -51,9 +60,7 @@ impl Bat {
                 vy: 0.0,
             },
             health: Health::new(3),
-            state: BatState::Flying {
-                dir_rad: rng.random_range(0.0..std::f32::consts::PI * 2.0),
-            },
+            state: BatState::Flying { dx, dy },
             animation_handler: AnimationHandler::new(BatAnimationState::Standing),
         }
     }
@@ -68,9 +75,9 @@ impl Enemy for Bat {
         let mut new_state: Option<BatState> = None;
 
         match &mut self.state {
-            BatState::Flying { dir_rad } => {
-                self.bb.vx = dir_rad.cos() * 0.01;
-                self.bb.vy = dir_rad.sin() * 0.01;
+            BatState::Flying { dx, dy } => {
+                self.bb.vx = *dx * BAT_SPEED;
+                self.bb.vy = *dy * BAT_SPEED;
 
                 let res = integrate_kinematic(map, &self.bb, false);
 
@@ -78,31 +85,25 @@ impl Enemy for Bat {
                     self.bb = res.new_bb;
                 }
 
-                let mut new_dir_rad = *dir_rad;
-                if res.on_left | res.on_right {
-                    new_dir_rad = (new_dir_rad.sin()).atan2(-new_dir_rad.cos());
-                }
-                if res.on_bottom | res.on_top {
-                    new_dir_rad = (-new_dir_rad.sin()).atan2(new_dir_rad.cos());
-                }
-
                 if res.on_bottom {
                     self.state = BatState::Standing;
                 } else {
-                    *dir_rad = new_dir_rad;
-                    // self.state = BatState::Flying {
-                    //     dir_rad: new_dir_rad,
-                    // };
+                    // Bounce off walls and the ceiling
+                    if res.on_left | res.on_right {
+                        *dx = -*dx;
+                    }
+                    if res.on_top {
+                        *dy = -*dy;
+                    }
                 }
 
                 self.animation_handler.set_state(BatAnimationState::Flying);
             }
             BatState::Standing => {
                 if ctx.rng.random_range(0..300) == 0 {
-                    let dir_rad = ctx
-                        .rng
-                        .random_range(std::f32::consts::PI * 1.25..std::f32::consts::PI * 1.75);
-                    self.state = BatState::Flying { dir_rad }
+                    // Take off upwards, at most 45 degrees from straight up
+                    let (dx, dy) = random_unit_vector(ctx.rng, |x, y| -y >= x.abs());
+                    self.state = BatState::Flying { dx, dy }
                 }
 
                 self.animation_handler

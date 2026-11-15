@@ -1,3 +1,6 @@
+// Rendering does not affect game state, so platform-dependent float math is fine here.
+#![allow(clippy::disallowed_methods)]
+
 use super::state::enemies::Enemy;
 use crate::atlas_info::AtlasInfo;
 use crate::camera::Camera;

@@ -1,3 +1,30 @@
+use crate::state::update_ctx::GameRng;
+use rand::Rng;
+
+/// Returns a random unit vector `(x, y)` whose direction is uniformly distributed
+/// among the directions for which `accept(x, y)` is true.
+///
+/// Uses rejection sampling in the unit disc, so it only needs basic arithmetic and
+/// `sqrt`, which IEEE 754 specifies exactly. The result is therefore identical on
+/// every platform (unlike `sin`/`cos`). Falls back to straight up if nothing is
+/// accepted.
+pub fn random_unit_vector(rng: &mut GameRng, accept: impl Fn(f32, f32) -> bool) -> (f32, f32) {
+    for _ in 0..1000 {
+        let x = rng.random_range(-1.0f32..1.0);
+        let y = rng.random_range(-1.0f32..1.0);
+        let len_sq = x * x + y * y;
+        if !(1e-6..=1.0).contains(&len_sq) {
+            continue;
+        }
+        let len = len_sq.sqrt();
+        let (ux, uy) = (x / len, y / len);
+        if accept(ux, uy) {
+            return (ux, uy);
+        }
+    }
+    (0.0, -1.0)
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Dir {
     Left,
@@ -147,5 +174,26 @@ impl BoundingBox {
             x: self.x + self.w * 0.5,
             y: self.y + self.h * 0.5,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+
+    #[test]
+    fn random_unit_vector_is_unit_length_and_respects_accept() {
+        let mut rng = GameRng::seed_from_u64(7);
+        let mut saw_left = false;
+        let mut saw_right = false;
+        for _ in 0..1000 {
+            let (x, y) = random_unit_vector(&mut rng, |x, y| -y >= x.abs());
+            assert!(((x * x + y * y) - 1.0).abs() < 1e-5);
+            assert!(-y >= x.abs() - 1e-6, "outside the upward cone: ({x}, {y})");
+            saw_left |= x < -0.5;
+            saw_right |= x > 0.5;
+        }
+        assert!(saw_left && saw_right, "should cover the whole cone");
     }
 }
