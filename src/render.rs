@@ -121,9 +121,28 @@ const DUAL_GRID_UV_TABLE: [(u32, u32); 16] = [
 pub trait DrawableGameState: GameState {
     fn draw_extra_mid(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool);
     fn draw_extra_last(&self, camera: &Camera, renderer: &mut Renderer, show_dark: bool);
+    fn update_and_draw_minimap(&mut self, renderer: &mut Renderer, camera: &Camera, draw_big: bool);
 }
 
 impl DrawableGameState for Game {
+    fn update_and_draw_minimap(
+        &mut self,
+        renderer: &mut Renderer,
+        camera: &Camera,
+        draw_big: bool,
+    ) {
+        if let Some((minimap, map, cur_room_index, visited_rooms)) = self.minimap_parts() {
+            minimap.update_and_draw_minimap(
+                renderer,
+                camera,
+                map,
+                cur_room_index,
+                visited_rooms,
+                draw_big,
+            )
+        }
+    }
+
     fn draw_extra_mid(&self, _camera: &Camera, renderer: &mut Renderer, _show_dark: bool) {
         // Draw the doors
         for door in &self.map.doors {
@@ -253,6 +272,14 @@ impl DrawableGameState for Editor {
     }
 
     fn draw_extra_last(&self, _camera: &Camera, _renderer: &mut Renderer, _show_dark: bool) {}
+
+    fn update_and_draw_minimap(
+        &mut self,
+        _renderer: &mut Renderer,
+        _camera: &Camera,
+        _draw_big: bool,
+    ) {
+    }
 }
 
 impl Renderer {
@@ -585,7 +612,12 @@ impl Renderer {
         self.ctx.end_render_pass();
     }
 
-    pub fn draw_hud(&mut self, state: &mut dyn GameState, camera: &Camera, draw_big_map: bool) {
+    pub fn draw_hud(
+        &mut self,
+        state: &mut dyn DrawableGameState,
+        camera: &Camera,
+        draw_big_map: bool,
+    ) {
         self.draw_player_health_bar(state, camera);
         state.update_and_draw_minimap(self, camera, draw_big_map);
     }

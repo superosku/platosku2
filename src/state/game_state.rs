@@ -2,7 +2,6 @@ use super::map_like::{GameMap, MapLike, Room};
 use super::player::{Player, PlayerUpdateResult};
 use crate::camera::Camera;
 use crate::minimap::Minimap;
-use crate::render::Renderer;
 use crate::sound_handler::{Sound, SoundPlayer};
 use crate::state::BoundingBox;
 use crate::state::enemies::Enemy;
@@ -10,6 +9,7 @@ use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateRes
 use crate::state::item::{Item, ItemInteractionResult};
 use crate::state::update_ctx::{GameRng, UpdateCtx};
 use rand::{Rng, SeedableRng};
+use std::collections::HashSet;
 
 #[derive(Default, Debug)]
 pub struct InputState {
@@ -33,8 +33,6 @@ pub trait GameState {
     fn player_mut(&mut self) -> &mut Player;
     fn map_mut(&mut self) -> &mut dyn MapLike;
     fn map(&self) -> &dyn MapLike;
-    /// Returns (center_x, center_y, view_width, view_height) in tile coords for minimap centering.
-    fn update_and_draw_minimap(&mut self, renderer: &mut Renderer, camera: &Camera, draw_big: bool);
 }
 
 pub struct Editor {
@@ -92,14 +90,6 @@ impl GameState for Editor {
     fn map_mut(&mut self) -> &mut dyn MapLike {
         &mut self.room
     }
-
-    fn update_and_draw_minimap(
-        &mut self,
-        _renderer: &mut Renderer,
-        _camera: &Camera,
-        _draw_big: bool,
-    ) {
-    }
 }
 
 pub struct Game {
@@ -112,6 +102,9 @@ pub struct Game {
     prev_room_index: Option<usize>,
     prev_room_show_frames: i32,
     room_change_position: (i32, i32),
+
+    /// Rooms the player has been in (shown on the minimap).
+    pub visited_rooms: HashSet<usize>,
 
     minimap: Minimap,
     rng: GameRng,
@@ -238,9 +231,27 @@ impl Game {
             prev_room_index: None,
             prev_room_show_frames: 0,
             room_change_position: (0, 0),
+            visited_rooms: HashSet::new(),
             minimap: Minimap::new(),
             rng,
         }
+    }
+
+    pub fn current_room_index(&self) -> Option<usize> {
+        self.cur_room_index
+    }
+
+    /// What the renderer needs for drawing the minimap: the minimap's own
+    /// presentation state, the map, the current room and the visited rooms.
+    /// `None` before the player has entered any room.
+    pub fn minimap_parts(&mut self) -> Option<(&mut Minimap, &GameMap, usize, &HashSet<usize>)> {
+        let cur_room_index = self.cur_room_index?;
+        Some((
+            &mut self.minimap,
+            &self.map,
+            cur_room_index,
+            &self.visited_rooms,
+        ))
     }
 
     pub fn get_rooms_for_display(&self) -> (Option<&Room>, Option<&Room>, f32, (i32, i32)) {
@@ -492,6 +503,7 @@ impl GameState for Game {
         {
             self.prev_room_index = self.cur_room_index;
             self.cur_room_index = Some(room_index);
+            self.visited_rooms.insert(room_index);
             self.prev_room_show_frames = ROOM_TRANSITION_FRAMES;
             self.room_change_position = (
                 player_center.x.floor() as i32,
@@ -585,23 +597,6 @@ impl GameState for Game {
     fn map_mut(&mut self) -> &mut dyn MapLike {
         &mut self.map
     }
-
-    fn update_and_draw_minimap(
-        &mut self,
-        renderer: &mut Renderer,
-        camera: &Camera,
-        draw_big: bool,
-    ) {
-        if let Some(cur_room_index) = self.cur_room_index {
-            self.minimap.update_and_draw_minimap(
-                renderer,
-                camera,
-                &self.map,
-                cur_room_index,
-                draw_big,
-            )
-        }
-    }
 }
 
 #[cfg(test)]
@@ -668,6 +663,10 @@ mod tests {
         let feet = game.player.bb.y + game.player.bb.h;
         assert!((feet - 4.0).abs() < 0.01, "feet at {feet}");
         assert_eq!(game.player.bb.vy, 0.0);
+
+        // Room tracking happens in the game logic, without any rendering.
+        assert_eq!(game.current_room_index(), Some(0));
+        assert!(game.visited_rooms.contains(&0));
     }
 
     #[test]

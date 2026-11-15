@@ -41,7 +41,7 @@ fn minimap_location_mix(
 
 pub struct Minimap {
     minimap_smooth_center: Option<(f32, f32)>, // Smooth the transition of the centered room
-    visited_rooms: HashSet<usize>,             // Define what rooms to show
+    visited_rooms: HashSet<usize>, // Copy of the game's visited rooms; defines what rooms to show
     previous_room_index: Option<usize>, // Used for defining when to recreate the minimap texture
     location: Option<MinimapLocation>,
 }
@@ -146,9 +146,10 @@ impl Minimap {
         camera: &Camera,
         map: &GameMap,
         current_room_index: usize,
+        visited_rooms: &HashSet<usize>,
         draw_big: bool, // Controls if is drawn into the corner of as big one on the center of the screen
     ) {
-        self.visited_rooms.insert(current_room_index);
+        self.visited_rooms.clone_from(visited_rooms);
 
         let smooth_center = self.update_and_get_minimap_smooth_center(map, current_room_index);
 
