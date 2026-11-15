@@ -1,21 +1,12 @@
 use miniquad::*;
 
-mod camera;
-mod physics;
-mod state;
-use crate::state::{GameState, InputState};
-mod atlas_info;
-mod debug_menu;
-mod minimap;
-mod render;
-mod sound_handler;
-
-use crate::camera::Camera;
-use crate::debug_menu::{DebugMenu, EditorSelection, GameStateDebugMenu, TileSelection};
-use crate::render::{DrawableGameState, Renderer};
-use crate::sound_handler::SoundHandler;
-use crate::state::game_state::{Editor, Game};
 use egui_miniquad as egui_mq;
+use platosku2::camera::Camera;
+use platosku2::debug_menu::{DebugMenu, EditorSelection, GameStateDebugMenu, TileSelection};
+use platosku2::render::{DrawableGameState, Renderer};
+use platosku2::sound_handler::SoundHandler;
+use platosku2::state::game_state::{Editor, Game};
+use platosku2::state::{GameState, InputState};
 
 trait FullGameState: GameState + DrawableGameState + GameStateDebugMenu {}
 impl<T: GameState + DrawableGameState + GameStateDebugMenu> FullGameState for T {}
