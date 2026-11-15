@@ -30,7 +30,7 @@ use batch::{QuadBatch, Vertex, WHITE};
 use glam::Mat4;
 use image::GenericImageView;
 use miniquad::*;
-use tiles::{CellRange, TileLayer, TileMesh};
+use tiles::{CACHE_MARGIN, CellRange, TileCacheKey, TileLayer, TileMesh};
 
 pub const TILE_SIZE: f32 = 16.0;
 
@@ -148,6 +148,8 @@ pub struct Renderer {
     hud_gpu: GpuMesh,
     tiles: TileMesh,
     tiles_gpu: GpuMesh,
+    /// What `tiles` (already uploaded to `tiles_gpu`) was built for.
+    tile_cache: Option<TileCacheKey>,
     dark: TileMesh,
     dark_gpu: GpuMesh,
 
@@ -239,6 +241,7 @@ impl Renderer {
             hud_gpu,
             tiles: TileMesh::default(),
             tiles_gpu,
+            tile_cache: None,
             dark: TileMesh::default(),
             dark_gpu,
             render_target: None,
@@ -291,26 +294,38 @@ impl Renderer {
         self.ctx.begin_pass(self.render_target, clear);
         let view_proj = camera.view_proj();
 
-        // 1. Tiles
+        // 1. Tiles (rebuilt only when the map changes or the camera leaves the cached area)
         let range = CellRange::visible(camera);
         let tex_size = (self.textures.tiles.w, self.textures.tiles.h);
         let map = state.map();
-        let base_is = |tile: BaseTile| move |x: i32, y: i32| map.get_at(x, y).0 == tile;
-        self.tiles.clear();
-        self.tiles
-            .push_layer(TileLayer::Background, range, tex_size, |_, _| true);
-        self.tiles.push_layer(
-            TileLayer::NotPartOfRoom,
-            range,
-            tex_size,
-            base_is(BaseTile::NotPartOfRoom),
-        );
-        self.tiles
-            .push_layer(TileLayer::Stone, range, tex_size, base_is(BaseTile::Stone));
-        self.tiles
-            .push_layer(TileLayer::Wood, range, tex_size, base_is(BaseTile::Wood));
-        self.tiles_gpu
-            .upload(&mut *self.ctx, &self.tiles.vertices, &self.tiles.indices);
+        let revision = map.tile_revision();
+        if !self
+            .tile_cache
+            .is_some_and(|key| key.covers(revision, &range))
+        {
+            let covered = range.expanded(CACHE_MARGIN);
+            let base_is = |tile: BaseTile| move |x: i32, y: i32| map.get_at(x, y).0 == tile;
+            self.tiles.clear();
+            self.tiles
+                .push_layer(TileLayer::Background, covered, tex_size, |_, _| true);
+            self.tiles.push_layer(
+                TileLayer::NotPartOfRoom,
+                covered,
+                tex_size,
+                base_is(BaseTile::NotPartOfRoom),
+            );
+            self.tiles.push_layer(
+                TileLayer::Stone,
+                covered,
+                tex_size,
+                base_is(BaseTile::Stone),
+            );
+            self.tiles
+                .push_layer(TileLayer::Wood, covered, tex_size, base_is(BaseTile::Wood));
+            self.tiles_gpu
+                .upload(&mut *self.ctx, &self.tiles.vertices, &self.tiles.indices);
+            self.tile_cache = Some(TileCacheKey { revision, covered });
+        }
         self.draw_tile_mesh(false, view_proj);
 
         // 2. World sprites and rectangles

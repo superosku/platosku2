@@ -1,6 +1,6 @@
 use super::common::{
     BaseTile, DoorDir, MapLike, ObjectTemplate, ObjectTemplateType, OverlayInfo, OverlayTile,
-    RoomDoor,
+    RoomDoor, new_tile_revision,
 };
 use crate::state::enemies::Enemy;
 use crate::state::update_ctx::GameRng;
@@ -23,6 +23,9 @@ pub struct Room {
 
     #[serde(skip, default)]
     all_overlays: Vec<OverlayInfo>,
+    /// See [`MapLike::tile_revision`]. Renew it whenever tiles, size or position change.
+    #[serde(skip, default = "new_tile_revision")]
+    tile_revision: u64,
 }
 
 impl Room {
@@ -44,6 +47,7 @@ impl Room {
 
         self.x = pos.0;
         self.y = pos.1;
+        self.tile_revision = new_tile_revision();
     }
 
     pub fn new_empty(x: i32, y: i32, w: u32, h: u32, base: BaseTile, overlay: OverlayTile) -> Room {
@@ -61,6 +65,7 @@ impl Room {
             object_templates: Vec::new(),
             all_overlays: Vec::new(),
             disabled: false,
+            tile_revision: new_tile_revision(),
         }
     }
 
@@ -268,10 +273,12 @@ impl Room {
 
     pub fn set_base_absolute(&mut self, x: u32, y: u32, tile: BaseTile) {
         self.base[(x + self.w * y) as usize] = tile;
+        self.tile_revision = new_tile_revision();
     }
 
     pub fn set_overlay_absolute(&mut self, x: u32, y: u32, tile: OverlayTile) {
         self.overlay[(x + self.w * y) as usize] = tile;
+        self.tile_revision = new_tile_revision();
     }
 
     pub fn get_absolute(&self, x: u32, y: u32) -> (BaseTile, OverlayTile) {
@@ -323,6 +330,7 @@ impl Room {
         self.w = new_w;
         self.overlay = new_overlay;
         self.base = new_base;
+        self.tile_revision = new_tile_revision();
         for door in &mut self.doors {
             door.x += cols_to_add_left as u32;
             door.y += rows_to_add_top as u32;
@@ -414,6 +422,7 @@ impl Room {
         self.w = new_w;
         self.overlay = new_overlay;
         self.base = new_base;
+        self.tile_revision = new_tile_revision();
 
         for door in &mut self.doors {
             door.x = (door.x as i32 - cols_to_remove_left as i32)
@@ -508,6 +517,10 @@ impl MapLike for Room {
         &self.all_overlays
     }
 
+    fn tile_revision(&self) -> u64 {
+        self.tile_revision
+    }
+
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile) {
         if let Some(rel) = self.abs_to_rel((x, y)) {
             self.set_base_absolute(rel.0, rel.1, tile);
@@ -563,6 +576,31 @@ impl MapLike for Room {
 mod tests {
     use super::super::common::{BaseTile, DoorDir, OverlayTile, RoomDoor};
     use super::*;
+
+    #[test]
+    fn tile_edits_renew_the_tile_revision() {
+        let mut room = Room::from_ascii(0, 0, &["###", "#S#", "###"]);
+        let copy = room.clone();
+        assert_eq!(copy.tile_revision(), room.tile_revision());
+
+        let before = room.tile_revision();
+        room.set_base(1, 1, BaseTile::Wood);
+        assert_ne!(room.tile_revision(), before, "set_base");
+
+        let before = room.tile_revision();
+        room.set_overlay(1, 1, OverlayTile::Ladder);
+        assert_ne!(room.tile_revision(), before, "set_overlay");
+
+        let before = room.tile_revision();
+        room.set_pos((5, 5));
+        assert_ne!(room.tile_revision(), before, "set_pos");
+
+        // Growing the room (painting outside it) also renews it.
+        let before = room.tile_revision();
+        room.set_base(20, 5, BaseTile::Stone);
+        assert_ne!(room.tile_revision(), before, "resize");
+        assert_ne!(copy.tile_revision(), room.tile_revision());
+    }
 
     #[test]
     fn from_ascii_builds_tiles_doors_and_enemies() {

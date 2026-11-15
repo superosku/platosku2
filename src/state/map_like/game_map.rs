@@ -1,4 +1,6 @@
-use super::common::{BaseTile, DoorDir, MapLike, OverlayInfo, OverlayTile, RoomDoor};
+use super::common::{
+    BaseTile, DoorDir, MapLike, OverlayInfo, OverlayTile, RoomDoor, new_tile_revision,
+};
 use super::room::Room;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::BoundingBox;
@@ -121,6 +123,8 @@ pub struct GameMap {
     y: i32,
     w: u32,
     h: u32,
+    /// See [`MapLike::tile_revision`]. Renewed by `rebuild_tile_cache`.
+    tile_revision: u64,
 }
 
 impl GameMap {
@@ -204,6 +208,7 @@ impl GameMap {
             w: 0,
             overlay: Vec::new(),
             base: Vec::new(),
+            tile_revision: 0,
         };
         game_map.rebuild_tile_cache();
         game_map
@@ -245,6 +250,7 @@ impl GameMap {
             w: 0,
             overlay: Vec::new(),
             base: Vec::new(),
+            tile_revision: 0,
         };
 
         let mut room_count = 1;
@@ -378,6 +384,7 @@ impl GameMap {
 
         self.overlay = vec![OverlayTile::None; (w * h) as usize];
         self.base = vec![BaseTile::Stone; (w * h) as usize];
+        self.tile_revision = new_tile_revision();
 
         for xx in 0..w {
             for yy in 0..h {
@@ -504,6 +511,10 @@ impl MapLike for GameMap {
         }
         let index = ((tx - self.x) + (ty - self.y) * self.w as i32) as usize;
         (self.base[index], self.overlay[index])
+    }
+
+    fn tile_revision(&self) -> u64 {
+        self.tile_revision
     }
 
     fn get_overlays(&self) -> &Vec<OverlayInfo> {

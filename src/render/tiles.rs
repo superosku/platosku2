@@ -81,6 +81,24 @@ impl CellRange {
     }
 }
 
+/// How many cells around the visible area a cached tile mesh covers, so the
+/// camera can move a bit before the mesh has to be rebuilt.
+pub const CACHE_MARGIN: i32 = 16;
+
+/// What a cached tile mesh was built for: a map revision and an area.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TileCacheKey {
+    pub revision: u64,
+    pub covered: CellRange,
+}
+
+impl TileCacheKey {
+    /// Whether the mesh can draw the `needed` cells of a map at `revision`.
+    pub fn covers(&self, revision: u64, needed: &CellRange) -> bool {
+        self.revision == revision && self.covered.contains(needed)
+    }
+}
+
 /// The corner mask of dual-grid cell `(x, y)`: which of the map tiles
 /// `(x, y)`, `(x + 1, y)`, `(x, y + 1)` and `(x + 1, y + 1)` are filled.
 fn corner_mask(filled: &impl Fn(i32, i32) -> bool, x: i32, y: i32) -> usize {
@@ -209,6 +227,28 @@ mod tests {
         assert_eq!(mesh.vertices.len(), (4 + 16) * 4);
         // Cell (0, 0) starts half a tile right and down from tile (0, 0).
         assert_eq!(mesh.vertices[3 * 4].pos, [8.0, 8.0]);
+    }
+
+    #[test]
+    fn cache_key_needs_same_revision_and_area() {
+        let visible = CellRange {
+            x0: 0,
+            y0: 0,
+            x1: 10,
+            y1: 10,
+        };
+        let key = TileCacheKey {
+            revision: 7,
+            covered: visible.expanded(CACHE_MARGIN),
+        };
+        assert!(key.covers(7, &visible));
+        assert!(!key.covers(8, &visible), "map changed");
+        let moved = CellRange {
+            x0: visible.x0 + CACHE_MARGIN + 1,
+            x1: visible.x1 + CACHE_MARGIN + 1,
+            ..visible
+        };
+        assert!(!key.covers(7, &moved), "camera left the cached area");
     }
 
     #[test]

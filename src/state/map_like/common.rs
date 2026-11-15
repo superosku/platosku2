@@ -4,6 +4,16 @@ use crate::state::map_like::Room;
 use crate::state::update_ctx::GameRng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_TILE_REVISION: AtomicU64 = AtomicU64::new(1);
+
+/// A fresh value for [`MapLike::tile_revision`], unique within this process.
+/// It only tells the renderer when to rebuild its cached tile meshes and never
+/// affects game logic, so it doesn't break determinism.
+pub fn new_tile_revision() -> u64 {
+    NEXT_TILE_REVISION.fetch_add(1, Ordering::Relaxed)
+}
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
 pub enum BaseTile {
@@ -36,6 +46,9 @@ pub trait MapLike {
     fn set_base(&mut self, x: i32, y: i32, tile: BaseTile);
     fn set_overlay(&mut self, x: i32, y: i32, tile: OverlayTile);
     fn get_overlays(&self) -> &Vec<OverlayInfo>;
+    /// Changes whenever the tiles change. Two maps with the same revision have
+    /// the same tiles (a clone keeps the revision of the original).
+    fn tile_revision(&self) -> u64;
     fn overlaps_solid(&self, x: f32, y: f32, w: f32, h: f32) -> bool;
 
     fn is_ladder_at(&self, tx: i32, ty: i32) -> bool {
