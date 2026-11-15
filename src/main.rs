@@ -186,7 +186,7 @@ impl EventHandler for Stage {
                 self.input.swing_held = true
             }
             KeyCode::Z => {
-                if !repeat && !self.input.swing_held {
+                if !repeat && !self.input.jump_held {
                     self.input.jump_pressed = true
                 }
                 self.input.jump_held = true
