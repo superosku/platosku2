@@ -20,7 +20,7 @@ Put temporary files (logs, screenshots, scripts) in `target/claude/`, which is g
 ## Project layout
 - `src/main.rs`: the game binary (window, input, debug UI). Everything else is in the library (`src/lib.rs`), so tests and tools can use it.
 - `src/state/`: game logic (player, enemies, items, map, rooms). Must stay deterministic and free of rendering (see Determinism).
-- `src/physics.rs`, `src/render.rs`, `src/minimap.rs`, `src/camera.rs`, `src/sound_handler.rs`, `src/atlas_info.rs`, `src/debug_menu/` (egui editor and debug UI).
+- `src/physics.rs`, `src/render/` (renderer, see Rendering), `src/minimap.rs`, `src/camera.rs`, `src/sound_handler.rs`, `src/atlas_info.rs`, `src/debug_menu/` (egui editor and debug UI).
 - `src/sim.rs` (headless simulation for tests), `src/script.rs` (input scripts), `src/watch.rs` (replay window for gameplay tests).
 - `tests/`: gameplay, content and script tests (see Testing). `examples/`: `run_script`, `capture`, `sprite_sheet` (see Tools).
 - `rooms/*.json`: room content (made with the in-game editor). `scripts/*.txt`: example input scripts. `assets/`: sprites, atlas, sounds.
@@ -35,7 +35,7 @@ Put temporary files (logs, screenshots, scripts) in `target/claude/`, which is g
 - The egui "Debug" window switches between Game and Editor. Switching to Game calls `Game::new()`, which regenerates the map.
 
 ### State (`src/state/`)
-- `GameState` trait (`game_state.rs`): `update(input, &dyn SoundPlayer)`, `update_camera`, accessors for player and map. It has no rendering dependencies. `FullGameState` = `GameState + DrawableGameState (render.rs, including the minimap) + GameStateDebugMenu (debug_menu/)`.
+- `GameState` trait (`game_state.rs`): `update(input, &dyn SoundPlayer)`, `update_camera`, accessors for player and map. It has no rendering dependencies. `FullGameState` = `GameState + DrawableGameState (render/game.rs, including the minimap) + GameStateDebugMenu (debug_menu/)`.
 - **`UpdateCtx`** (`update_ctx.rs`): `{ sound: &dyn SoundPlayer, rng: &mut GameRng }`, passed to every entity update (player, enemies, item interactions). Add new cross-cutting services here instead of new parameters.
 - **Constructing games:** `Game::new()` (random seed, printed), `Game::new_with_seed(seed)`, or `Game::builder().seed(..).single_room(room).player_pos(x, y).random_items(false).build()`. `MapSetup` = `RandomFromFolder` | `Random(Vec<Room>)` | `SingleRoom(..)`.
 - `Game`: player, `GameMap`, `items: Vec<Item>`, `enemies: Vec<Box<dyn Enemy>>`, current and previous room index (for camera and room-transition "dark" effect), `visited_rooms`, `Minimap` (presentation state only, no GPU resources), and the `GameRng`. `Game::update` does all the interactions: door push-out, player update, items (physics, pickup, swing hits, projectile hits on enemies), enemies (only those in the current room are updated), stomp and contact damage, room change detection, doors.
@@ -53,19 +53,22 @@ Put temporary files (logs, screenshots, scripts) in `target/claude/`, which is g
 - `Room` (`room.rs`): serde JSON in `rooms/room_XXXX.json`. It holds base and overlay tiles, its position, `doors: Vec<RoomDoor>`, `object_templates` (enemy spawns) and `disabled`. `Room::load_rooms_from_folder()` reads `rooms/`. The editor saves here too. **`disabled` is currently only used by the editor; the map generator ignores it.**
 - `Room::from_ascii(x, y, &[rows])` builds a room from ASCII art (see its doc comment for the characters). Use it in tests.
 - `GameMap::new_random(&rooms, rng)` (`game_map.rs`): starts from the **first** room that has a StartDoor, then randomly attaches rooms door to door (max 1000 attempts, stops at 10 rooms), rejecting overlaps. It then flattens everything into one tile grid (`rebuild_tile_cache`). `GameMap::from_single_room(room)` makes a one-room map. `MapDoor` is a door between rooms, with animation and temporary closing. Doors are currently **always open** (see the `TODO: TEMP` in `Game::update`).
-- Coordinates: world units are **tiles** (1.0 = one tile = 16 px, `render::TILE_SIZE`). Positions are f32, tile indices i32, and y grows downward.
+- Coordinates: world units are **tiles** (1.0 = one tile = 16 px, `state::common::TILE_SIZE`). Positions are f32, tile indices i32, and y grows downward.
 
 ### Physics (`src/physics.rs`)
 - `integrate_kinematic(map, bb, gravity)`: per-axis sweep (X then Y) with bisection against `overlaps_solid`. Returns a new bb plus `on_bottom/top/left/right`. GRAVITY = 0.007 tiles/tick², terminal velocity 0.9.
 - `check_and_snap_platforms` (one-way platforms) and `check_and_snap_hang` (ledge grab).
 
-### Rendering (`src/render.rs`, `src/minimap.rs`, `src/camera.rs`)
-- `Renderer` owns the miniquad `Context`, 3 pipelines (sprites, batched tiles, HUD) and textures. Sprites are queued into one atlas batch (`draw_from_texture_atlas`) and flushed once per frame.
-- Tiles use a **dual-grid** autotiling system (`draw_base_dual_grid`, `DUAL_GRID_UV_TABLE`) with layer indices into `tile_backgrounds.png`.
-- The "dark" overlay hides rooms other than the current one and animates during room transitions (`DrawableGameState::draw_extra_last`).
-- `Camera` lerps smoothly towards a target (`slowly_follow`). `screen_to_tile` must match the renderer's view transform.
-- `Minimap`: built as a CPU pixel image and uploaded to a texture only when the room changes. It shows visited rooms and supports zooming.
-- Entity `draw` methods live on the entities themselves and take `&mut Renderer`.
+### Rendering (`src/render/`, `src/minimap.rs`, `src/camera.rs`)
+- **Game state describes, the renderer draws.** Entities fill a `DrawList` (`state/draw.rs`: `Sprite`, rectangles, rotated rectangles, health bars; coordinates in tiles) in their `draw(&self, out: &mut DrawList)` methods. Nothing in `state/` imports `render`. Use `Sprite::around(name, frame, &bb)` for the usual sprite with a 1 px border around a bounding box.
+- `DrawableGameState` (`render/game.rs`): `draw_world` (doors, items, enemies; before the player), `draw_world_top` (after the player: enemy health bars), `dark_tiles` (which tiles the dark overlay covers) and `update_and_draw_minimap`.
+- `Renderer::draw` (`render/mod.rs`) fixes the frame order: tiles, then the world `DrawList` (overlay tiles, `draw_world`, player, `draw_world_top`), then the dark overlay, then the HUD (player health bar, minimap). Everything in one stage is drawn **in submission order**, so later items are on top.
+- `QuadBatch` (`render/batch.rs`) collects quads with per-vertex color and splits them into texture segments (one draw call per texture change). Colored rectangles use a 1x1 white texture. Indices are `u32`. `GpuMesh` grows (and frees) its buffers as needed; each buffer is uploaded at most once per frame.
+- Two shaders (`render/shaders.rs`): **sprite** (texture times vertex color; also rectangles and the HUD) and **tile** (magenta pixels in `tilemap16.png` show a repeating 64x64 region of `tile_backgrounds.png`, anchored to the world). The atlas has no magenta pixels.
+- Tiles use a **dual-grid** autotiling system (`render/tiles.rs`: `TileMesh::push_layer`, `DUAL_GRID_UV_TABLE`). All layers (`TileLayer`: background, not-part-of-room, stone, wood) go into one mesh, which is **cached**: it covers the visible area plus `CACHE_MARGIN` cells and is rebuilt only when the camera leaves that area or `MapLike::tile_revision()` changes. **Any new code that changes tiles must renew the revision** (`new_tile_revision()`; `Room` does it in its mutating methods, `GameMap` in `rebuild_tile_cache`). The revision comes from a process-wide counter and never affects game logic.
+- The "dark" overlay hides rooms other than the current one and animates during room transitions (`DrawableGameState::dark_tiles`). It is rebuilt every frame.
+- `Camera` owns the view math (`view`, `view_proj`, `screen_proj`, `visible_world_px`, `screen_to_tile`, using `glam`). The camera center is pixel-snapped. It lerps smoothly towards a target (`slowly_follow`); the zoom is a free value (pixel-perfect output is a README TODO).
+- `Minimap`: built as a CPU pixel image and uploaded only when the room changes (`Renderer::set_minimap_image`, drawn with `draw_minimap_image`). It shows visited rooms and supports zooming.
 
 ### Sound (`src/sound_handler.rs`)
 - `SoundPlayer` trait: `SoundHandler` (real audio), `NullSound` and `RecordingSound` (for tests; `played()` returns the requested sounds in order).
@@ -81,7 +84,7 @@ Put temporary files (logs, screenshots, scripts) in `target/claude/`, which is g
 ## Determinism (important)
 Game logic must give identical results for the same seed and inputs, on every platform (macOS on ARM locally, Linux on x86 in CI).
 - **Randomness:** only through `ctx.rng` / a `&mut GameRng` (ChaCha8). Never `rand::rng()` in game logic. Sound variant selection is the one exception, because it doesn't affect state.
-- **Float math:** `+ - * /` and `sqrt` are fine. `sin`, `cos`, `atan2`, `powf`, `exp` and similar are platform-dependent and **banned by `clippy.toml`** (`disallowed-methods`). Use `libm::sinf` and friends, or avoid them (see `random_unit_vector` in `state/common.rs`). `render.rs` is exempt.
+- **Float math:** `+ - * /` and `sqrt` are fine. `sin`, `cos`, `atan2`, `powf`, `exp` and similar are platform-dependent and **banned by `clippy.toml`** (`disallowed-methods`). Use `libm::sinf` and friends, or avoid them (see `random_unit_vector` in `state/common.rs`). `render/` is exempt.
 - **No iterating `HashMap`/`HashSet`** in game logic; the order is random per run. Use `Vec` or `BTreeMap`/`BTreeSet`. Lookups and inserts are fine.
 - **No wall-clock time** in game logic. Count ticks.
 

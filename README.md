@@ -31,7 +31,8 @@ This is my platformer game (prototype) written in rust.
    * [ ] Doors close until the room's enemies are dead (code exists, currently disabled: `TODO: TEMP` in `Game::update`)
    * [ ] Use the room `disabled` flag in map generation (currently only the editor uses it)
  * Optimizations
-   * [x] All sprites use just one draw call
+   * [x] Sprites and rectangles are batched (one draw call per texture change)
+   * [x] The tile mesh is cached and rebuilt only when the map changes or the camera moves away
    * [ ] Less looping over things multiple times
  * Rendering
    * [ ] Pixel-perfect output: the camera zoom is a free, animated value, so pixel-art pixels are
