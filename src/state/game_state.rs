@@ -8,8 +8,8 @@ use crate::state::BoundingBox;
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::item::{Item, ItemInteractionResult};
-use crate::state::update_ctx::UpdateCtx;
-use rand::Rng;
+use crate::state::update_ctx::{GameRng, UpdateCtx};
+use rand::{Rng, SeedableRng};
 
 #[derive(Default, Debug)]
 pub struct InputState {
@@ -40,6 +40,7 @@ pub trait GameState {
 pub struct Editor {
     player: Player,
     pub room: Room,
+    rng: GameRng,
 }
 
 impl Editor {
@@ -47,13 +48,20 @@ impl Editor {
         let room = Room::new_boxed(0, 0, 5, 5);
         let player = Player::new(2.0, 2.0);
 
-        Editor { player, room }
+        Editor {
+            player,
+            room,
+            rng: GameRng::seed_from_u64(0),
+        }
     }
 }
 
 impl GameState for Editor {
     fn update(&mut self, input: &InputState, sound: &dyn SoundPlayer) {
-        let mut ctx = UpdateCtx { sound };
+        let mut ctx = UpdateCtx {
+            sound,
+            rng: &mut self.rng,
+        };
         self.player.update(input, &self.room, &mut ctx);
     }
 
@@ -106,27 +114,36 @@ pub struct Game {
     room_change_position: (i32, i32),
 
     minimap: Minimap,
+    rng: GameRng,
 }
 
 const ROOM_TRANSITION_FRAMES: i32 = 30;
 
 impl Game {
+    /// Creates a new game with a random seed. The seed is printed so that a run
+    /// can be reproduced with [`Game::new_with_seed`].
     pub fn new() -> Game {
-        let map = GameMap::new_random();
+        let seed: u64 = rand::rng().random();
+        println!("Game seed: {}", seed);
+        Game::new_with_seed(seed)
+    }
+
+    pub fn new_with_seed(seed: u64) -> Game {
+        let mut rng = GameRng::seed_from_u64(seed);
+        let map = GameMap::new_random(&mut rng);
         let pos = map.player_start_pos();
         let player = Player::new(pos.0, pos.1);
-        let enemies = map.get_enemies_from_templates();
+        let enemies = map.get_enemies_from_templates(&mut rng);
 
         // Add some random items to the map
         let mut items = vec![];
         for _ in 0..10000 {
             let (min_x, min_y, width, height) = map.get_bounds();
-            let mut rng = rand::rng();
             let x = rng.random_range(min_x..min_x + width);
             let y = rng.random_range(min_y..min_y + height);
 
             if !map.is_solid_at_tile(x, y) {
-                items.push(Item::new_random(x as f32 + 0.5, y as f32 + 0.5));
+                items.push(Item::new_random(x as f32 + 0.5, y as f32 + 0.5, &mut rng));
             }
             if items.len() > 50 {
                 break;
@@ -143,6 +160,7 @@ impl Game {
             prev_room_show_frames: 0,
             room_change_position: (0, 0),
             minimap: Minimap::new(),
+            rng,
         }
     }
 
@@ -163,7 +181,10 @@ impl Game {
 
 impl GameState for Game {
     fn update(&mut self, input: &InputState, sound: &dyn SoundPlayer) {
-        let mut ctx = UpdateCtx { sound };
+        let mut ctx = UpdateCtx {
+            sound,
+            rng: &mut self.rng,
+        };
         let door_bbs: Vec<BoundingBox> = self
             .map
             .doors
@@ -327,15 +348,15 @@ impl GameState for Game {
                 continue;
             }
 
-            for result in enemy.update(&self.map) {
+            for result in enemy.update(&self.map, &mut ctx) {
                 match result {
                     EnemyUpdateResult::SpawnItemThrowTowardsPlayer { mut item } => {
                         let x_diff = (self.player.bb.x - item.bb().x).clamp(-4.0, 4.0);
 
                         item.set_v(x_diff * 0.025, -0.15);
 
-                        item.randomize_direction();
-                        item.randomize_speed();
+                        item.randomize_direction(ctx.rng);
+                        item.randomize_speed(ctx.rng);
 
                         self.items.push(item);
                     }
@@ -501,5 +522,48 @@ impl GameState for Game {
                 draw_big,
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sound_handler::NullSound;
+
+    /// A compact summary of the game state, used to compare two runs.
+    fn snapshot(game: &Game) -> Vec<(i32, i32)> {
+        let mut out: Vec<(i32, i32)> = game.map.rooms.iter().map(|r| r.get_pos()).collect();
+        out.extend(
+            game.items
+                .iter()
+                .map(|i| ((i.bb().x * 1000.0) as i32, (i.bb().y * 1000.0) as i32)),
+        );
+        out.extend(
+            game.enemies
+                .iter()
+                .map(|e| ((e.bb().x * 1000.0) as i32, (e.bb().y * 1000.0) as i32)),
+        );
+        out
+    }
+
+    #[test]
+    fn same_seed_gives_same_game() {
+        let mut a = Game::new_with_seed(42);
+        let mut b = Game::new_with_seed(42);
+        assert_eq!(snapshot(&a), snapshot(&b));
+
+        let input = InputState::default();
+        for _ in 0..600 {
+            a.update(&input, &NullSound);
+            b.update(&input, &NullSound);
+        }
+        assert_eq!(snapshot(&a), snapshot(&b));
+    }
+
+    #[test]
+    fn different_seeds_give_different_games() {
+        let a = Game::new_with_seed(1);
+        let b = Game::new_with_seed(2);
+        assert_ne!(snapshot(&a), snapshot(&b));
     }
 }

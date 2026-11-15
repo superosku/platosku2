@@ -5,6 +5,7 @@ use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::map_like::GameMap;
+use crate::state::update_ctx::UpdateCtx;
 use rand::prelude::IndexedRandom;
 
 // Slime bounces around
@@ -64,7 +65,7 @@ impl Enemy for Slime {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, ctx: &mut UpdateCtx) -> Vec<EnemyUpdateResult> {
         let result = integrate_kinematic(map, &self.bb, true);
         self.bb = result.new_bb;
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
@@ -81,7 +82,7 @@ impl Enemy for Slime {
                     self.state = SlimeState::Jumping {
                         frames_remaining: jump_total_frames,
                     };
-                    self.dir = *[Dir::Left, Dir::Right].choose(&mut rand::rng()).unwrap();
+                    self.dir = *[Dir::Left, Dir::Right].choose(ctx.rng).unwrap();
                 } else {
                     self.state = SlimeState::Idle {
                         frames_remaining: frames_remaining - 1,

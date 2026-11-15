@@ -1,6 +1,8 @@
 use crate::state::common::BoundingBox;
 use crate::state::enemies::{Bat, Burrower, Enemy, Slime, Worm};
 use crate::state::map_like::Room;
+use crate::state::update_ctx::GameRng;
+use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Debug)]
@@ -114,7 +116,8 @@ impl ObjectTemplate {
     }
 
     pub fn get_bb(&self) -> BoundingBox {
-        *self.as_object().bb()
+        // Only used for drawing templates in the editor, so a throwaway RNG is fine.
+        *self.as_object(&mut GameRng::seed_from_u64(0)).bb()
     }
 
     pub fn get_texture_index(&self) -> &str {
@@ -126,9 +129,9 @@ impl ObjectTemplate {
         }
     }
 
-    pub fn as_object(&self) -> Box<dyn Enemy> {
+    pub fn as_object(&self, rng: &mut GameRng) -> Box<dyn Enemy> {
         match self.object_type {
-            ObjectTemplateType::Bat => Box::new(Bat::new(self.x, self.y)),
+            ObjectTemplateType::Bat => Box::new(Bat::new(self.x, self.y, rng)),
             ObjectTemplateType::Slime => Box::new(Slime::new(self.x, self.y)),
             ObjectTemplateType::Worm => Box::new(Worm::new(self.x, self.y)),
             ObjectTemplateType::Burrower => Box::new(Burrower::new(self.x, self.y)),

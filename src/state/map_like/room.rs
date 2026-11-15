@@ -2,6 +2,7 @@ use super::common::{
     BaseTile, DoorDir, MapLike, ObjectTemplate, OverlayInfo, OverlayTile, RoomDoor,
 };
 use crate::state::enemies::Enemy;
+use crate::state::update_ctx::GameRng;
 use serde::{Deserialize, Serialize};
 use std::fs::DirEntry;
 use std::{fs, io, path::Path};
@@ -62,10 +63,10 @@ impl Room {
         }
     }
 
-    pub fn get_enemies_from_template(&self) -> Vec<Box<dyn Enemy>> {
+    pub fn get_enemies_from_template(&self, rng: &mut GameRng) -> Vec<Box<dyn Enemy>> {
         self.object_templates
             .iter()
-            .map(|t| t.as_object())
+            .map(|t| t.as_object(rng))
             .collect()
     }
 

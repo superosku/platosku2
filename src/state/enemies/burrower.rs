@@ -6,6 +6,7 @@ use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::item::{Item, ItemType};
 use crate::state::map_like::{GameMap, MapLike};
+use crate::state::update_ctx::{GameRng, UpdateCtx};
 use rand::Rng;
 
 #[derive(PartialEq)]
@@ -65,6 +66,7 @@ impl Burrower {
 fn find_random_close_floor_pos_at_room_here(
     current_pos: &BoundingBox,
     map: &GameMap,
+    rng: &mut GameRng,
 ) -> Option<BoundingBox> {
     let center = current_pos.get_center();
 
@@ -74,7 +76,6 @@ fn find_random_close_floor_pos_at_room_here(
     let current_y = center.y.floor() as i32;
 
     for _ in 0..50 {
-        let mut rng = rand::rng();
         let x_diff = rng.random_range(-10..10);
         let y_diff = rng.random_range(-10..10);
 
@@ -112,7 +113,7 @@ impl Enemy for Burrower {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, ctx: &mut UpdateCtx) -> Vec<EnemyUpdateResult> {
         let mut update_results = Vec::new();
         self.immunity_frames = self.immunity_frames.saturating_sub(1);
 
@@ -149,7 +150,9 @@ impl Enemy for Burrower {
                 }
                 BurrowerAnimationState::Hidden => {
                     // Randomize the position of the burrower
-                    if let Some(new_bb) = find_random_close_floor_pos_at_room_here(&self.bb, map) {
+                    if let Some(new_bb) =
+                        find_random_close_floor_pos_at_room_here(&self.bb, map, ctx.rng)
+                    {
                         self.bb = new_bb;
                     }
 

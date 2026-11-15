@@ -2,7 +2,7 @@ use crate::physics::integrate_kinematic;
 use crate::render::Renderer;
 use crate::sound_handler::Sound;
 use crate::state::map_like::MapLike;
-use crate::state::update_ctx::UpdateCtx;
+use crate::state::update_ctx::{GameRng, UpdateCtx};
 use crate::state::{BoundingBox, Pos};
 use rand::Rng;
 use rand::seq::IndexedRandom;
@@ -44,20 +44,18 @@ impl Item {
         self.bb.vx.abs() > 0.001 || self.bb.vy.abs() > 0.001
     }
 
-    pub fn randomize_speed(&mut self) {
+    pub fn randomize_speed(&mut self, rng: &mut GameRng) {
         let min_max_speed = 0.95;
 
-        let mut rng = rand::rng();
         let speed = rng.random_range(min_max_speed..1.0 / min_max_speed);
         self.bb.vx *= speed;
         self.bb.vy *= speed;
     }
 
-    pub fn randomize_direction(&mut self) {
+    pub fn randomize_direction(&mut self, rng: &mut GameRng) {
         let min_max_degrees = 5.0_f32;
 
         let min_max_radians = min_max_degrees.to_radians();
-        let mut rng = rand::rng();
         let angle = rng.random_range(-min_max_radians..min_max_radians);
 
         let cos = angle.cos();
@@ -153,9 +151,7 @@ impl Item {
         self.draw_fake_xy(renderer, self.bb.x, self.bb.y);
     }
 
-    pub fn new_random(center_x: f32, center_y: f32) -> Self {
-        let mut rng = rand::rng();
-
+    pub fn new_random(center_x: f32, center_y: f32, rng: &mut GameRng) -> Self {
         let item_types = [
             ItemType::Coin,
             ItemType::SmallStone,
@@ -163,7 +159,7 @@ impl Item {
             ItemType::Box,
         ];
 
-        let random_type = item_types.choose(&mut rng).unwrap();
+        let random_type = item_types.choose(rng).unwrap();
 
         Item::new(center_x, center_y, *random_type)
     }
@@ -221,10 +217,9 @@ impl Item {
         match self.item_type {
             ItemType::Box => {
                 let mut results = vec![ItemInteractionResult::RemoveItem];
-                let mut rng = rand::rng();
-                for _ in 0..rng.random_range(1..5) {
-                    let vy = rng.random_range(-0.05..0.05);
-                    let vx = rng.random_range(-0.05..0.05);
+                for _ in 0..ctx.rng.random_range(1..5) {
+                    let vy = ctx.rng.random_range(-0.05..0.05);
+                    let vx = ctx.rng.random_range(-0.05..0.05);
                     results.push(ItemInteractionResult::SpawnItem {
                         item: Item::new_with_velocity(
                             self.bb.x + self.bb.w * 0.5,

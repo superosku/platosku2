@@ -10,4 +10,4 @@ pub mod update_ctx;
 pub use common::{BoundingBox, Dir, Pos};
 pub use game_state::{GameState, InputState};
 pub use map_like::{BaseTile, OverlayTile};
-pub use update_ctx::UpdateCtx;
+pub use update_ctx::{GameRng, UpdateCtx};

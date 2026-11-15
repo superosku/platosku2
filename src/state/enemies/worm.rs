@@ -5,6 +5,7 @@ use crate::state::common::{BoundingBox, Dir, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::map_like::GameMap;
+use crate::state::update_ctx::UpdateCtx;
 
 // Worm moves back and fort
 #[derive(PartialEq)]
@@ -50,7 +51,7 @@ impl Enemy for Worm {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, _ctx: &mut UpdateCtx) -> Vec<EnemyUpdateResult> {
         match self.dir {
             Dir::Left => {
                 self.bb.vx = -0.01;

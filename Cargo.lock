@@ -1089,6 +1089,7 @@ dependencies = [
  "miniquad",
  "quad-snd",
  "rand 0.9.2",
+ "rand_chacha",
  "serde",
  "serde_json",
 ]

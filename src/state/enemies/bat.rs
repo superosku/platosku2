@@ -5,6 +5,7 @@ use crate::state::common::{BoundingBox, Health};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::map_like::GameMap;
+use crate::state::update_ctx::{GameRng, UpdateCtx};
 use rand::Rng;
 
 // Bat flies around
@@ -39,9 +40,7 @@ pub struct Bat {
 }
 
 impl Bat {
-    pub fn new(x: f32, y: f32) -> Self {
-        let mut rng = rand::rng();
-
+    pub fn new(x: f32, y: f32, rng: &mut GameRng) -> Self {
         Bat {
             bb: BoundingBox {
                 x,
@@ -65,7 +64,7 @@ impl Enemy for Bat {
         &self.bb
     }
 
-    fn update(&mut self, map: &GameMap) -> Vec<EnemyUpdateResult> {
+    fn update(&mut self, map: &GameMap, ctx: &mut UpdateCtx) -> Vec<EnemyUpdateResult> {
         let mut new_state: Option<BatState> = None;
 
         match &mut self.state {
@@ -99,11 +98,10 @@ impl Enemy for Bat {
                 self.animation_handler.set_state(BatAnimationState::Flying);
             }
             BatState::Standing => {
-                let mut rng = rand::rng();
-
-                if rng.random_range(0..300) == 0 {
-                    let dir_rad =
-                        rng.random_range(std::f32::consts::PI * 1.25..std::f32::consts::PI * 1.75);
+                if ctx.rng.random_range(0..300) == 0 {
+                    let dir_rad = ctx
+                        .rng
+                        .random_range(std::f32::consts::PI * 1.25..std::f32::consts::PI * 1.75);
                     self.state = BatState::Flying { dir_rad }
                 }
 

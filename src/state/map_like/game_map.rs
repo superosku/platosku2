@@ -3,6 +3,7 @@ use super::room::Room;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::BoundingBox;
 use crate::state::enemies::Enemy;
+use crate::state::update_ctx::GameRng;
 use rand::Rng;
 use rand::seq::IndexedRandom;
 use std::collections::HashSet;
@@ -177,20 +178,19 @@ impl GameMap {
         None
     }
 
-    pub fn get_enemies_from_templates(&self) -> Vec<Box<dyn Enemy>> {
+    pub fn get_enemies_from_templates(&self, rng: &mut GameRng) -> Vec<Box<dyn Enemy>> {
         let mut enemies = Vec::new();
 
         for room in &self.rooms {
-            let mut room_enemies = room.get_enemies_from_template();
+            let mut room_enemies = room.get_enemies_from_template(rng);
             enemies.append(&mut room_enemies)
         }
 
         enemies
     }
 
-    pub fn new_random() -> GameMap {
+    pub fn new_random(rng: &mut GameRng) -> GameMap {
         let room_candidates = Room::load_rooms_from_folder();
-        let mut rng = rand::rng();
 
         let first_room_candidates: Vec<Room> = room_candidates
             .iter()
@@ -236,13 +236,13 @@ impl GameMap {
             if random_existing_room.get_doors().is_empty() {
                 continue;
             }
-            let random_door = random_existing_room.get_doors().choose(&mut rng).unwrap();
+            let random_door = random_existing_room.get_doors().choose(rng).unwrap();
             let random_door_x = random_door.x;
             let random_door_y = random_door.y;
             let door_world_pos = random_existing_room.rel_to_abs((random_door.x, random_door.y));
 
             println!(" b) Choosing a random room to add");
-            let mut random_new_room = non_first_room_candidates.choose(&mut rng).unwrap().clone();
+            let mut random_new_room = non_first_room_candidates.choose(rng).unwrap().clone();
             println!(" c) Choosing a random door");
             let door_match_candidates: Vec<RoomDoor> = random_new_room
                 .get_doors()
@@ -262,8 +262,7 @@ impl GameMap {
             }
 
             println!(" d) Checking if room overlaps with any other ones");
-            let random_door_where_trying_to_connect =
-                door_match_candidates.choose(&mut rng).unwrap();
+            let random_door_where_trying_to_connect = door_match_candidates.choose(rng).unwrap();
             let new_door_world_pos = random_new_room.rel_to_abs((
                 random_door_where_trying_to_connect.x,
                 random_door_where_trying_to_connect.y,
