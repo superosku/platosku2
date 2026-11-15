@@ -1,7 +1,7 @@
 use crate::physics::EPS;
-use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Health};
+use crate::state::draw::{DrawList, Sprite};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::item::{Item, ItemType};
@@ -212,7 +212,7 @@ impl Enemy for Burrower {
         }
     }
 
-    fn draw(&self, renderer: &mut crate::render::Renderer) {
+    fn draw(&self, out: &mut DrawList) {
         if matches!(
             self.animation_handler.current_state(),
             BurrowerAnimationState::Hidden
@@ -220,16 +220,13 @@ impl Enemy for Burrower {
             return;
         }
 
-        let bb = self.bb();
-        renderer.draw_from_texture_atlas(
-            "burrower",
-            self.animation_handler.get_atlas_index(),
-            true,
-            bb.x - 1.0 / TILE_SIZE,
-            bb.y - 1.0 / TILE_SIZE,
-            bb.w + 2.0 / TILE_SIZE,
-            bb.h + 2.0 / TILE_SIZE,
-            1.0,
+        out.sprite(
+            Sprite::around(
+                "burrower",
+                self.animation_handler.get_atlas_index(),
+                self.bb(),
+            )
+            .flipped(true),
         );
     }
 

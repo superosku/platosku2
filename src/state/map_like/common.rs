@@ -133,7 +133,7 @@ impl ObjectTemplate {
         *self.as_object(&mut GameRng::seed_from_u64(0)).bb()
     }
 
-    pub fn get_texture_index(&self) -> &str {
+    pub fn get_texture_index(&self) -> &'static str {
         match self.object_type {
             ObjectTemplateType::Bat => "bat",
             ObjectTemplateType::Slime => "slime",

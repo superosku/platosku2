@@ -1,7 +1,7 @@
 use crate::physics::integrate_kinematic;
-use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Dir, Health};
+use crate::state::draw::{DrawList, Sprite};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::map_like::GameMap;
@@ -154,17 +154,10 @@ impl Enemy for Slime {
         }
     }
 
-    fn draw(&self, renderer: &mut crate::render::Renderer) {
-        let bb = self.bb();
-        renderer.draw_from_texture_atlas(
-            "slime",
-            self.animation_handler.get_atlas_index(),
-            self.dir.goes_right(),
-            bb.x - 1.0 / TILE_SIZE,
-            bb.y - 1.0 / TILE_SIZE,
-            bb.w + 2.0 / TILE_SIZE,
-            bb.h + 2.0 / TILE_SIZE,
-            1.0,
+    fn draw(&self, out: &mut DrawList) {
+        out.sprite(
+            Sprite::around("slime", self.animation_handler.get_atlas_index(), self.bb())
+                .flipped(self.dir.goes_right()),
         );
     }
 }

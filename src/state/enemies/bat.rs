@@ -1,7 +1,7 @@
 use crate::physics::integrate_kinematic;
-use crate::render::TILE_SIZE;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::common::{BoundingBox, Health, random_unit_vector};
+use crate::state::draw::{DrawList, Sprite};
 use crate::state::enemies::Enemy;
 use crate::state::enemies::common::{EnemyHitResult, EnemyHitType, EnemyUpdateResult};
 use crate::state::map_like::GameMap;
@@ -165,17 +165,10 @@ impl Enemy for Bat {
         }
     }
 
-    fn draw(&self, renderer: &mut crate::render::Renderer) {
-        let bb = self.bb();
-        renderer.draw_from_texture_atlas(
-            "bat",
-            self.animation_handler.get_atlas_index(),
-            true,
-            bb.x - 1.0 / TILE_SIZE,
-            bb.y - 1.0 / TILE_SIZE,
-            bb.w + 2.0 / TILE_SIZE,
-            bb.h + 2.0 / TILE_SIZE,
-            1.0,
+    fn draw(&self, out: &mut DrawList) {
+        out.sprite(
+            Sprite::around("bat", self.animation_handler.get_atlas_index(), self.bb())
+                .flipped(true),
         );
     }
 }

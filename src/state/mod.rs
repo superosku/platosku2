@@ -1,5 +1,6 @@
 pub mod animation_handler;
 pub mod common;
+pub mod draw;
 pub mod enemies;
 pub mod game_state;
 pub mod item;

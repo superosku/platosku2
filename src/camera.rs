@@ -1,4 +1,4 @@
-use crate::render::TILE_SIZE;
+use crate::state::common::TILE_SIZE;
 use glam::{Mat4, Vec3};
 
 pub struct Camera {

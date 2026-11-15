@@ -1,8 +1,8 @@
-use super::common::{BoundingBox, Dir, Health, Pos};
+use super::common::{BoundingBox, Dir, Health, Pos, TILE_SIZE};
+use super::draw::{DrawList, Sprite};
 use super::game_state::InputState;
 use super::map_like::MapLike;
 use crate::physics::{EPS, check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
-use crate::render::{Renderer, TILE_SIZE};
 use crate::sound_handler::Sound;
 use crate::state::animation_handler::{AnimationConfig, AnimationConfigResult, AnimationHandler};
 use crate::state::item::{Item, ItemType};
@@ -113,30 +113,21 @@ impl Player {
         self.item = Some(item);
     }
 
-    pub fn draw(&self, renderer: &mut Renderer) {
-        let px = self.bb.x;
-        let py = self.bb.y;
-        let pw = self.bb.w;
-        let ph = self.bb.h;
-
+    pub fn draw(&self, out: &mut DrawList) {
         let alpha = if !self.can_be_hit() {
             ((self.immunity_frames / 10) % 2) as f32
         } else {
             1.0
         };
 
-        renderer.draw_from_texture_atlas(
-            "character",
-            self.animation_handler.get_atlas_index(),
-            match self.dir {
-                Dir::Left => true,
-                Dir::Right => false,
-            },
-            px - 1.0 / crate::render::TILE_SIZE,
-            py - 1.0 / crate::render::TILE_SIZE,
-            pw + 2.0 / crate::render::TILE_SIZE,
-            ph + 2.0 / crate::render::TILE_SIZE,
-            alpha,
+        out.sprite(
+            Sprite::around(
+                "character",
+                self.animation_handler.get_atlas_index(),
+                &self.bb,
+            )
+            .flipped(self.dir == Dir::Left)
+            .with_alpha(alpha),
         );
 
         if let Some(item) = &self.item {
@@ -146,12 +137,12 @@ impl Player {
                 } else {
                     0.0
                 };
-            item.draw_fake_xy(renderer, self.bb.x, self.bb.y + crouch_offset_y);
+            item.draw_at(out, self.bb.x, self.bb.y + crouch_offset_y);
         }
 
         // Draw the sword as the last step
         if let Some(swing_info) = self.get_swing_info() {
-            renderer.draw_rect_rotated(
+            out.rotated_rect(
                 swing_info.pivot.x - 0.05,
                 swing_info.pivot.y - 0.15,
                 0.1,
@@ -162,7 +153,7 @@ impl Player {
                 [0.5, 0.5, 0.5, 1.0],
             );
 
-            renderer.draw_rect(
+            out.rect(
                 swing_info.end.x - 0.05,
                 swing_info.end.y - 0.05,
                 0.1,

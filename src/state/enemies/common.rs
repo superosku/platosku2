@@ -1,5 +1,6 @@
 use crate::sound_handler::Sound;
 use crate::state::common::{BoundingBox, Health};
+use crate::state::draw::DrawList;
 use crate::state::item::Item;
 use crate::state::map_like::GameMap;
 use crate::state::update_ctx::UpdateCtx;
@@ -26,7 +27,7 @@ pub trait Enemy {
 
     fn maybe_got_hit(&mut self, hit_type: EnemyHitType) -> EnemyHitResult;
     fn maybe_damage_player(&self) -> Option<u32>;
-    fn draw(&self, renderer: &mut crate::render::Renderer);
+    fn draw(&self, out: &mut DrawList);
 
     fn should_remove(&self) -> bool;
     fn get_health(&self) -> Health;

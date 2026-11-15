@@ -1,6 +1,10 @@
 use crate::state::update_ctx::GameRng;
 use rand::Rng;
 
+/// Art pixels per tile. Sprites are drawn on a 16 px grid, and some game logic
+/// uses it for pixel-sized offsets.
+pub const TILE_SIZE: f32 = 16.0;
+
 /// Returns a random unit vector `(x, y)` whose direction is uniformly distributed
 /// among the directions for which `accept(x, y)` is true.
 ///

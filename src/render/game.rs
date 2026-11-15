@@ -1,51 +1,43 @@
 //! What the game and the editor draw, on top of the map tiles.
 
-use super::{Renderer, TILE_SIZE};
+use super::Renderer;
 use crate::camera::Camera;
 use crate::state::BaseTile;
 use crate::state::GameState;
+use crate::state::draw::{DrawList, Sprite};
 use crate::state::game_state::{Editor, Game};
 use crate::state::map_like::DoorDir;
 
 pub trait DrawableGameState: GameState {
     /// World sprites drawn after the tiles and before the player
     /// (doors, items, enemies).
-    fn draw_world(&self, renderer: &mut Renderer);
+    fn draw_world(&self, out: &mut DrawList);
     /// World sprites drawn after the player (enemy health bars).
-    fn draw_world_top(&self, renderer: &mut Renderer);
+    fn draw_world_top(&self, out: &mut DrawList);
     /// Which tiles the dark overlay covers this frame, or `None` for no overlay.
     fn dark_tiles(&self) -> Option<Box<dyn Fn(i32, i32) -> bool + '_>>;
     fn update_and_draw_minimap(&mut self, renderer: &mut Renderer, camera: &Camera, draw_big: bool);
 }
 
 impl DrawableGameState for Game {
-    fn draw_world(&self, renderer: &mut Renderer) {
+    fn draw_world(&self, out: &mut DrawList) {
         for door in &self.map.doors {
-            renderer.draw_from_texture_atlas(
-                "door",
-                door.get_atlas_index(),
-                false,
-                door.x as f32,
-                door.y as f32,
-                1.0,
-                1.0,
-                1.0,
-            );
+            let (x, y) = (door.x as f32, door.y as f32);
+            out.sprite(Sprite::new("door", door.get_atlas_index(), x, y, 1.0, 1.0));
         }
         for item in &self.items {
-            item.draw(renderer);
+            item.draw(out);
         }
         for enemy in &self.enemies {
-            enemy.draw(renderer);
+            enemy.draw(out);
         }
     }
 
-    fn draw_world_top(&self, renderer: &mut Renderer) {
+    fn draw_world_top(&self, out: &mut DrawList) {
         for enemy in &self.enemies {
             let health = enemy.get_health().ratio();
             if health < 1.0 && enemy.should_render_health_bar() {
-                let bb = enemy.bb();
-                renderer.draw_health_bar_above(bb.x, bb.y, bb.w, health);
+                out.health_bar_above(enemy.bb(), health);
             }
         }
     }
@@ -114,7 +106,7 @@ impl DrawableGameState for Game {
 }
 
 impl DrawableGameState for Editor {
-    fn draw_world(&self, renderer: &mut Renderer) {
+    fn draw_world(&self, out: &mut DrawList) {
         let room_pos = self.room.get_pos();
         for door in self.room.get_doors() {
             let x = room_pos.0 + door.x as i32;
@@ -125,27 +117,17 @@ impl DrawableGameState for Editor {
                 DoorDir::Down => 5,
                 DoorDir::Left => 6,
             };
-            renderer
-                .draw_from_texture_atlas("tiles", frame, false, x as f32, y as f32, 1.0, 1.0, 1.0);
+            out.sprite(Sprite::new("tiles", frame, x as f32, y as f32, 1.0, 1.0));
         }
 
         // Enemy spawn points
         for template in &self.room.object_templates {
             let bb = template.get_bb();
-            renderer.draw_from_texture_atlas(
-                template.get_texture_index(),
-                0,
-                false,
-                bb.x - 1.0 / TILE_SIZE,
-                bb.y - 1.0 / TILE_SIZE,
-                bb.w + 2.0 / TILE_SIZE,
-                bb.h + 2.0 / TILE_SIZE,
-                1.0,
-            );
+            out.sprite(Sprite::around(template.get_texture_index(), 0, &bb));
         }
     }
 
-    fn draw_world_top(&self, _renderer: &mut Renderer) {}
+    fn draw_world_top(&self, _out: &mut DrawList) {}
 
     fn dark_tiles(&self) -> Option<Box<dyn Fn(i32, i32) -> bool + '_>> {
         None

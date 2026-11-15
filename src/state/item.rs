@@ -1,6 +1,6 @@
 use crate::physics::integrate_kinematic;
-use crate::render::Renderer;
 use crate::sound_handler::Sound;
+use crate::state::draw::{DrawList, Sprite};
 use crate::state::map_like::MapLike;
 use crate::state::update_ctx::{GameRng, UpdateCtx};
 use crate::state::{BoundingBox, Pos};
@@ -115,23 +115,16 @@ impl Item {
         Self::new_with_velocity(center_x, center_y, 0.0, 0.0, item_type)
     }
 
-    pub fn draw_fake_xy(&self, renderer: &mut Renderer, x: f32, y: f32) {
-        renderer.draw_from_texture_atlas(
-            match self.item_type {
-                ItemType::Coin => "coin",
-                ItemType::SmallStone => "small_stone",
-                ItemType::LargeStone => "large_stone",
-                ItemType::Box => "box",
-                ItemType::GreenProjectile => "green_projectile",
-            },
-            0,
-            false,
-            x,
-            y,
-            self.bb.w,
-            self.bb.h,
-            1.0,
-        );
+    /// Draws the item with its top-left at `(x, y)` (e.g. carried by the player).
+    pub fn draw_at(&self, out: &mut DrawList, x: f32, y: f32) {
+        let name = match self.item_type {
+            ItemType::Coin => "coin",
+            ItemType::SmallStone => "small_stone",
+            ItemType::LargeStone => "large_stone",
+            ItemType::Box => "box",
+            ItemType::GreenProjectile => "green_projectile",
+        };
+        out.sprite(Sprite::new(name, 0, x, y, self.bb.w, self.bb.h));
     }
 
     pub fn set_v(&mut self, vx: f32, vy: f32) {
@@ -154,8 +147,8 @@ impl Item {
         self.bb.overlaps_line(a, b)
     }
 
-    pub fn draw(&self, renderer: &mut Renderer) {
-        self.draw_fake_xy(renderer, self.bb.x, self.bb.y);
+    pub fn draw(&self, out: &mut DrawList) {
+        self.draw_at(out, self.bb.x, self.bb.y);
     }
 
     pub fn new_random(center_x: f32, center_y: f32, rng: &mut GameRng) -> Self {

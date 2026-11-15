@@ -24,6 +24,7 @@ pub use game::DrawableGameState;
 
 use crate::atlas_info::AtlasInfo;
 use crate::camera::Camera;
+use crate::state::draw::{DrawItem, DrawList, Sprite};
 use crate::state::map_like::MapLike;
 use crate::state::{BaseTile, OverlayTile};
 use batch::{QuadBatch, Vertex, WHITE};
@@ -32,7 +33,24 @@ use image::GenericImageView;
 use miniquad::*;
 use tiles::{CACHE_MARGIN, CellRange, TileCacheKey, TileLayer, TileMesh};
 
-pub const TILE_SIZE: f32 = 16.0;
+pub use crate::state::common::TILE_SIZE;
+
+/// Ladders, platforms and start doors are atlas sprites drawn over the tiles.
+fn overlay_tile_sprites(map: &dyn MapLike, out: &mut DrawList) {
+    for item in map.get_overlays() {
+        let frames: &[u32] = match item.tile {
+            OverlayTile::None => &[],
+            OverlayTile::Ladder => &[0],
+            OverlayTile::Platform => &[2],
+            OverlayTile::LadderPlatform => &[0, 2],
+            OverlayTile::StartDoor => &[7],
+        };
+        for &frame in frames {
+            let (x, y) = (item.x as f32, item.y as f32);
+            out.sprite(Sprite::new("tiles", frame, x, y, 1.0, 1.0));
+        }
+    }
+}
 
 /// Size of one repeating background region in `tile_backgrounds.png`, in pixels.
 const TILE_BACKGROUND_REGION: f32 = 64.0;
@@ -152,6 +170,8 @@ pub struct Renderer {
     tile_cache: Option<TileCacheKey>,
     dark: TileMesh,
     dark_gpu: GpuMesh,
+    /// Reused every frame for the world draw items.
+    draw_list: DrawList,
 
     /// Offscreen target for the game rendering (used by screenshot capture).
     /// `None` renders to the window.
@@ -244,6 +264,7 @@ impl Renderer {
             tile_cache: None,
             dark: TileMesh::default(),
             dark_gpu,
+            draw_list: DrawList::new(),
             render_target: None,
         }
     }
@@ -329,11 +350,17 @@ impl Renderer {
         self.draw_tile_mesh(false, view_proj);
 
         // 2. World sprites and rectangles
+        let mut list = std::mem::take(&mut self.draw_list);
+        list.clear();
+        overlay_tile_sprites(state.map(), &mut list);
+        state.draw_world(&mut list);
+        state.player().draw(&mut list);
+        state.draw_world_top(&mut list);
         self.world.clear();
-        self.draw_overlay_tiles(state.map());
-        state.draw_world(self);
-        state.player().draw(self);
-        state.draw_world_top(self);
+        for item in list.items() {
+            self.push_world_item(item);
+        }
+        self.draw_list = list;
         Self::flush(
             &mut *self.ctx,
             &self.sprite_pipeline,
@@ -421,30 +448,6 @@ impl Renderer {
         }
     }
 
-    fn draw_overlay_tiles(&mut self, map: &dyn MapLike) {
-        for item in map.get_overlays() {
-            let frames: &[u32] = match item.tile {
-                OverlayTile::None => &[],
-                OverlayTile::Ladder => &[0],
-                OverlayTile::Platform => &[2],
-                OverlayTile::LadderPlatform => &[0, 2],
-                OverlayTile::StartDoor => &[7],
-            };
-            for &frame in frames {
-                self.draw_from_texture_atlas(
-                    "tiles",
-                    frame,
-                    false,
-                    item.x as f32,
-                    item.y as f32,
-                    1.0,
-                    1.0,
-                    1.0,
-                );
-            }
-        }
-    }
-
     fn draw_player_health_bar(&mut self, ratio: f32, camera: &Camera) {
         let max_width = 200.0;
         let height = 20.0;
@@ -457,97 +460,87 @@ impl Renderer {
         self.draw_hud_rect(x, y, max_width * ratio, height, [0.65, 0.11, 0.11, 1.0]);
     }
 
-    /// A health bar above a bounding box (in tiles), in the world.
-    pub fn draw_health_bar_above(&mut self, x: f32, y: f32, w: f32, ratio: f32) {
-        let padding = 0.3;
-        let height = 0.1;
-        let max_width = w + padding + padding;
-        let x = x - padding;
-        let y = y - height - padding;
-
-        self.draw_rect(x, y, max_width, height, [0.1, 0.1, 0.1, 1.0]);
-        self.draw_rect(x, y, max_width * ratio, height, [0.65, 0.11, 0.11, 1.0]);
-    }
-
-    /// A sprite frame from the atlas, stretched over a rectangle in tiles.
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_from_texture_atlas(
-        &mut self,
-        sprite: &str,
-        frame: u32,
-        flip: bool,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        alpha: f32,
-    ) {
-        if alpha <= 0.0 {
-            return;
+    /// Turns a draw item (in tiles) into quads in the world batch (world pixels).
+    fn push_world_item(&mut self, item: &DrawItem) {
+        let white = self.textures.white.texture;
+        match item {
+            DrawItem::Sprite(sprite) => {
+                let atlas = &self.textures.atlas;
+                let rect = self.atlas_info.get_rect(sprite.name, sprite.frame as i32);
+                let uv = UvRect {
+                    u0: rect.x as f32 / atlas.w,
+                    v0: rect.y as f32 / atlas.h,
+                    u1: (rect.x + rect.w) as f32 / atlas.w,
+                    v1: (rect.y + rect.h) as f32 / atlas.h,
+                };
+                self.world.push_rect(
+                    atlas.texture,
+                    sprite.x * TILE_SIZE,
+                    sprite.y * TILE_SIZE,
+                    sprite.w * TILE_SIZE,
+                    sprite.h * TILE_SIZE,
+                    uv.flipped_x(sprite.flip),
+                    [1.0, 1.0, 1.0, sprite.alpha],
+                );
+            }
+            &DrawItem::Rect { x, y, w, h, color } => {
+                self.world.push_rect(
+                    white,
+                    x * TILE_SIZE,
+                    y * TILE_SIZE,
+                    w * TILE_SIZE,
+                    h * TILE_SIZE,
+                    UvRect::FULL,
+                    color,
+                );
+            }
+            &DrawItem::RotatedRect {
+                x,
+                y,
+                w,
+                h,
+                pivot_x,
+                pivot_y,
+                angle_rad,
+                color,
+            } => {
+                let (s, c) = angle_rad.sin_cos();
+                let corner = |cx: f32, cy: f32| {
+                    let dx = cx - pivot_x;
+                    let dy = cy - pivot_y;
+                    [
+                        (pivot_x + c * dx - s * dy) * TILE_SIZE,
+                        (pivot_y + s * dx + c * dy) * TILE_SIZE,
+                    ]
+                };
+                let corners = [
+                    corner(x, y),
+                    corner(x + w, y),
+                    corner(x + w, y + h),
+                    corner(x, y + h),
+                ];
+                self.world.push_quad(white, corners, UvRect::FULL, color);
+            }
+            &DrawItem::HealthBar { x, y, w, ratio } => {
+                let padding = 0.3;
+                let height = 0.1;
+                let max_width = w + padding + padding;
+                let x = x - padding;
+                let y = y - height - padding;
+                for (width, color) in [
+                    (max_width, [0.1, 0.1, 0.1, 1.0]),
+                    (max_width * ratio, [0.65, 0.11, 0.11, 1.0]),
+                ] {
+                    self.push_world_item(&DrawItem::Rect {
+                        x,
+                        y,
+                        w: width,
+                        h: height,
+                        color,
+                    });
+                }
+            }
         }
-        let atlas = &self.textures.atlas;
-        let rect = self.atlas_info.get_rect(sprite, frame as i32);
-        let uv = UvRect {
-            u0: rect.x as f32 / atlas.w,
-            v0: rect.y as f32 / atlas.h,
-            u1: (rect.x + rect.w) as f32 / atlas.w,
-            v1: (rect.y + rect.h) as f32 / atlas.h,
-        };
-        self.world.push_rect(
-            atlas.texture,
-            x * TILE_SIZE,
-            y * TILE_SIZE,
-            w * TILE_SIZE,
-            h * TILE_SIZE,
-            uv.flipped_x(flip),
-            [1.0, 1.0, 1.0, alpha],
-        );
-    }
-
-    /// A colored rectangle in the world (tiles).
-    pub fn draw_rect(&mut self, x: f32, y: f32, w: f32, h: f32, color: [f32; 4]) {
-        self.world.push_rect(
-            self.textures.white.texture,
-            x * TILE_SIZE,
-            y * TILE_SIZE,
-            w * TILE_SIZE,
-            h * TILE_SIZE,
-            UvRect::FULL,
-            color,
-        );
-    }
-
-    /// A colored rectangle in the world (tiles), rotated by `angle_rad`
-    /// around `(pivot_x, pivot_y)`.
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_rect_rotated(
-        &mut self,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        pivot_x: f32,
-        pivot_y: f32,
-        angle_rad: f32,
-        color: [f32; 4],
-    ) {
-        let (s, c) = angle_rad.sin_cos();
-        let corner = |cx: f32, cy: f32| {
-            let dx = cx - pivot_x;
-            let dy = cy - pivot_y;
-            [
-                (pivot_x + c * dx - s * dy) * TILE_SIZE,
-                (pivot_y + s * dx + c * dy) * TILE_SIZE,
-            ]
-        };
-        let corners = [
-            corner(x, y),
-            corner(x + w, y),
-            corner(x + w, y + h),
-            corner(x, y + h),
-        ];
-        self.world
-            .push_quad(self.textures.white.texture, corners, UvRect::FULL, color);
     }
 
     /// A colored rectangle on the HUD (screen pixels).
