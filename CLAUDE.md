@@ -103,7 +103,18 @@ cargo run --example run_script -- scripts/jump_demo.txt   # headless; prints pla
 ```
 Use it to check a scenario quickly or reproduce a bug. In code: `Script::load(path)?.build_game()?`, then `sim.run_script(&script, |sim, snap_name| ...)`.
 
-- Still to come: a screenshot capture mode (it will use the same scripts; `snap` takes a screenshot).
+### Visual checks (screenshots and sprites)
+You can look at PNGs with the Read tool. Use these to check rendering, UI and sprite changes:
+```sh
+cargo run --example capture -- scripts/jump_demo.txt            # PNG at every snap -> target/claude/shots/jump_demo/
+cargo run --example capture -- scripts/jump_demo.txt --every 10 # plus every 10 ticks (animations)
+cargo run --example sprite_sheet -- list                        # sprite names and frame counts
+cargo run --example sprite_sheet -- character 0-7               # enlarged frames -> target/claude/sprites/character.png
+```
+- Capture plays the script with **one tick per rendered frame** (no wall-clock time), so the same script always gives byte-identical screenshots. It renders into an 800x600 offscreen texture (`Renderer::set_render_target`); a window opens briefly. The egui debug window is not included.
+- It relies on miniquad's OpenGL backend (the default on macOS); `texture_read_pixels` is unimplemented in miniquad's Metal backend. It needs a display, so it can't run in CI.
+- To check a scene, write a small script (ASCII map + inputs + `snap`) in `target/claude/`, capture it and look at the PNGs.
+- Sprite edits: edit `assets/sprites/*.aseprite`, re-export the atlas with the aseprite CLI (README.md; `aseprite` is on PATH), then use `sprite_sheet` and a capture to review.
 
 ## Conventions
 - Small, focused changes. Keep the game behaving the same unless the change is meant to alter it.

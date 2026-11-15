@@ -71,6 +71,18 @@ impl AtlasInfo {
         AtlasInfo { mapper }
     }
 
+    /// All sprite names with their frame indices, sorted.
+    pub fn sprites(&self) -> std::collections::BTreeMap<String, Vec<i32>> {
+        let mut sprites: std::collections::BTreeMap<String, Vec<i32>> = Default::default();
+        for (name, frame) in self.mapper.keys() {
+            sprites.entry(name.clone()).or_default().push(*frame);
+        }
+        for frames in sprites.values_mut() {
+            frames.sort();
+        }
+        sprites
+    }
+
     pub fn get_rect(&self, sprite: &str, frame_i: i32) -> &AtlasRect {
         let result = self.mapper.get(&(sprite.to_string(), frame_i));
 
