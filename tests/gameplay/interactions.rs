@@ -207,7 +207,7 @@ fn coins_from_a_broken_box_pop_up_and_are_collected_one_at_a_time() {
 
         // Nothing is collected while the coins can't be picked up yet.
         assert!(
-            collected[0] > SPAWNED_COIN_PICKUP_DELAY,
+            collected[0] >= SPAWNED_COIN_PICKUP_DELAY,
             "seed {seed}: coin collected too early, at tick {}",
             collected[0]
         );
@@ -262,26 +262,30 @@ fn the_coin_streak_starts_over_after_a_pause() {
     assert_eq!(sim.notes(Sound::CollectCoin), vec![0, 1, 0]);
 }
 
-fn coins_from_a_broken_box_fly_up() {
-    let mut sim = sim_in(BOX_ROOM_TALL);
-    sim.run(30);
-    sim.press(Key::Down)
-        .tap(Key::Swing)
-        .release(Key::Down)
-        .run(30);
-    let floor_y = sim.game.items[0].bb().y;
-    sim.tap(Key::Swing).run(15);
+fn coins_from_a_broken_box_pop_up_about_half_a_tile() {
+    for seed in 0..8 {
+        let mut sim = sim_in_seeded(BOX_ROOM_TALL, seed);
+        sim.run(30);
+        sim.press(Key::Down)
+            .tap(Key::Swing)
+            .release(Key::Down)
+            .run(30);
+        let floor = sim.game.items[0].bb().y + sim.game.items[0].bb().h;
+        sim.tap(Key::Swing);
 
-    let highest = sim
-        .game
-        .items
-        .iter()
-        .map(|i| i.bb().y)
-        .fold(f32::MAX, f32::min);
-    assert!(
-        highest < floor_y - 0.5,
-        "coins should rise at least half a tile, highest y {highest}, box y {floor_y}"
-    );
+        // The highest any coin's bottom gets above the floor.
+        let mut peak = 0.0f32;
+        sim.run_observing(40, |g| {
+            for item in &g.items {
+                peak = peak.max(floor - (item.bb().y + item.bb().h));
+            }
+        });
+        // Measured 0.40-0.56 tiles over these seeds.
+        assert!(
+            (0.3..=0.7).contains(&peak),
+            "seed {seed}: coins should pop up about half a tile, peaked at {peak}"
+        );
+    }
 }
 
 /// Two rooms connected by a door: A (with the start) on the left, B on the right.
@@ -357,7 +361,7 @@ pub fn tests() -> Vec<(&'static str, fn())> {
         dropping_and_picking_up_the_box,
         swinging_at_a_box_breaks_it_into_coins_that_can_be_collected,
         coins_from_a_broken_box_pop_up_and_are_collected_one_at_a_time,
-        coins_from_a_broken_box_fly_up,
+        coins_from_a_broken_box_pop_up_about_half_a_tile,
         coins_collected_quickly_play_rising_notes,
         the_coin_streak_starts_over_after_a_pause,
         walking_through_a_door_changes_the_room,

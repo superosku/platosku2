@@ -19,9 +19,14 @@ pub enum ItemType {
     GreenProjectile,
 }
 
-/// How long (ticks) coins from a broken box can't be collected, so they
-/// visibly burst out and get collected one by one instead of all at once.
+/// The first coin from a broken box can be collected this many ticks after it
+/// spawns (not before), so the coins visibly pop out first.
 pub const SPAWNED_COIN_PICKUP_DELAY: u32 = 20;
+
+/// Each further coin from the same box becomes collectable this many ticks
+/// after the previous one, so coins that land on the player are collected one
+/// by one (a quick rising run of notes) instead of all at once.
+pub const SPAWNED_COIN_PICKUP_STAGGER: u32 = 5;
 
 pub struct Item {
     bb: BoundingBox,
@@ -227,9 +232,9 @@ impl Item {
         match self.item_type {
             ItemType::Box => {
                 let mut results = vec![ItemInteractionResult::RemoveItem];
-                for _ in 0..ctx.rng.random_range(1..5) {
-                    // Pop the coins up and out (rising about 0.7-1.8 tiles).
-                    let vy = ctx.rng.random_range(-0.16..-0.10);
+                for i in 0..ctx.rng.random_range(1..5) {
+                    // Pop the coins up and out (peaking about 0.5 tiles above the floor).
+                    let vy = ctx.rng.random_range(-0.08..-0.06);
                     let vx = ctx.rng.random_range(-0.06..0.06);
                     let mut coin = Item::new_with_velocity(
                         self.bb.x + self.bb.w * 0.5,
@@ -238,7 +243,7 @@ impl Item {
                         vy,
                         ItemType::Coin,
                     );
-                    coin.pickup_delay = SPAWNED_COIN_PICKUP_DELAY;
+                    coin.pickup_delay = SPAWNED_COIN_PICKUP_DELAY + i * SPAWNED_COIN_PICKUP_STAGGER;
                     results.push(ItemInteractionResult::SpawnItem { item: coin })
                 }
                 ctx.sound.play(Sound::Clink);
