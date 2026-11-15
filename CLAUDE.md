@@ -135,6 +135,7 @@ cargo run --example sprite_sheet -- character 0-7               # enlarged frame
 - Capture plays the script with **one tick per rendered frame** (no wall-clock time), so the same script always gives byte-identical screenshots. It renders into an 800x600 offscreen texture (`Renderer::set_render_target`); a window opens briefly. The egui debug window is not included.
 - It relies on miniquad's OpenGL backend (the default on macOS); `texture_read_pixels` is unimplemented in miniquad's Metal backend. It needs a display, so it can't run in CI.
 - To check a scene, write a small script (ASCII map + inputs + `snap`) in `target/claude/`, capture it and look at the PNGs.
+- **Rendering refactors:** captures are byte-identical for the same script, so compare before and after pixel by pixel. Build the old code from `git archive <commit> | tar -x -C target/claude/old`, run `capture` there with `CARGO_TARGET_DIR=../oldtarget` and `--out ../before`, run it again on the new code, and diff the PNGs. Use `--every N` on a random-map walk through doors to cover room transitions (the dark). Seed 6, `300 right` then `600 left`, crosses two doors.
 - Sprite edits: edit `assets/sprites/*.aseprite`, re-export the atlas with the aseprite CLI (README.md; `aseprite` is on PATH), then use `sprite_sheet` and a capture to review.
 
 ## How to develop a feature
@@ -167,6 +168,9 @@ Found while writing tests; keep this list current.
 - **Character sprite frame 21** isn't used by any animation.
 - The game's very first frame is drawn before the first tick, so it's all dark. One frame at startup; left as is.
 - `coin.rs` is dead code (not in `state/mod.rs`).
+- **Free camera zoom, not pixel-perfect:** the zoom fits the room and animates, so art pixels are rarely an integer scale and can shimmer. Kept on purpose for now; the fix (low-res target, integer upscale) is a README TODO.
+- **`tile_revision` is a process-wide counter**, not game state. It only invalidates the renderer's tile cache; game logic must never read it.
+- **The editor isn't covered by `capture`** (it only plays scripts in a `Game`), so editor drawing (doors, enemy spawn icons, live tile edits) has to be checked by hand.
 
 ## Conventions
 - Small, focused changes. Keep the game behaving the same unless the change is meant to alter it.
