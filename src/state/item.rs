@@ -203,11 +203,11 @@ impl Item {
         vec![]
     }
 
-    pub fn handle_player_touch(&mut self, ctx: &mut UpdateCtx) -> Vec<ItemInteractionResult> {
+    pub fn handle_player_touch(&mut self) -> Vec<ItemInteractionResult> {
         match self.item_type {
             ItemType::Coin if self.pickup_delay > 0 => vec![],
+            // The coin sound is played by the game, as part of a coin streak.
             ItemType::Coin => {
-                ctx.sound.play(Sound::CollectCoin);
                 vec![
                     ItemInteractionResult::RemoveItem,
                     ItemInteractionResult::IncreaseScore,

@@ -3,7 +3,7 @@
 use crate::common::*;
 use platosku2::sim::{Key, Sim};
 use platosku2::sound_handler::Sound;
-use platosku2::state::game_state::{Game, MapSetup};
+use platosku2::state::game_state::{COIN_STREAK_TICKS, Game, MapSetup};
 use platosku2::state::item::{ItemType, SPAWNED_COIN_PICKUP_DELAY};
 use platosku2::state::map_like::Room;
 
@@ -173,9 +173,9 @@ fn swinging_at_a_box_breaks_it_into_coins_that_can_be_collected() {
     assert!(collected + coins_left <= 4, "a box drops 1-4 coins");
 }
 
-/// Ticks after the box breaks at which coins were collected (one entry per
-/// coin), standing still for `ticks` ticks.
-fn break_box_and_record_collections(sim: &mut Sim, ticks: u32) -> Vec<u32> {
+/// Breaks the player's box, stands still for `ticks` ticks and returns the
+/// coins collected as (ticks after the break, note of the coin sound).
+fn break_box_and_record_collections(sim: &mut Sim, ticks: u32) -> Vec<(u32, u32)> {
     sim.run(30);
     sim.press(Key::Down)
         .tap(Key::Swing)
@@ -188,12 +188,10 @@ fn break_box_and_record_collections(sim: &mut Sim, ticks: u32) -> Vec<u32> {
     let mut collected = Vec::new();
     for t in 1..=ticks {
         sim.run(1);
-        for sound in sim.sounds() {
-            if sound == Sound::CollectCoin {
-                collected.push(t);
-            }
+        let notes = sim.notes(Sound::CollectCoin);
+        for note in &notes[collected.len()..] {
+            collected.push((t, *note));
         }
-        sim.clear_sounds();
     }
     collected
 }
@@ -201,7 +199,10 @@ fn break_box_and_record_collections(sim: &mut Sim, ticks: u32) -> Vec<u32> {
 fn coins_from_a_broken_box_pop_up_and_are_collected_one_at_a_time() {
     for seed in 0..8 {
         let mut sim = sim_in_seeded(BOX_ROOM, seed);
-        let collected = break_box_and_record_collections(&mut sim, 120);
+        let collected: Vec<u32> = break_box_and_record_collections(&mut sim, 120)
+            .iter()
+            .map(|(tick, _)| *tick)
+            .collect();
         assert!(!collected.is_empty(), "seed {seed}: no coins collected");
 
         // Nothing is collected while the coins can't be picked up yet.
@@ -216,6 +217,49 @@ fn coins_from_a_broken_box_pop_up_and_are_collected_one_at_a_time() {
             "seed {seed}: several coins collected on one tick: {collected:?}"
         );
     }
+}
+
+fn coins_collected_quickly_play_rising_notes() {
+    let mut longest = 0;
+    for seed in 0..8 {
+        let mut sim = sim_in_seeded(BOX_ROOM, seed);
+        let collected = break_box_and_record_collections(&mut sim, 120);
+        assert_eq!(collected[0].1, 0, "seed {seed}: a streak starts at note 0");
+        for pair in collected.windows(2) {
+            let ((prev_tick, prev_note), (tick, note)) = (pair[0], pair[1]);
+            let expected = if tick - prev_tick <= COIN_STREAK_TICKS {
+                prev_note + 1
+            } else {
+                0
+            };
+            assert_eq!(note, expected, "seed {seed}: {collected:?}");
+        }
+        longest = longest.max(collected.len());
+    }
+    assert!(longest >= 3, "some box should give a streak of 3 coins");
+}
+
+fn the_coin_streak_starts_over_after_a_pause() {
+    // With this seed, two coins are collected right away and one lands out of
+    // reach.
+    let mut sim = sim_in_seeded(BOX_ROOM, 0);
+    let collected = break_box_and_record_collections(&mut sim, 120);
+    assert_eq!(
+        collected.iter().map(|c| c.1).collect::<Vec<_>>(),
+        vec![0, 1]
+    );
+    assert_eq!(sim.game.items.len(), 1, "one coin left");
+
+    // Walk to the last coin, long after the streak ended.
+    let key = if sim.game.items[0].bb().x > sim.player().bb.x {
+        Key::Right
+    } else {
+        Key::Left
+    };
+    sim.press(key);
+    sim.run_until(120, |g| g.items.is_empty())
+        .expect("should reach the last coin");
+    assert_eq!(sim.notes(Sound::CollectCoin), vec![0, 1, 0]);
 }
 
 fn coins_from_a_broken_box_fly_up() {
@@ -314,6 +358,8 @@ pub fn tests() -> Vec<(&'static str, fn())> {
         swinging_at_a_box_breaks_it_into_coins_that_can_be_collected,
         coins_from_a_broken_box_pop_up_and_are_collected_one_at_a_time,
         coins_from_a_broken_box_fly_up,
+        coins_collected_quickly_play_rising_notes,
+        the_coin_streak_starts_over_after_a_pause,
         walking_through_a_door_changes_the_room,
         enemies_in_other_rooms_are_frozen,
     ]

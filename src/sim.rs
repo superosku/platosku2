@@ -216,6 +216,16 @@ impl Sim {
         self.sound.played()
     }
 
+    /// Notes of the `play_note` calls for `sound` so far, in order.
+    pub fn notes(&self, sound: Sound) -> Vec<u32> {
+        self.sound
+            .requests()
+            .iter()
+            .filter(|r| r.sound == sound)
+            .filter_map(|r| r.note)
+            .collect()
+    }
+
     pub fn clear_sounds(&mut self) -> &mut Self {
         self.sound.clear();
         self

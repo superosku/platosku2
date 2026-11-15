@@ -108,9 +108,41 @@ pub struct Game {
 
     minimap: Minimap,
     rng: GameRng,
+
+    coin_streak: CoinStreak,
 }
 
 const ROOM_TRANSITION_FRAMES: i32 = 30;
+
+/// A coin collected within this many ticks of the previous one continues the
+/// streak, so its sound plays one note higher.
+pub const COIN_STREAK_TICKS: u32 = 30;
+
+/// Coins collected in quick succession. Each one plays the next note of a
+/// rising scale (see `SoundPlayer::play_note`).
+#[derive(Default)]
+struct CoinStreak {
+    /// Coins in the current streak.
+    length: u32,
+    ticks_since_last: u32,
+}
+
+impl CoinStreak {
+    fn tick(&mut self) {
+        self.ticks_since_last = self.ticks_since_last.saturating_add(1);
+    }
+
+    /// Records a collected coin and returns its note (0 = first of a streak).
+    fn collect(&mut self) -> u32 {
+        if self.length > 0 && self.ticks_since_last <= COIN_STREAK_TICKS {
+            self.length += 1;
+        } else {
+            self.length = 1;
+        }
+        self.ticks_since_last = 0;
+        self.length - 1
+    }
+}
 
 /// How the map of a [`Game`] is created.
 #[derive(Clone)]
@@ -236,6 +268,7 @@ impl Game {
             visited_rooms: HashSet::new(),
             minimap: Minimap::new(),
             rng,
+            coin_streak: CoinStreak::default(),
         }
     }
 
@@ -273,6 +306,7 @@ impl Game {
 
 impl GameState for Game {
     fn update(&mut self, input: &InputState, sound: &dyn SoundPlayer) {
+        self.coin_streak.tick();
         let mut ctx = UpdateCtx {
             sound,
             rng: &mut self.rng,
@@ -369,7 +403,10 @@ impl GameState for Game {
                         ItemInteractionResult::RemoveItem => {
                             keep_item = false;
                         }
-                        ItemInteractionResult::IncreaseScore => {}
+                        ItemInteractionResult::IncreaseScore => {
+                            let note = self.coin_streak.collect();
+                            sound.play_note(Sound::CollectCoin, note);
+                        }
                         ItemInteractionResult::SpawnItem { item } => {
                             new_items.push(item);
                         }
@@ -388,7 +425,7 @@ impl GameState for Game {
 
             // Player collecting items
             if item.overlaps(&self.player.bb) {
-                let results = item.handle_player_touch(&mut ctx);
+                let results = item.handle_player_touch();
                 handle_item_results(results);
             }
 
@@ -698,5 +735,41 @@ mod tests {
         let a = Game::new_with_seed(1);
         let b = Game::new_with_seed(2);
         assert_ne!(snapshot(&a), snapshot(&b));
+    }
+
+    /// Collects a coin after `gap` ticks of a running streak, returning its note.
+    fn note_after_gap(gap: u32) -> u32 {
+        let mut streak = CoinStreak::default();
+        assert_eq!(streak.collect(), 0);
+        assert_eq!(streak.collect(), 1, "same tick continues the streak");
+        for _ in 0..gap {
+            streak.tick();
+        }
+        streak.collect()
+    }
+
+    #[test]
+    fn coin_streak_continues_up_to_the_window_and_resets_after() {
+        assert_eq!(note_after_gap(1), 2);
+        assert_eq!(
+            note_after_gap(COIN_STREAK_TICKS),
+            2,
+            "last tick that continues"
+        );
+        assert_eq!(
+            note_after_gap(COIN_STREAK_TICKS + 1),
+            0,
+            "first tick that resets"
+        );
+    }
+
+    #[test]
+    fn coin_streak_starts_at_zero_even_after_a_long_time() {
+        let mut streak = CoinStreak::default();
+        for _ in 0..1000 {
+            streak.tick();
+        }
+        assert_eq!(streak.collect(), 0);
+        assert_eq!(streak.collect(), 1);
     }
 }

@@ -53,6 +53,9 @@ struct Variation {
     pitch_semitones: f32,
     /// Random volume range, ± dB.
     volume_db: f32,
+    /// Whether [`SoundPlayer::play_note`] is used with this sound, so its
+    /// scale notes need rendering.
+    has_notes: bool,
 }
 
 impl Sound {
@@ -70,14 +73,30 @@ impl Sound {
         Variation {
             pitch_semitones,
             volume_db,
+            has_notes: self == Sound::CollectCoin,
         }
     }
+}
+
+/// Semitones of the notes used by [`SoundPlayer::play_note`]: a major scale
+/// from the sound's own pitch up one octave. Notes past the end repeat the top.
+const STREAK_SCALE: [f32; 8] = [0.0, 2.0, 4.0, 5.0, 7.0, 9.0, 11.0, 12.0];
+
+/// A sound to play, optionally as a note of a rising scale.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct PlayRequest {
+    pub sound: Sound,
+    pub note: Option<u32>,
 }
 
 /// Something that can play game sounds. The real game uses [`SoundHandler`];
 /// tests use [`NullSound`] or [`RecordingSound`].
 pub trait SoundPlayer {
     fn play(&self, sound: Sound);
+
+    /// Plays `sound` as the `note`-th note of a rising scale (0 = its normal
+    /// pitch). Used for streaks, such as collecting coins quickly.
+    fn play_note(&self, sound: Sound, note: u32);
 }
 
 /// Plays nothing.
@@ -85,16 +104,22 @@ pub struct NullSound;
 
 impl SoundPlayer for NullSound {
     fn play(&self, _sound: Sound) {}
+    fn play_note(&self, _sound: Sound, _note: u32) {}
 }
 
 /// Plays nothing but remembers which sounds were requested, in order.
 #[derive(Default)]
 pub struct RecordingSound {
-    played: std::cell::RefCell<Vec<Sound>>,
+    played: RefCell<Vec<PlayRequest>>,
 }
 
 impl RecordingSound {
     pub fn played(&self) -> Vec<Sound> {
+        self.played.borrow().iter().map(|r| r.sound).collect()
+    }
+
+    /// Like [`Self::played`], with the note of each `play_note` call.
+    pub fn requests(&self) -> Vec<PlayRequest> {
         self.played.borrow().clone()
     }
 
@@ -105,7 +130,16 @@ impl RecordingSound {
 
 impl SoundPlayer for RecordingSound {
     fn play(&self, sound: Sound) {
-        self.played.borrow_mut().push(sound);
+        self.played
+            .borrow_mut()
+            .push(PlayRequest { sound, note: None });
+    }
+
+    fn play_note(&self, sound: Sound, note: u32) {
+        self.played.borrow_mut().push(PlayRequest {
+            sound,
+            note: Some(note),
+        });
     }
 }
 
@@ -199,6 +233,8 @@ fn db_to_gain(db: f32) -> f32 {
 struct LoadedSound {
     /// Pitch variants, picked at random on each play.
     variants: Vec<SndSound>,
+    /// The [`STREAK_SCALE`] notes, if the sound has them.
+    notes: Vec<SndSound>,
     volume_db: f32,
 }
 
@@ -214,16 +250,17 @@ struct Stagger {
     /// Sounds started during the current tick.
     started_this_tick: Vec<Sound>,
     /// Duplicates waiting for their turn, with ticks left until they play.
-    queue: Vec<(Sound, u32)>,
+    queue: Vec<(PlayRequest, u32)>,
 }
 
 impl Stagger {
     /// Returns true if the sound should play now; otherwise it is queued.
-    fn request(&mut self, sound: Sound) -> bool {
+    fn request(&mut self, request: PlayRequest) -> bool {
+        let sound = request.sound;
         let last_queued = self
             .queue
             .iter()
-            .filter(|(s, _)| *s == sound)
+            .filter(|(r, _)| r.sound == sound)
             .map(|(_, ticks)| *ticks)
             .max();
         match last_queued {
@@ -234,24 +271,24 @@ impl Stagger {
             _ => {
                 // Line up after the last one waiting.
                 let ticks = last_queued.unwrap_or(0) + SAME_TICK_STAGGER_TICKS;
-                self.queue.push((sound, ticks));
+                self.queue.push((request, ticks));
                 false
             }
         }
     }
 
     /// Advances one tick and returns the queued sounds that should play now.
-    fn end_tick(&mut self) -> Vec<Sound> {
+    fn end_tick(&mut self) -> Vec<PlayRequest> {
         self.started_this_tick.clear();
         let mut due = Vec::new();
-        self.queue.retain_mut(|(sound, ticks)| {
+        self.queue.retain_mut(|(request, ticks)| {
             *ticks -= 1;
             if *ticks == 0 {
-                due.push(*sound);
+                due.push(*request);
             }
             *ticks > 0
         });
-        self.started_this_tick.extend(&due);
+        self.started_this_tick.extend(due.iter().map(|r| r.sound));
         due
     }
 }
@@ -289,18 +326,29 @@ impl SoundHandler {
 
     fn render_variants(ctx: &AudioContext, sound: Sound, samples: &Samples) -> LoadedSound {
         let variation = sound.variation();
+        let render = |semitones: f32| {
+            let data = resample(samples, semitones_to_ratio(semitones));
+            let wav = encode_wav(&data, samples.channels, samples.sample_rate);
+            SndSound::load(ctx, &wav)
+        };
         let variants = (0..PITCH_VARIANTS)
             .map(|i| {
                 // Evenly from -pitch_semitones to +pitch_semitones.
                 let f = i as f32 / (PITCH_VARIANTS - 1) as f32 * 2.0 - 1.0;
-                let ratio = semitones_to_ratio(f * variation.pitch_semitones);
-                let data = resample(samples, ratio);
-                let wav = encode_wav(&data, samples.channels, samples.sample_rate);
-                SndSound::load(ctx, &wav)
+                render(f * variation.pitch_semitones)
             })
             .collect();
+        let notes = if variation.has_notes {
+            STREAK_SCALE
+                .iter()
+                .map(|semitones| render(*semitones))
+                .collect()
+        } else {
+            Vec::new()
+        };
         LoadedSound {
             variants,
+            notes,
             volume_db: variation.volume_db,
         }
     }
@@ -308,17 +356,23 @@ impl SoundHandler {
     /// Call after every game tick: plays the queued sounds whose turn it is.
     pub fn end_tick(&self) {
         let due = self.stagger.borrow_mut().end_tick();
-        for sound in due {
-            self.play_now(sound);
+        for request in due {
+            self.play_now(request);
         }
     }
 
-    fn play_now(&self, sound: Sound) {
-        let Some(loaded) = self.loaded(sound) else {
+    fn play_now(&self, request: PlayRequest) {
+        let Some(loaded) = self.loaded(request.sound) else {
             return;
         };
         let mut rng = rand::rng();
-        let Some(variant) = loaded.variants.choose(&mut rng) else {
+        let variant = match request.note {
+            Some(note) if !loaded.notes.is_empty() => {
+                loaded.notes.get(note as usize).or(loaded.notes.last())
+            }
+            _ => loaded.variants.choose(&mut rng),
+        };
+        let Some(variant) = variant else {
             return;
         };
         let db = if loaded.volume_db > 0.0 {
@@ -347,11 +401,24 @@ impl Default for SoundHandler {
     }
 }
 
+impl SoundHandler {
+    fn request(&self, request: PlayRequest) {
+        if self.stagger.borrow_mut().request(request) {
+            self.play_now(request);
+        }
+    }
+}
+
 impl SoundPlayer for SoundHandler {
     fn play(&self, sound: Sound) {
-        if self.stagger.borrow_mut().request(sound) {
-            self.play_now(sound);
-        }
+        self.request(PlayRequest { sound, note: None });
+    }
+
+    fn play_note(&self, sound: Sound, note: u32) {
+        self.request(PlayRequest {
+            sound,
+            note: Some(note),
+        });
     }
 }
 
@@ -412,15 +479,42 @@ mod tests {
     fn run_stagger(stagger: &mut Stagger, requests: &[&[Sound]]) -> Vec<Vec<Sound>> {
         let mut out = Vec::new();
         for tick_requests in requests {
-            let mut played = stagger.end_tick();
+            let mut played: Vec<Sound> = stagger.end_tick().iter().map(|r| r.sound).collect();
             for sound in *tick_requests {
-                if stagger.request(*sound) {
+                if stagger.request(PlayRequest {
+                    sound: *sound,
+                    note: None,
+                }) {
                     played.push(*sound);
                 }
             }
             out.push(played);
         }
         out
+    }
+
+    #[test]
+    fn stagger_keeps_the_order_of_queued_notes() {
+        let mut stagger = Stagger::default();
+        let coin = |note| PlayRequest {
+            sound: Sound::CollectCoin,
+            note: Some(note),
+        };
+        assert!(stagger.request(coin(0)));
+        assert!(!stagger.request(coin(1)));
+        assert!(!stagger.request(coin(2)));
+        let mut notes = Vec::new();
+        for _ in 0..20 {
+            notes.extend(stagger.end_tick().iter().map(|r| r.note.unwrap()));
+        }
+        assert_eq!(notes, vec![1, 2]);
+    }
+
+    #[test]
+    fn streak_scale_rises_one_octave() {
+        assert!(STREAK_SCALE.windows(2).all(|w| w[0] < w[1]));
+        assert_eq!(STREAK_SCALE[0], 0.0);
+        assert_eq!(*STREAK_SCALE.last().unwrap(), 12.0);
     }
 
     #[test]
