@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::{fs, io};
 
@@ -30,8 +31,21 @@ pub struct AtlasRect {
     pub h: u32,
 }
 
+/// Drawn for a sprite that is not in the atlas.
+const MISSING_RECT: AtlasRect = AtlasRect {
+    x: 0,
+    y: 0,
+    w: 1,
+    h: 1,
+};
+
+/// Where each sprite frame is in `assets/atlas.png`, from `assets/atlas.json`.
+/// Frames are named `"<name> <n>.aseprite"` (or `"<name>.aseprite"` for frame 0).
 pub struct AtlasInfo {
-    mapper: HashMap<(String, i32), AtlasRect>,
+    /// Sprite name -> frame index -> rect.
+    sprites: HashMap<String, HashMap<i32, AtlasRect>>,
+    /// Missing sprites that were already reported, so they are logged only once.
+    reported_missing: RefCell<HashSet<(String, i32)>>,
 }
 
 impl AtlasInfo {
@@ -41,24 +55,16 @@ impl AtlasInfo {
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
             .unwrap();
 
-        let mut mapper = HashMap::new();
+        let mut sprites: HashMap<String, HashMap<i32, AtlasRect>> = HashMap::new();
 
         for frame in file_content.frames {
             let without_ext = frame.file_name.strip_suffix(".aseprite").unwrap();
 
-            let (name, number) = if without_ext.contains(" ") {
-                without_ext.rsplit_once(' ').unwrap()
-            } else {
-                (without_ext, "0")
-            };
+            let (name, number) = without_ext.rsplit_once(' ').unwrap_or((without_ext, "0"));
+            let index = number.parse::<i32>().unwrap();
 
-            // println!("without_ext: {}", without_ext);
-            // let (name, number) = without_ext.rsplit_once(' ').unwrap();
-            // println!("name: {}, number: {}", name, number);
-
-            let index = number.parse::<i32>().ok().unwrap();
-            mapper.insert(
-                (name.to_string(), index),
+            sprites.entry(name.to_string()).or_default().insert(
+                index,
                 AtlasRect {
                     x: frame.frame.x as u32,
                     y: frame.frame.y as u32,
@@ -68,35 +74,36 @@ impl AtlasInfo {
             );
         }
 
-        AtlasInfo { mapper }
+        AtlasInfo {
+            sprites,
+            reported_missing: RefCell::new(HashSet::new()),
+        }
     }
 
     /// All sprite names with their frame indices, sorted.
-    pub fn sprites(&self) -> std::collections::BTreeMap<String, Vec<i32>> {
-        let mut sprites: std::collections::BTreeMap<String, Vec<i32>> = Default::default();
-        for (name, frame) in self.mapper.keys() {
-            sprites.entry(name.clone()).or_default().push(*frame);
-        }
-        for frames in sprites.values_mut() {
-            frames.sort();
-        }
-        sprites
+    pub fn sprites(&self) -> BTreeMap<String, Vec<i32>> {
+        self.sprites
+            .iter()
+            .map(|(name, frames)| {
+                let mut indices: Vec<i32> = frames.keys().copied().collect();
+                indices.sort();
+                (name.clone(), indices)
+            })
+            .collect()
     }
 
     pub fn get_rect(&self, sprite: &str, frame_i: i32) -> &AtlasRect {
-        let result = self.mapper.get(&(sprite.to_string(), frame_i));
-
-        if let Some(xy) = result {
-            xy
-        } else {
-            println!("Sprite not found {} {}", sprite, frame_i);
-            println!("Potential sprites {:?}", self.mapper.keys());
-            &AtlasRect {
-                x: 0,
-                y: 0,
-                w: 1,
-                h: 1,
-            }
+        if let Some(rect) = self.sprites.get(sprite).and_then(|f| f.get(&frame_i)) {
+            return rect;
         }
+        if self
+            .reported_missing
+            .borrow_mut()
+            .insert((sprite.to_string(), frame_i))
+        {
+            println!("Sprite not found {} {}", sprite, frame_i);
+            println!("Potential sprites {:?}", self.sprites().keys());
+        }
+        &MISSING_RECT
     }
 }

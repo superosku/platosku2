@@ -1,7 +1,6 @@
 use crate::camera::Camera;
-use crate::render::{Renderer, TextureIndexes, TextureInfo, Uniforms};
+use crate::render::{Renderer, UvRect};
 use crate::state::map_like::{GameMap, MapLike};
-use miniquad::{FilterMode, MipmapFilterMode, TextureWrap, UniformsSource};
 use std::collections::HashSet;
 
 struct MinimapLocation {
@@ -160,16 +159,10 @@ impl Minimap {
             self.previous_room_index = Some(current_room_index);
             let (pixels, texture_width, texture_height) =
                 self.construct_minimap_image(map, current_room_index);
-            self.update_minimap_texture_with_pixels(
-                renderer,
-                pixels,
-                texture_width,
-                texture_height,
-            );
+            renderer.set_minimap_image(&pixels, texture_width, texture_height);
         }
 
-        let minimap_info = renderer.textures.get(&TextureIndexes::Minimap).unwrap();
-        let current_size = renderer.ctx.texture_size(minimap_info.texture);
+        let current_size = renderer.minimap_image_size();
 
         self.update_minimap_size_and_location(
             map,
@@ -180,7 +173,7 @@ impl Minimap {
             current_size.1,
         );
 
-        self.draw_minimap(renderer, camera);
+        self.draw_minimap(renderer);
     }
 
     pub fn update_and_get_minimap_smooth_center(
@@ -269,81 +262,15 @@ impl Minimap {
         (pixels, tex_w_pad as u32, tex_h_pad as u32)
     }
 
-    pub fn update_minimap_texture_with_pixels(
-        &mut self,
-        renderer: &mut Renderer,
-        pixels: Vec<u8>,
-        texture_width: u32,
-        texture_height: u32,
-    ) {
-        // Update the texture
-        let minimap_info = renderer.textures.get(&TextureIndexes::Minimap).unwrap();
-        let current_size = renderer.ctx.texture_size(minimap_info.texture);
-
-        let need_new_texture = current_size.0 != texture_width || current_size.1 != texture_height;
-
-        if need_new_texture {
-            let new_tex = renderer.ctx.new_texture_from_rgba8(
-                texture_width as u16,
-                texture_height as u16,
-                &pixels,
-            );
-            renderer
-                .ctx
-                .texture_set_filter(new_tex, FilterMode::Nearest, MipmapFilterMode::None);
-            renderer
-                .ctx
-                .texture_set_wrap(new_tex, TextureWrap::Clamp, TextureWrap::Clamp);
-            renderer.textures.insert(
-                TextureIndexes::Minimap,
-                TextureInfo::new(texture_width as f32, texture_height as f32, new_tex),
-            );
-        } else {
-            renderer.ctx.texture_update(minimap_info.texture, &pixels);
-        }
-    }
-
-    pub fn draw_minimap(&mut self, renderer: &mut Renderer, camera: &Camera) {
-        let minimap_info = renderer.textures.get(&TextureIndexes::Minimap).unwrap();
-        let background = renderer
-            .textures
-            .get(&TextureIndexes::TileBackground)
-            .unwrap();
-
-        renderer.bindings.images[0] = minimap_info.texture;
-        renderer.bindings.images[1] = background.texture;
-        renderer.ctx.apply_bindings(&renderer.bindings);
-
+    pub fn draw_minimap(&self, renderer: &mut Renderer) {
         if let Some(location) = &self.location {
-            // TODO: These into a function. Make them non pub and two functions for getting the mvp depending on if game or hud.
-            let proj = Renderer::ortho_mvp(camera);
-            let model = Renderer::mat4_mul(
-                Renderer::mat4_translation(location.x, location.y),
-                Renderer::mat4_scale(location.size, location.size),
-            );
-            let mvp = Renderer::mat4_mul(proj, model);
-
-            // Where on the screen to draw the minimap
-            let world_base = [location.x, location.y, 0.0, 0.0];
-            let world_scale = [location.size, location.size, 0.0, 0.0];
-
-            let uniforms = Uniforms {
-                mvp,
-                color: [1.0, 1.0, 1.0, 1.0],
-                uv_base: location.uv_base,
-                uv_scale: location.uv_scale,
-                world_base,
-                world_scale,
-                color_key: [1.0, 0.0, 1.0, 0.01],
-                bg_tile_size: [64.0, 64.0, 0.0, 0.0],
-                bg_region_origin: [0.0, 0.0, 0.0, 0.0],
-                bg_tex_size: [background.w, background.h, 0.0, 0.0],
+            let uv = UvRect {
+                u0: location.uv_base[0],
+                v0: location.uv_base[1],
+                u1: location.uv_base[0] + location.uv_scale[0],
+                v1: location.uv_base[1] + location.uv_scale[1],
             };
-
-            renderer
-                .ctx
-                .apply_uniforms(UniformsSource::table(&uniforms));
-            renderer.ctx.draw(0, 6, 1);
+            renderer.draw_minimap_image(location.x, location.y, location.size, location.size, uv);
         }
     }
 }

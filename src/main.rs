@@ -170,7 +170,6 @@ impl EventHandler for Stage {
 
     fn resize_event(&mut self, width: f32, height: f32) {
         self.camera.on_resize(width, height);
-        self.renderer.resize(width, height);
     }
 
     fn key_down_event(&mut self, keycode: KeyCode, keymods: KeyMods, repeat: bool) {

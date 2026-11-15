@@ -1,7 +1,6 @@
 use super::common::{BoundingBox, Dir, Health, Pos};
 use super::game_state::InputState;
 use super::map_like::MapLike;
-use crate::camera::Camera;
 use crate::physics::{EPS, check_and_snap_hang, check_and_snap_platforms, integrate_kinematic};
 use crate::render::{Renderer, TILE_SIZE};
 use crate::sound_handler::Sound;
@@ -114,7 +113,7 @@ impl Player {
         self.item = Some(item);
     }
 
-    pub fn draw(&self, renderer: &mut Renderer, camera: &Camera) {
+    pub fn draw(&self, renderer: &mut Renderer) {
         let px = self.bb.x;
         let py = self.bb.y;
         let pw = self.bb.w;
@@ -153,7 +152,6 @@ impl Player {
         // Draw the sword as the last step
         if let Some(swing_info) = self.get_swing_info() {
             renderer.draw_rect_rotated(
-                camera,
                 swing_info.pivot.x - 0.05,
                 swing_info.pivot.y - 0.15,
                 0.1,
@@ -165,7 +163,6 @@ impl Player {
             );
 
             renderer.draw_rect(
-                camera,
                 swing_info.end.x - 0.05,
                 swing_info.end.y - 0.05,
                 0.1,
